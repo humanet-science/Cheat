@@ -22,7 +22,7 @@ def reset_game():
     global game, bot, clients
     game = CheatGame(num_players=2)
     bot = RandomBot()
-    clients = []
+    #clients = []
 
 def make_state(player_id):
     return {
@@ -45,49 +45,41 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.send_json({"type": "state", "state": make_state(player_id)})
     clients.append(ws)
 
-    player_id = len(clients) - 1  # simple assignment for demo
-
     try:
         while True:
+
             data = await ws.receive_json()
-            print(data['type'], player_id)
-            if data["type"] == "play":
+            print(data, game.turn)
+            if data["type"] == "new_game":
+                print("Starting a new game")
+                reset_game()
+                for i, client in enumerate(clients):
+                    await client.send_json({
+                        "type": "state",
+                        "state": make_state(i)
+                    })
+            elif data["type"] == "play":
                 declared_rank = data["declared_rank"]
                 cards = data["cards"]
-                game.play_turn(player_id, declared_rank, cards)
+                game.play_turn(game.turn, declared_rank, cards)
                 game.next_player()
 
             elif data["type"] == "call":
-                result = game.call_bluff(player_id)
-                # Check who picks up the pile to determine who goes next
-                if f"Player {player_id} picks up" in result:
-                    # Player who called bluff was wrong - other player goes again
-                    # Don't change turn
-                    pass
-                else:
-                    # Bluff was successful - caller goes next
-                    game.turn = player_id
-                print(result)
+                result = game.call_bluff(game.turn)
+                print(f'Result of call: {result}')
                 await broadcast({"type": "result", "result": result})
 
-            winner = game.game_over()
-            if winner is not None:
-                await broadcast({"type": "game_over", "winner": winner})
-                break
+                # Check who picks up the pile to determine who goes next
+                if f"Player {game.turn} picks up" in result:
+                    # Caller was wrong: misses a turn
+                    await check_for_fours()
+                    game.next_player()
+                else:
+                    # Bluff was successful - caller goes next
+                    await check_for_fours()
+                    print(f"successful call by player {game.turn}. Game turn is {game.turn}")
 
-            # Let the bot move if it’s their turn
-            if game.turn == 1:  # assume player 0 = human, 1 = bot
-                await asyncio.sleep(1)
-                action = bot.choose_action(game, 1)
-                print(action)
-                if action[0] == "play":
-                    _, rank, cards = action
-                    game.play_turn(1, rank, cards)
-                elif action[0] == "call":
-                    game.call_bluff(1)
-                player_id = game.next_player()
-
-                # Send personalized state to each client
+                # Send updated state to all clients after bluff
                 for i, client in enumerate(clients):
                     try:
                         await client.send_json({
@@ -96,6 +88,13 @@ async def websocket_endpoint(ws: WebSocket):
                         })
                     except Exception as e:
                         print(f"Error sending to client {i}: {e}")
+
+            winner = game.game_over()
+            if winner is not None:
+                await broadcast({"type": "game_over", "winner": winner})
+                continue
+            await process_bot_turn()
+
     except WebSocketDisconnect:
         print(f"Client {player_id} disconnected")
     except Exception as e:
@@ -110,6 +109,57 @@ async def websocket_endpoint(ws: WebSocket):
 async def broadcast(message):
     for c in clients:
         await c.send_json(message)
+
+async def check_for_fours():
+
+    # Check if four of a kind can be discarded
+    msg = game.four_of_a_kind_check(game.turn)
+    print("Checking for four of a kind", msg)
+    if msg:
+        await broadcast({"type": "result", "result": msg})
+        # Send updated state to all clients
+        for i, client in enumerate(clients):
+            await client.send_json({"type": "state_update", "state": make_state(i)})
+        await asyncio.sleep(1.5)
+
+async def process_bot_turn():
+
+    # Let the bot move if it’s their turn
+    if game.turn == 1:  # assume player 0 = human, 1 = bot
+        await asyncio.sleep(1)
+        await check_for_fours()
+        action = bot.choose_action(game, game.turn)
+        print(f"Bot (player {game.turn}) is playing", action)
+        if action[0] == "play":
+            _, rank, cards = action
+            game.play_turn(game.turn, rank, cards)
+            game.next_player()
+        elif action[0] == "call":
+            result = game.call_bluff(game.turn)
+            await broadcast({"type": "result", "result": result})
+            if f"Player {game.turn} picks up" in result:
+                # Caller was wrong: misses a turn
+                await check_for_fours()
+                game.turn = game.next_player()
+            else:
+                # Bluff was successful - caller's turn and a new round can start
+                print(f"Successful call by player {game.turn}. Game turn is {game.turn}")
+                game.current_rank = None
+                _, rank, cards = bot.start_play(game, game.turn)
+                print(f"Bot (player {game.turn}) is playing: ('play', {rank}, {cards})")
+                await check_for_fours()
+                game.play_turn(game.turn, rank, cards)
+                game.next_player()
+
+        # Send personalized state to each client
+        for i, client in enumerate(clients):
+            try:
+                await client.send_json({
+                    "type": "state_update",
+                    "state": make_state(i)
+                })
+            except Exception as e:
+                print(f"Error sending to client {i}: {e}")
 
 if __name__ == "__main__":
     import argparse

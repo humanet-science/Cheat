@@ -6,11 +6,7 @@ class RandomBot:
         self.p_call = p_call
         self.p_lie = p_lie
 
-    def choose_action(self, game, player_idx):
-        # Can call only if there is a last play
-        if random.random() < self.p_call and len(game.history) > 0:
-            return ("call",)
-
+    def start_play(self, game, player_idx):
         hand = list(game.players[player_idx])
 
         # If this is the first play of the trick, choose a declared rank (not Ace)
@@ -28,3 +24,10 @@ class RandomBot:
             # lie: play random cards (still must declare current rank)
             chosen = random.sample(hand, random.randint(1, min(3, len(hand))))
             return ("play", declared_rank, chosen)
+
+    def choose_action(self, game, player_idx):
+        # Can call only if there is a last play
+        if random.random() < self.p_call and len(game.history) > 0 and game.current_rank is not None:
+            return ("call",)
+        else:
+            return self.start_play(game, player_idx)

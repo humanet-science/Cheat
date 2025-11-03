@@ -3,6 +3,8 @@ from collections import deque
 
 RANKS = [str(n) for n in range(2, 11)] + ["J", "Q", "K", "A"]
 SUITS = ["♠", "♥", "♦", "♣"]
+# Sort by rank (define a helper rank value)
+RANK_ORDER = {"2":2, "3":3, "4":4, "5":5, "6":6, "7":7, "8":8, "9":9, "10":10, "J":11, "Q":12, "K":13, "A":14}
 
 class InvalidMove(Exception):
     pass
@@ -42,11 +44,16 @@ class CheatGame:
         self.deal_cards()
         self.history = []
 
+    def sort_hand(self, player_idx):
+        self.players[player_idx] = deque(sorted(self.players[player_idx], key=lambda c: RANK_ORDER[c.rank]))
+
     def deal_cards(self):
         while self.deck:
             for player in self.players:
                 if self.deck:
                     player.append(self.deck.pop())
+        for i in range(len(self.players)):
+            self.sort_hand(i)
 
     def next_player(self):
         self.turn = (self.turn + 1) % len(self.players)
@@ -54,10 +61,6 @@ class CheatGame:
 
     def play_turn(self, player_idx, declared_rank, cards_played):
         """Player plays some cards and declares a rank (possibly lying)."""
-
-        # validate declared rank not Ace
-        if declared_rank == "A":
-            raise InvalidMove("Aces cannot be declared.")
 
         # If new trick (pile empty) then this declared_rank becomes the round rank
         if len(self.pile) == 0:
@@ -77,6 +80,7 @@ class CheatGame:
         for c in cards_played:
             self.players[player_idx].remove(c)
         self.pile.extend([str_to_Card(c) for c in cards_played])
+        self.sort_hand(player_idx)
         self.history.append((player_idx, declared_rank, list(cards_played)))
 
     def call_bluff(self, caller_idx):
@@ -85,9 +89,11 @@ class CheatGame:
 
         if lying:
             self.players[last_player].extend(self.pile)
+            self.sort_hand(last_player)
             result = f"Player {last_player} lied! Picks up {len(self.pile)} cards."
         else:
             self.players[caller_idx].extend(self.pile)
+            self.sort_hand(caller_idx)
             result = f"Player {last_player} told the truth! Player {caller_idx} picks up {len(self.pile)} cards."
 
         self.pile.clear()
@@ -97,11 +103,16 @@ class CheatGame:
     def four_of_a_kind_check(self, player_idx):
         """Allow a player to discard 4 of a kind."""
         ranks = [str_to_Card(c).rank for c in self.players[player_idx]]
+        discarded_ranks = []
         for r in set(ranks):
+            if r == 'A':
+                continue # Aces cannot be discarded
             if ranks.count(r) == 4:
                 # discard them
+                discarded_ranks.append(r)
                 self.players[player_idx] = deque(c for c in self.players[player_idx] if str_to_Card(c).rank != r)
-                return f"Player {player_idx} discards 4 {r}s."
+        if discarded_ranks:
+            return f"Player {player_idx} discards {', '.join(discarded_ranks)}."
         return None
 
     def game_over(self):
