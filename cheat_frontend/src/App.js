@@ -3,7 +3,7 @@ import CheatGame from "./CheatGame";
 
 function App() {
   return (
-    <div className="min-h-screen bg-blue-950 ">
+    <div className="min-h-screen bg-green-950 ">
       <CheatGame />
     </div>
   );

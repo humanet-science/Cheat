@@ -4,6 +4,15 @@ from cheat.game import CheatGame
 from cheat.random_bot import RandomBot
 import asyncio
 import json
+import yaml
+
+import os
+from pathlib import Path
+
+# Path to configuration file, located in root
+game_config_path = Path(__file__).parent.parent / "config.yaml"
+with open(game_config_path, "r") as f:
+    game_config = yaml.safe_load(f)
 
 app = FastAPI()
 app.add_middleware(
@@ -19,10 +28,21 @@ bot = RandomBot()
 clients = []
 
 def reset_game():
-    global game, bot, clients
-    game = CheatGame(num_players=2)
-    bot = RandomBot()
-    #clients = []
+    global game, bots, clients
+    num_players = game_config['game']['num_players']
+    game = CheatGame(num_players=num_players)
+
+    # Create bots based on config (currently only one human player, rest are bots)
+    bots = []
+    for bot_config in game_config['bots']:
+        if bot_config['type'] == "RandomBot":
+            bots.append(RandomBot(
+                p_call=bot_config.get('p_call', 0.3),
+                p_lie=bot_config.get('p_lie', 0.3)
+            ))
+
+# Initialize on startup
+reset_game()
 
 def make_state(player_id):
     return {
@@ -39,7 +59,7 @@ async def websocket_endpoint(ws: WebSocket):
 
     await ws.accept()
 
-    # Assign player_id - only allow as many clients as there are players
+    # Assign player_id - only allow one human player
     player_id = len(clients)
 
     await ws.send_json({"type": "state", "state": make_state(player_id)})
@@ -124,12 +144,16 @@ async def check_for_fours():
 
 async def process_bot_turn():
 
-    # Let the bot move if it’s their turn
-    if game.turn == 1:  # assume player 0 = human, 1 = bot
+    # Let the bots play
+    while game.turn > 0 and game.turn < len(game.players):
         await asyncio.sleep(1)
         await check_for_fours()
+
+        bot_id = game.turn
+        bot = bots[bot_id - 1]
+
         action = bot.choose_action(game, game.turn)
-        print(f"Bot (player {game.turn}) is playing", action)
+        print(f"Bot (id {bot_id}, game turn {game.turn}) is playing", action)
         if action[0] == "play":
             _, rank, cards = action
             game.play_turn(game.turn, rank, cards)
@@ -143,10 +167,10 @@ async def process_bot_turn():
                 game.turn = game.next_player()
             else:
                 # Bluff was successful - caller's turn and a new round can start
-                print(f"Successful call by player {game.turn}. Game turn is {game.turn}")
+                print(f"Successful call by bot {bot_id}. Game turn is {game.turn}")
                 game.current_rank = None
                 _, rank, cards = bot.start_play(game, game.turn)
-                print(f"Bot (player {game.turn}) is playing: ('play', {rank}, {cards})")
+                print(f"Bot (player {bot_id}) is playing: ('play', {rank}, {cards})")
                 await check_for_fours()
                 game.play_turn(game.turn, rank, cards)
                 game.next_player()

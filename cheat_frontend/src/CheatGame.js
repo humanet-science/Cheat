@@ -227,10 +227,15 @@ export default function CheatGame() {
     return (
 
     <div className="min-h-screen text-white flex flex-col p-6">
-      {/* Game over */}
+
+        {/* Game over */}
         {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-3xl font-bold z-50">
-            <div className="mb-6">{`🎉 Player ${winner} wins! 🎉`}</div>
+            <div className="mb-6">
+              {winner === state.yourId
+                ? "🎉 You win! 🎉"
+                : `🎉 Player ${winner} wins! 🎉`}
+            </div>
             <button
               onClick={() => {
                 ws.send(JSON.stringify({ type: "new_game" }));
@@ -248,117 +253,146 @@ export default function CheatGame() {
           </div>
         )}
 
-      {/* Message Banner */}
-        {message && !gameOver && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-blue-950 px-6 py-3 rounded-lg font-bold text-lg shadow-lg z-50">
+        {/* Message Banner */}
+            {message && !gameOver && (
+            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-blue-950 px-6 py-3 rounded-lg font-bold text-lg shadow-lg z-50">
             {message}
-          </div>
+            </div>
         )}
 
-      {/* Opponents Section */}
-      <div className="flex justify-center gap-4 mb-8">
-        {opponents.map((opp) => (
-          <div
-            key={opp.id}
-            className={`bg-blue-800 rounded-lg p-4 min-w-[120px] border-2 ${
-              state.currentPlayer === opp.id
-                ? "border-yellow-400"
-                : "border-blue-600"
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-sm opacity-75">Player {opp.id}</div>
-              <div className="text-3xl font-bold mt-1">{opp.cardCount}</div>
-              <div className="text-xs opacity-75 mt-1">cards</div>
-            </div>
-          </div>
-        ))}
-      </div>
+        {/* Center Pile Section with Opponents */}
+        <div className="flex-1 flex items-center justify-center relative">
+          {/* Opponents arranged in semi-circle around pile */}
+          {opponents.map((opp, index) => {
+            const totalOpponents = opponents.length;
+            // Calculate angle for each opponent (spread across top semi-circle)
+            const angle = 90 + (360 / (totalOpponents + 1)) * (index + 1);
+            const angleRad = (angle * Math.PI) / 180;
+            const radius = 300; // Distance from pile center
 
-      {/* Center Pile Section */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="bg-blue-800 rounded-xl p-8 border-4 border-blue-600 min-w-[300px]">
-          <div className="text-center">
-            <div className="text-lg opacity-75 mb-2">Pile</div>
-            <div className="text-6xl font-bold mb-4">{state.pile_size}</div>
-            <div className="text-sm opacity-75 mb-1">Declared rank:</div>
-            <div className="text-3xl font-bold text-yellow-400">
-              {state.currentRank || "—"}
-            </div>
-          </div>
+            // Calculate position from center (pile position)
+            const x = Math.cos(angleRad) * radius;
+            const y = Math.sin(angleRad) * radius;
 
-          {/* Call Bluff Button - shown on your turn if opponent just played and you haven't acted */}
-          {isMyTurn && state.pile_size > 0 && state.currentRank && !hasActed && (
-            <div className="mt-6">
-              <button
-                onClick={callBluff}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
-              >
-                Call Bluff!
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* My Hand Section */}
-      <div className="bg-blue-800 rounded-xl p-6 border-2 border-blue-600">
-        <div className="text-center mb-4">
-          <div className="text-lg font-semibold">
-            {isMyTurn && (
-              <span className="ml-3 text-yellow-400">Your Turn</span>
-            )}
-          </div>
-        </div>
-
-        {/* Cards */}
-        <div className="flex justify-center flex-wrap gap-3 mb-4">
-          {state.yourHand.map((card, index) => {
-            const { rank, suit, isRed } = parseCard(card);
             return (
-              <button
-                key={`${card}-${index}`}
-                onClick={() => toggleCard(card)}
-                disabled={!isMyTurn || hasActed || (selectedCards.length >= 3 && !selectedCards.includes(card))}
-                className={`relative w-16 h-24 rounded-lg border-2 transition-all font-bold ${
-                  selectedCards.includes(card)
-                    ? "bg-yellow-400 border-yellow-500 transform -translate-y-3 shadow-xl"
-                    : "bg-white border-gray-400 shadow-md"
-                } ${
-                  isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card))
-                    ? "hover:shadow-lg hover:-translate-y-1 cursor-pointer"
-                    : "opacity-50 cursor-not-allowed"
+              <div
+                key={opp.id}
+                style={{
+                  position: 'absolute',
+                  left: `calc(50% + ${x}px)`,
+                  top: `calc(50% + ${y}px)`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+                className={`bg-gray-500 rounded-full p-4 w-24 h-24 border-2 ${
+                  state.currentPlayer === opp.id
+                    ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]"
+                    : "border-green-600"
                 }`}
               >
-                {/* Top-left corner */}
-                <div className={`absolute top-1 left-1.5 text-sm leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                  <div>{rank}</div>
-                  <div className="text-base">{suit}</div>
+                <div className="text-center flex flex-col items-center justify-center h-full">
+                  <div className="text-xs opacity-75">Player {opp.id}</div>
+                  <div className="text-2xl font-bold">{opp.cardCount}</div>
+                  <div className="text-xs opacity-75">cards</div>
                 </div>
-
-                {/* Center suit */}
-                <div className={`absolute inset-0 flex items-center justify-center text-3xl ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                  {suit}
-                </div>
-
-                {/* Bottom-right corner (upside down) */}
-                <div className={`absolute bottom-1 right-1.5 text-sm leading-none transform rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                  <div>{rank}</div>
-                  <div className="text-base">{suit}</div>
-                </div>
-              </button>
+              </div>
             );
           })}
-        </div>
 
-        {/* Play Controls */}
+          {/* Pile in center */}
+          <div className="bg-green-800 rounded-xl p-8 border-4 border-green-600 min-w-[300px] relative z-10">
+            <div className="text-center">
+              <div className="text-lg opacity-75 mb-2">Pile</div>
+              <div className="text-6xl font-bold mb-4">{state.pile_size}</div>
+              <div className="text-sm opacity-75 mb-1">Declared rank:</div>
+              <div className="text-3xl font-bold text-yellow-400">
+                {state.currentRank || "—"}
+              </div>
+            </div>
+
+            {/* Call Bluff Button */}
+            {isMyTurn && state.pile_size > 0 && state.currentRank && !hasActed && (
+              <div className="mt-6">
+                <button
+                  onClick={callBluff}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                >
+                  Call Bluff!
+                </button>
+              </div>
+            )}
+          </div>
+
+            {/* My Hand Section */}
+        <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: '0',
+          transform: 'translateX(-50%)'
+        }}
+        className="z-10"
+      >
+        <div className="flex justify-center">
+          <div className="rounded-xl p-4">
+            <div className="text-center mb-3">
+              <div className="text-lg font-semibold">
+                {isMyTurn && (
+                  <span className="ml-3 text-yellow-400">Your Turn</span>
+                )}
+              </div>
+            </div>
+
+            {/* Cards */}
+            <div className="flex justify-center items-end mb-4" style={{ paddingLeft: '2rem', paddingRight: '2rem' }}>
+              {state.yourHand.map((card, index) => {
+                const { rank, suit, isRed } = parseCard(card);
+                return (
+                  <button
+                    key={`${card}-${index}`}
+                    onClick={() => toggleCard(card)}
+                    disabled={!isMyTurn || hasActed || (selectedCards.length >= 3 && !selectedCards.includes(card))}
+                    style={{ marginLeft: index === 0 ? '0' : '-1.5rem' }}
+                    className={`relative w-16 h-24 rounded-lg border-2 transition-all font-bold ${
+                      selectedCards.includes(card)
+                        ? "bg-yellow-400 border-yellow-500 transform -translate-y-4 shadow-xl z-10"
+                        : "bg-white border-gray-400 shadow-md hover:z-10"
+                    } ${
+                      isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card))
+                        ? "hover:shadow-lg hover:-translate-y-2 cursor-pointer"
+                        : !isMyTurn || hasActed
+                          ? "cursor-not-allowed"
+                          : "opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    {/* Top-left corner */}
+                    <div className={`absolute top-1 left-1.5 text-sm leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                      <div>{rank}</div>
+                      <div className="text-base">{suit}</div>
+                    </div>
+
+                    {/* Center suit */}
+                    <div className={`absolute inset-0 flex items-center justify-center text-3xl ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                      {suit}
+                    </div>
+
+                    {/* Bottom-right corner (upside down) */}
+                    <div className={`absolute bottom-1 right-1.5 text-sm leading-none transform rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                      <div>{rank}</div>
+                      <div className="text-base">{suit}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+              {/* Play Controls */}
         {isMyTurn && !hasActed && (
           <div className="flex items-center justify-center gap-4">
             {/* Only show rank input for new rounds */}
             {isMyTurn && showRankInput && (
               <input
                 type="text"
-                placeholder="Rank (e.g., 7, J, A)"
+                placeholder="Rank (e.g. 7)"
                 value={declaredRank}
                 onChange={(e) => setDeclaredRank(e.target.value.toUpperCase())}
                 onKeyDown={(e) => {
@@ -390,14 +424,20 @@ export default function CheatGame() {
             </button>
           </div>
         )}
+          </div>
 
-        {/* Debug info */}
-        <div className="mt-4 text-center text-sm opacity-50">
+      </div>
+
+            {/* Debug info */}
+        <div className="text-center text-sm opacity-50">
           {selectedCards.length > 0 && (
             <span>Selected: {selectedCards.join(", ")}</span>
           )}
         </div>
-      </div>
+
+        </div>
+
+        </div>
     </div>
     );
     }
