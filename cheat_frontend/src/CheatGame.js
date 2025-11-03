@@ -19,6 +19,18 @@ export default function CheatGame() {
     const [gameOver, setGameOver] = useState(false);
     const [winner, setWinner] = useState(null);
 
+    // Add this helper function at the top of your component, after the state declarations
+    const parseCard = (cardStr) => {
+      // Extract rank and suit from string like "7♠" or "K♥"
+      const rank = cardStr.slice(0, -1);
+      const suit = cardStr.slice(-1);
+
+      // Determine color based on suit
+      const isRed = suit === '♥' || suit === '♦';
+
+      return { rank, suit, isRed };
+    };
+
     useEffect(() => {
 
         const socket = new WebSocket("ws://localhost:5050/ws");
@@ -293,33 +305,50 @@ export default function CheatGame() {
       <div className="bg-blue-800 rounded-xl p-6 border-2 border-blue-600">
         <div className="text-center mb-4">
           <div className="text-lg font-semibold">
-            Your Hand
             {isMyTurn && (
-              <span className="ml-3 text-yellow-400">(Your Turn)</span>
+              <span className="ml-3 text-yellow-400">Your Turn</span>
             )}
           </div>
         </div>
 
         {/* Cards */}
-        <div className="flex justify-center flex-wrap gap-2 mb-4">
-          {state.yourHand.map((card, index) => (
-            <button
-              key={`${card}-${index}`}
-              onClick={() => toggleCard(card)}
-              disabled={!isMyTurn}
-              className={`px-4 py-6 text-xl font-bold rounded-lg border-2 transition-all ${
-                selectedCards.includes(card)
-                  ? "bg-yellow-400 text-blue-950 border-yellow-500 transform -translate-y-2"
-                  : "bg-white text-blue-950 border-gray-300"
-              } ${
-                isMyTurn
-                  ? "hover:bg-yellow-200 cursor-pointer"
-                  : "opacity-50 cursor-not-allowed"
-              }`}
-            >
-              {card}
-            </button>
-          ))}
+        <div className="flex justify-center flex-wrap gap-3 mb-4">
+          {state.yourHand.map((card, index) => {
+            const { rank, suit, isRed } = parseCard(card);
+            return (
+              <button
+                key={`${card}-${index}`}
+                onClick={() => toggleCard(card)}
+                disabled={!isMyTurn || hasActed || (selectedCards.length >= 3 && !selectedCards.includes(card))}
+                className={`relative w-16 h-24 rounded-lg border-2 transition-all font-bold ${
+                  selectedCards.includes(card)
+                    ? "bg-yellow-400 border-yellow-500 transform -translate-y-3 shadow-xl"
+                    : "bg-white border-gray-400 shadow-md"
+                } ${
+                  isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card))
+                    ? "hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
+              >
+                {/* Top-left corner */}
+                <div className={`absolute top-1 left-1.5 text-sm leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                  <div>{rank}</div>
+                  <div className="text-base">{suit}</div>
+                </div>
+
+                {/* Center suit */}
+                <div className={`absolute inset-0 flex items-center justify-center text-3xl ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                  {suit}
+                </div>
+
+                {/* Bottom-right corner (upside down) */}
+                <div className={`absolute bottom-1 right-1.5 text-sm leading-none transform rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                  <div>{rank}</div>
+                  <div className="text-base">{suit}</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Play Controls */}
