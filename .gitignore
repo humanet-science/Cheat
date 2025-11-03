@@ -1,0 +1,4 @@
+.DS_Store
+.Cheat_venv
+.venv
+node_modules/
