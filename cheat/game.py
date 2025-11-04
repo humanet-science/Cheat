@@ -35,6 +35,7 @@ def str_to_Card(object):
 
 class CheatGame:
     def __init__(self, num_players=4):
+        self.num_players=num_players
         self.deck = [Card(r, s) for r in RANKS for s in SUITS]
         random.shuffle(self.deck)
         self.players = [deque() for _ in range(num_players)]
@@ -81,7 +82,7 @@ class CheatGame:
             self.players[player_idx].remove(c)
         self.pile.extend([str_to_Card(c) for c in cards_played])
         self.sort_hand(player_idx)
-        self.history.append((player_idx, declared_rank, list(cards_played)))
+        self.history.append((player_idx, declared_rank, [str_to_Card(c) for c in cards_played]))
 
     def call_bluff(self, caller_idx):
         last_player, declared_rank, cards_played = self.history[-1]
