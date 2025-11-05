@@ -325,8 +325,9 @@ export default function CheatGame() {
 	return (
 
 	<div className="min-h-screen text-white flex flex-col p-6">
-
-			{/* Game over */}
+			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
+				<div className="text-white opacity-5 text-9xl satisfy-regular">Cheat!</div>
+			</div>			{/* Game over */}
 			{gameOver && (
 				<div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-3xl font-bold z-50">
 					<div className="mb-6">
@@ -455,7 +456,7 @@ export default function CheatGame() {
 
 					{/* Call Bluff Button */}
 					{isMyTurn && state.pile_size > 0 && state.currentRank && !hasActed && (
-						<div className="absolute top-full mt-4 left-1/2" style={{ transform: 'translateX(-50%)' }}>
+						<div className="absolute top-full mt-4 left-1/2 pop-in" style={{ transform: 'translateX(-50%)' }}>
 							<button
 								onClick={callBluff}
 								className="w-full drop-shadow-[0_0px_15px_rgba(0,0,0,1)] bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6
@@ -557,7 +558,7 @@ export default function CheatGame() {
 											className={`relative w-16 h-24 rounded-lg border-2 transition-all font-bold ${
 												selectedCards.includes(card)
 													? "bg-yellow-400 border-yellow-500 transform -translate-y-4 shadow-xl z-10"
-													: "bg-white border-gray-400 shadow-md hover:z-10"
+													: "bg-white border-gray-400 shadow-md"
 											} ${
 												isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card))
 													? "hover:shadow-lg hover:-translate-y-2 cursor-pointer"
