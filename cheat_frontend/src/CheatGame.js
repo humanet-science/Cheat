@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback} from "react";
 import confetti from "canvas-confetti";
+import { soundManager } from './sounds';
 
 export default function CheatGame() {
 
@@ -7,7 +8,6 @@ export default function CheatGame() {
 	const [state, setState] = useState(null);
 	const [selectedCards, setSelectedCards] = useState([]);
 	const [declaredRank, setDeclaredRank] = useState("");
-	const [message, setMessage] = useState(""); // Collect messages
 	const [hasActed, setHasActed] = useState(false); // Track if player has acted
 	const prevStateRef = useRef(null);
 	const [showRankInput, setShowRankInput] = useState(false); // Whether the rank input box should be shown
@@ -124,6 +124,7 @@ export default function CheatGame() {
             }));
 
 			// Animate cards moving to pile
+			soundManager.play('cardPlay');
 			setAnimatingCards({
 				playerId: msg.player_id,
 				cardCount: msg.card_count,
@@ -156,6 +157,11 @@ export default function CheatGame() {
 			setIsMyTurn(Boolean(msg?.player_id && msg?.yourId && msg.player_id === msg.yourId));
 
 			// Show revealed cards
+			if (msg.was_lying) {
+			    soundManager.play('bluffFail');
+			} else {
+			    soundManager.play('bluffSuccess');
+			}
 			setRevealedCards({
 				cards: msg.actual_cards,
 				wasLying: msg.was_lying,
@@ -190,6 +196,7 @@ export default function CheatGame() {
                 const y = Math.sin(angleRad) * radius;
 
                 // Show animation
+                soundManager.play('discard');
                 setDiscardAnimation({
                   playerId,
                   ranks,
@@ -212,8 +219,8 @@ export default function CheatGame() {
 
              setWinner(msg.winner);
              setGameOver(true);
-             setMessage(`Game Over! Player ${msg.winner} wins!`);
 
+             soundManager.play('win');
              // 🎉 Trigger confetti burst
              confetti({
                     particleCount: 200,
@@ -347,6 +354,23 @@ export default function CheatGame() {
 		}
 	}, [state?.hands, state?.yourId]); // React to changes in both
 
+    // Load sounds
+    useEffect(() => {
+      soundManager.loadSound('cardPlay', '/sounds/card_play.mp3', 0.3);
+      soundManager.loadSound('bluffSuccess', '/sounds/success.mp3');
+      soundManager.loadSound('bluffFail', '/sounds/busted.mp3');
+      soundManager.loadSound('callBluff', '/sounds/pop_low.mp3');
+      soundManager.loadSound('discard', '/sounds/discard.wav');
+      soundManager.loadSound('win', '/sounds/win.wav');
+    }, []);
+
+    // Play sound when Call Bluff! button pops up
+    useEffect(() => {
+      if (isMyTurn && state?.pile_size > 0 && state?.currentRank && !hasActed) {
+        soundManager.play('callBluff');
+      }
+    }, [isMyTurn, state?.pile_size, state?.currentRank, hasActed]);
+
 	if (!state) {
         return (
             <div className="min-h-screen bg-blue-950 flex items-center justify-center text-white text-xl">
@@ -383,18 +407,17 @@ export default function CheatGame() {
 
         {/* Game over */}
         {gameOver && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white satisfy-regular text-5xl font-bold z-50">
-                <div className="mb-6">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-7xl font-bold z-50">
+                <div className="mb-6 satisfy-regular">
                     {winner === state.yourId
                         ? "🎉 You win! 🎉"
-                        : `🎉 Player ${winner} wins! 🎉`}
+                        : `Player ${winner} wins!`}
                 </div>
                 <button
                     onClick={() => {
                         ws.send(JSON.stringify({ type: "new_game" }));
                         setGameOver(false);
                         setWinner(null);
-                        setMessage("");
                         setSelectedCards([]);     // clear any lingering selections
                         setDeclaredRank("");      // reset the rank box
                         setHasActed(false);       // reset action flag
