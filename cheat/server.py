@@ -62,6 +62,9 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.send_json({"type": "state", "state": make_state(player_id)})
     clients.append(ws)
 
+    # Check if game is over
+    game_is_over = False
+
     try:
         while True:
 
@@ -72,16 +75,30 @@ async def websocket_endpoint(ws: WebSocket):
             if data["type"] == "new_game":
                 print("Starting a new game")
                 reset_game()
+                game_is_over = False  # Reset the flag
                 for i, client in enumerate(clients):
                     await client.send_json({
                         "type": "state",
                         "state": make_state(i)
                     })
+                continue
+
+            if game_is_over:
+                continue
 
             # Card has been played
             elif data["type"] == "play":
                 declared_rank = data["declared_rank"]
                 cards = data["cards"]
+
+                # Check for win
+                winner = game.check_winner(game.turn)
+                if winner is not None:
+                    await broadcast({"type": "game_over", "winner": winner})
+                    game_is_over = True
+                    continue
+
+                # No winner -- continue game
                 game.play_turn(game.turn, declared_rank, cards)
 
                 # Broadcast the play
@@ -109,6 +126,7 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Get the last play before calling bluff
                 last_player, declared_rank, cards_played = game.history[-1]
+                caller_id = game.turn
 
                 # Result of the call
                 result = game.call_bluff(game.turn)
@@ -117,19 +135,17 @@ async def websocket_endpoint(ws: WebSocket):
                 # Check who picks up the pile to determine who goes next
                 if f"Player {game.turn} picks up" in result:
                     # Caller was wrong: misses a turn
-                    await check_for_fours()
                     game.next_player()
                     was_lying = False
                 else:
-                    # Bluff was successful - caller goes next
-                    await check_for_fours()
+                    # Bluff was successful -- caller goes next
                     print(f"successful call by player {game.turn}. Game turn is {game.turn}")
                     was_lying = True
 
                 # Broadcast bluff result with revealed cards
                 await broadcast({
                     "type": "bluff_called",
-                    "caller_id": game.turn,
+                    "caller_id": caller_id,
                     "accused_id": last_player,
                     "declared_rank": declared_rank,
                     "actual_cards": [str(c) for c in cards_played],  # The actual cards that were played
@@ -137,6 +153,12 @@ async def websocket_endpoint(ws: WebSocket):
                     "result": result,
                     "yourId": player_id,
                 })
+
+                # Whoever picked up cards does a four-of-a-kind check
+                if was_lying:
+                    await check_for_fours(last_player)
+                else:
+                    await check_for_fours(player_id)
 
                 # Send updated state to all clients after bluff
                 for i, client in enumerate(clients):
@@ -148,14 +170,8 @@ async def websocket_endpoint(ws: WebSocket):
                     except Exception as e:
                         print(f"Error sending to client {i}: {e}")
 
-            # End of game
-            winner = game.game_over()
-            if winner is not None:
-                await broadcast({"type": "game_over", "winner": winner})
-                continue
-
             # Human turn is done - move to bots
-            await process_bot_turn()
+            game_is_over = await process_bot_turn()
 
     except WebSocketDisconnect:
         print(f"Client {player_id} disconnected")
@@ -172,13 +188,15 @@ async def broadcast(message):
     for c in clients:
         await c.send_json(message)
 
-async def check_for_fours():
+async def check_for_fours(_player_id: int = None):
 
-    # Check if four of a kind can be discarded
-    msg = game.four_of_a_kind_check(game.turn)
-    print("Checking for four of a kind", msg)
+    # Check if four of a kind can be discarded: by default, this is the current player, but can also be the previous
+    # player.
+    _player_id = game.turn if _player_id is None else _player_id
+    msg = game.four_of_a_kind_check(_player_id)
+    print(f"Checking for four of a kind for player {_player_id}; result: {msg}.")
     if msg:
-        await broadcast({"type": "result", "result": msg})
+        await broadcast({"type": "discard", "result": msg})
         # Send updated state to all clients
         for i, client in enumerate(clients):
             await client.send_json({"type": "state_update", "state": make_state(i)})
@@ -199,6 +217,13 @@ async def process_bot_turn():
 
         # Bot playing
         if action[0] == "play":
+
+            # Check for win
+            winner = game.check_winner(game.turn)
+            if winner is not None:
+                await broadcast({"type": "game_over", "winner": winner})
+                return True
+
             _, declared_rank, cards = action
             game.play_turn(game.turn, declared_rank, cards)
 
@@ -227,7 +252,6 @@ async def process_bot_turn():
 
             if f"Player {game.turn} picks up" in result:
                 # Caller was wrong: misses a turn
-                await check_for_fours()
                 game.turn = game.next_player()
                 was_lying = False
             else:
@@ -248,6 +272,12 @@ async def process_bot_turn():
                 "result": result
             })
 
+            # Whoever picked up cards does a four-of-a-kind check
+            if was_lying:
+                await check_for_fours(last_player)
+            else:
+                await check_for_fours(bot_id)
+
             # Send state update after bluff
             for i, client in enumerate(clients):
                 try:
@@ -260,9 +290,15 @@ async def process_bot_turn():
 
             # The bluff was successful, they now play
             if was_lying:
+
+                # Check for win
+                winner = game.check_winner(game.turn)
+                if winner is not None:
+                    await broadcast({"type": "game_over", "winner": winner})
+                    continue
+
                 _, rank, cards = bot.start_play(game, game.turn)
                 print(f"Bot (player {bot_id}) is playing after successful call: ('play', {rank}, {cards})")
-                await check_for_fours()
                 game.play_turn(game.turn, rank, cards)
 
                 # Broadcast the bot's play
@@ -290,6 +326,8 @@ async def process_bot_turn():
             })
         except Exception as e:
             print(f"Error sending to client {i}: {e}")
+
+    return False
 
 if __name__ == "__main__":
     import argparse

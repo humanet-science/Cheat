@@ -40,10 +40,14 @@ class CheatGame:
         random.shuffle(self.deck)
         self.players = [deque() for _ in range(num_players)]
         self.pile = []  # cards currently on table
+        self.discarded_ranks = [] # ranks that are no longer in play
         self.turn = 0   # index of current player
         self.current_rank = None  # rank being declared
         self.deal_cards()
         self.history = []
+
+        self.game_over = False # Check if game is over: this can be set at any time by a player if they have won
+        self.winner = None
 
     def sort_hand(self, player_idx):
         self.players[player_idx] = deque(sorted(self.players[player_idx], key=lambda c: RANK_ORDER[c.rank]))
@@ -113,11 +117,15 @@ class CheatGame:
                 discarded_ranks.append(r)
                 self.players[player_idx] = deque(c for c in self.players[player_idx] if str_to_Card(c).rank != r)
         if discarded_ranks:
+            self.discarded_ranks.extend(discarded_ranks)
             return f"Player {player_idx} discards {', '.join(discarded_ranks)}."
         return None
 
-    def game_over(self):
-        for i, hand in enumerate(self.players):
-            if len(hand) == 0:
-                return i
+    def check_winner(self, player_idx):
+        # Declare a winner if all cards on hands can be truthfully discarded in play
+        hand = list(self.players[player_idx])
+        if len(hand) == 0  or (all([c.rank==hand[0].rank for c in hand]) and hand[0].rank != "A" and (self.current_rank is None or self.current_rank == hand[0].rank)):
+            self.game_over = True
+            self.winner = player_idx
+            return player_idx
         return None

@@ -1,5 +1,5 @@
 game:
-  num_players: 6
+  num_players: 5
 bots:
   - type: RandomBot
     p_call: 0.4
