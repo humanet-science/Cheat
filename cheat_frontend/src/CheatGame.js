@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback} from "react";
 import confetti from "canvas-confetti";
 import { soundManager } from './sounds';
+import WelcomePage from './WelcomePage';
 
 export default function CheatGame() {
+
+  const [hasJoined, setHasJoined] = useState(false);
 
 	const [ws, setWs] = useState(null);
 	const [state, setState] = useState(null);
@@ -35,15 +38,73 @@ export default function CheatGame() {
 	// Cards on the pile
 	const [pileCards, setPileCards] = useState([]);
 
-    // Number of cards played in last hand, so that we can highlight them when it's time to call a bluff
-    const [lastPlayedCount, setLastPlayedCount] = useState(0);
+	// Number of cards played in last hand, so that we can highlight them when it's time to call a bluff
+	const [lastPlayedCount, setLastPlayedCount] = useState(0);
 
-    // Discarded ranks
-    const [discards, setDiscards] = useState([]); // Track all discarded ranks
-    const [discardAnimation, setDiscardAnimation] = useState(null); // {playerId, rank}
+	// Discarded ranks
+	const [discards, setDiscards] = useState([]); // Track all discarded ranks
+	const [discardAnimation, setDiscardAnimation] = useState(null); // {playerId, rank}
+
+	// Player colours
+	const gradients = [
+		'bg-gradient-to-br from-blue-500 to-purple-600',
+		'bg-gradient-to-br from-red-500 to-pink-600',
+		'bg-gradient-to-br from-green-500 to-teal-600',
+		'bg-gradient-to-br from-yellow-500 to-orange-600',
+		'bg-gradient-to-br from-purple-500 to-indigo-600'
+	];
+
+	const getPlayerColor = (playerId) => {
+		return gradients[playerId % gradients.length];
+	};
+
+	const handleJoinGame = (playerName, avatar) => {
+
+		console.log("handleJoinGame called with:", playerName, avatar)
+
+		const socket = new WebSocket("ws://localhost:5050/ws");
+		console.log("WebSocket created, connecting...");
+		socket.onopen = () => {
+			console.log("WebSocket connected");
+
+			// Send player info immediately after connection
+			socket.send(JSON.stringify({
+				type: "player_join",
+				name: playerName,
+				avatar: avatar
+			}));
+		};
+
+		socket.onmessage = (event) => {
+			const msg = JSON.parse(event.data);
+			console.log("Received message:", msg);
+
+			if (msg.type === 'new_game') {
+				const { type, ...currentState } = msg;
+				setState(currentState);
+				setHasJoined(true);
+				if (msg.current_player === msg.your_id) {
+					setHasActed(false);
+				}
+				setIsMyTurn(msg.current_player === msg.your_id);
+			}
+
+			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over"].includes(msg.type)) {
+				setActionQueue((prev) => [...prev, msg]);
+			}
+
+		};
+
+		socket.onerror = (error) => {
+			console.error("WebSocket error:", error);
+		};
+
+		setWs(socket);
+	};
 
 	// Action queue: queued actions waiting while frontend animations play
 	const [actionQueue, setActionQueue] = useState([]);
+
 
 	// Helper function to visualise cards
 	const parseCard = (cardStr) => {
@@ -71,28 +132,31 @@ export default function CheatGame() {
 		// Get the first action
 		const msg = actionQueue[0];
 
-		if (msg.type === "state" || msg.type === "state_update") {
+		if (msg.type === "state") {
+
+				// Unpack
+				const { type, ...currentState } = msg;
 
 			  // Get the previous state
 				const prevState = prevStateRef.current;
 
 				// First, sync declaredRank with backend so that the declared rank always matches
-				// what people are currently playing. If this is NULL, it means a new round has started and a new
+				// whatf people are currently playing. If this is NULL, it means a new round has started and a new
 				// rank can be declared.
-				if (msg.state.currentRank !== null) {
-						setDeclaredRank(msg.state.currentRank);
-				} else if (prevState?.yourId === msg.state.currentPlayer) {
+				if (msg.current_rank !== null) {
+						setDeclaredRank(msg.current_rank);
+				} else if (prevState?.your_id === msg.current_player) {
 						setDeclaredRank("");
 				}
 
-				prevStateRef.current = msg.state;
-				setState(msg.state);
+				prevStateRef.current = currentState;
+				setState(currentState);
 
-				// Only reset hasActed when it becomes YOUR turn
-				if (msg.state.currentPlayer === msg.state.yourId) {
+				// Only reset hasActed when it becomes your turn
+				if (msg.current_player === msg.your_id) {
 					setHasActed(false);
 				}
-				setIsMyTurn(msg.state.currentPlayer === msg.state.yourId);
+				setIsMyTurn(msg.current_player === msg.your_id);
 
 				// Small delay to let state update
     		await new Promise(r => setTimeout(r, 100));
@@ -102,11 +166,11 @@ export default function CheatGame() {
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg?.player_id && msg?.yourId && msg.player_id === msg.yourId));
+			setIsMyTurn(Boolean(msg?.player_id && msg?.your_id && msg.player_id === msg.your_id));
 
 			// Calculate the start position of the animation
 			const totalPlayers = msg.num_players;
-			const angle = 90 + (360 / (totalPlayers)) * (msg.player_id);
+			const angle = 90 + (360 / (totalPlayers)) * (msg.current_player);
 			const angleRad = (angle * Math.PI) / 180;
 			const radius = 300;
 			const x = Math.cos(angleRad) * radius;
@@ -126,7 +190,7 @@ export default function CheatGame() {
 			// Animate cards moving to pile
 			soundManager.play('cardPlay');
 			setAnimatingCards({
-				playerId: msg.player_id,
+				playerId: msg.current_player,
 				cardCount: msg.card_count,
 				declaredRank: msg.declared_rank,
 				x,
@@ -154,7 +218,7 @@ export default function CheatGame() {
 
 		} else if (msg.type === "bluff_called") {
 
-			setIsMyTurn(Boolean(msg?.player_id && msg?.yourId && msg.player_id === msg.yourId));
+			setIsMyTurn(Boolean(msg?.current_player && msg?.your_id && msg.current_player === msg.your_id));
 
 			// Show revealed cards
 			if (msg.was_lying) {
@@ -166,8 +230,10 @@ export default function CheatGame() {
 				cards: msg.actual_cards,
 				wasLying: msg.was_lying,
 				declaredRank: msg.declared_rank,
-				caller: msg.caller_id,
-				accused: msg.accused_id
+				caller: msg.caller,
+				accused: msg.accused,
+				caller_name: msg.caller_name,
+				accused_name: msg.accused_name
 			});
 
 			// Clear after showing cards
@@ -180,53 +246,54 @@ export default function CheatGame() {
 		// Cards have been discarded: set a message
 		} else if (msg.type === "discard") {
 
-            // Parse: "Player 2 discards 7, K, A."
-            const match = msg.result.match(/Player (\d+) discards (.+)\./);
-            if (match) {
-                const playerId = parseInt(match[1]);
-                const ranksStr = match[2]; // "7, K, A"
-                const ranks = ranksStr.split(', '); // ["7", "K", "A"]
+			// Parse: "Player 2 discards 7, K, A."
+			const match = msg.result.match(/Player (\d+) discards (.+)\./);
+			if (match) {
+					const playerId = parseInt(match[1]);
+					const ranksStr = match[2]; // "7, K, A"
+					const ranks = ranksStr.split(', '); // ["7", "K", "A"]
 
-                // Calculate player position for animation
-                const totalPlayers = state.hands.length;
-                const angle = 90 + (360 / totalPlayers) * playerId;
-                const angleRad = (angle * Math.PI) / 180;
-                const radius = 300;
-                const x = Math.cos(angleRad) * radius;
-                const y = Math.sin(angleRad) * radius;
+					// Calculate player position for animation
+					const totalPlayers = state.num_players;
+					const angle = 90 + (360 / totalPlayers) * playerId;
+					const angleRad = (angle * Math.PI) / 180;
+					const radius = 300;
+					const x = Math.cos(angleRad) * radius;
+					const y = Math.sin(angleRad) * radius;
 
-                // Show animation
-                soundManager.play('discard');
-                setDiscardAnimation({
-                  playerId,
-                  ranks,
-                  x,
-                  y,
-                  message: playerId === state.yourId
-                    ? `You discard ${ranksStr}!`
-                    : `Discards ${ranksStr}!`
-                });
+					// Show animation
+					soundManager.play('discard');
+					setDiscardAnimation({
+						playerId,
+						ranks,
+						x,
+						y,
+						message: playerId === state.your_id
+							? `You discard ${ranksStr}!`
+							: `Discards ${ranksStr}!`
+					});
 
-                // Add all ranks to discard list
-                setDiscards(prev => [...prev, ...ranks]);
+					// Add all ranks to discard list
+					setDiscards(prev => [...prev, ...ranks]);
 
-                // Wait for animation
-                await new Promise(r => setTimeout(r, 1500));
-                setDiscardAnimation(null);
-            }
-        // Game is over
+					// Wait for animation
+					await new Promise(r => setTimeout(r, 1500));
+					setDiscardAnimation(null);
+			}
+
+		// Game is over
 		} else if (msg.type === "game_over") {
 
-             setWinner(msg.winner);
-             setGameOver(true);
+			setWinner(msg.winner);
+			setGameOver(true);
 
-             soundManager.play('win');
-             // 🎉 Trigger confetti burst
-             confetti({
-                    particleCount: 200,
-                    spread: 100,
-                    origin: { y: 0.6 },
-             });
+			soundManager.play('win');
+			// 🎉 Trigger confetti burst
+			confetti({
+						particleCount: 200,
+						spread: 100,
+						origin: { y: 0.6 },
+			});
 		}
 
 		// remove the processed action
@@ -240,36 +307,6 @@ export default function CheatGame() {
                 processActionQueue();
         }
     }, [actionQueue, animatingCards]);
-
-	useEffect(() => {
-
-		const socket = new WebSocket("ws://localhost:5050/ws");
-
-		socket.onmessage = async (event) => {
-
-			const msg = JSON.parse(event.data);
-			console.log("Received message:", msg);
-
-			// Add actions to action queue for card playing or bluffs being called.
-			// This way animations play in succession and game play is paused until the animations are done
-            if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over"].includes(msg.type)) {
-
-                setActionQueue((prev) => [...prev, msg]);
-
-            }
-		};
-
-		socket.onopen = () => {
-			console.log("WebSocket connected");
-		};
-
-		socket.onerror = (error) => {
-			console.error("WebSocket error:", error);
-		};
-
-		setWs(socket);
-		return () => socket.close();
-	}, []);
 
 	// Checks whether the rank needs to be declared; if not, the text box disappears.
 	// Also validates the rank, so that only valid ranks are sent to the backend.
@@ -297,17 +334,17 @@ export default function CheatGame() {
         }
 
         ws.send(
-        JSON.stringify({
-            type: "play",
-            declared_rank: declaredRank,
-            cards: selectedCards,
-        })
+					JSON.stringify({
+							type: "play",
+							declared_rank: declaredRank,
+							cards: selectedCards,
+					})
         );
 
         // Optimistically update your hand immediately
         setState(prevState => ({
             ...prevState,
-            yourHand: prevState.yourHand.filter(card => !selectedCards.includes(card))
+            your_hand: prevState.your_hand.filter(card => !selectedCards.includes(card))
         }));
 
         setSelectedCards([]);
@@ -331,9 +368,9 @@ export default function CheatGame() {
 	useEffect(() => {
 		if (!state) return;
 
+		const calculatedIsNewRound = !declaredRank; // Calculate locally because we need to use the updated value here
 		setIsNewRound(!declaredRank); // "" or null both mean new round
-
-		if (isMyTurn && isNewRound) {
+		if (isMyTurn && calculatedIsNewRound) {
 			setShowRankInput(true);
 		} else {
 			setShowRankInput(false);
@@ -342,17 +379,21 @@ export default function CheatGame() {
 
 	useEffect(() => {
 		if (!state) return;
-		if (state.hands && state.yourId !== undefined) {
-			const newOpponents = state.hands
-				.map((cardCount, index) => ({
-					id: index,
-					cardCount: cardCount,
-				}))
-				.filter((player) => player.id !== state.yourId);
+		if (state.players && state.your_id !== undefined) {
+			const newOpponents = state.players
+				.filter((player) => player.id !== state.your_id)
+				.map((player) => ({
+					id: player.id,
+					name: player.name,
+					avatar: player.avatar,
+					cardCount: player.cardCount,
+					type: player.type,
+					connected: player.connected
+				}));
 
 			setOpponents(newOpponents);
 		}
-	}, [state?.hands, state?.yourId]); // React to changes in both
+	}, [state?.players, state?.your_id]);
 
     // Load sounds
     useEffect(() => {
@@ -366,18 +407,10 @@ export default function CheatGame() {
 
     // Play sound when Call Bluff! button pops up
     useEffect(() => {
-      if (isMyTurn && state?.pile_size > 0 && state?.currentRank && !hasActed) {
+      if (isMyTurn && state?.pile_size > 0 && state?.current_rank && !hasActed) {
         soundManager.play('callBluff');
       }
-    }, [isMyTurn, state?.pile_size, state?.currentRank, hasActed]);
-
-	if (!state) {
-        return (
-            <div className="min-h-screen bg-blue-950 flex items-center justify-center text-white text-xl">
-                Loading game...
-            </div>
-        );
-	}
+    }, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
 	const toggleCard = (card) => {
 		setSelectedCards((sel) => {
@@ -395,6 +428,13 @@ export default function CheatGame() {
 		setHasActed(true);
 	};
 
+	if (!hasJoined) {
+    return <WelcomePage onJoinGame={handleJoinGame} />;
+  }
+
+  if (!state) {
+    return <div>Loading game...</div>;
+  }
 
 	return (
 
@@ -409,7 +449,7 @@ export default function CheatGame() {
         {gameOver && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-7xl font-bold z-50">
                 <div className="mb-6 satisfy-regular">
-                    {winner === state.yourId
+                    {winner === state.your_id
                         ? "🎉 You win! 🎉"
                         : `Player ${winner} wins!`}
                 </div>
@@ -458,34 +498,48 @@ export default function CheatGame() {
                             top: `calc(50% + ${y}px)`,
                             transform: 'translate(-50%, -50%)'
                         }}
-                        className={`bg-green-900 rounded-full p-4 w-24 h-24 border-2 ${
-                            state.currentPlayer === opp.id
+                        className={`rounded-full p-4 w-24 h-24 border-2 ${getPlayerColor(opp.id)} ${
+                            state.current_player === opp.id
                                 ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]"
                                 : ""
                         }`}
                     >
-                        <div className="text-center flex flex-col items-center justify-center h-full">
-                            <div className="text-m opacity-75">Player {opp.id}</div>
-                        </div>
+											<div className="text-center flex flex-col items-center justify-center h-full relative">
+												{/* Curved player name */}
+												<svg width="200" height="100" viewBox="0 0 200 80" className="absolute left-1/2 -top-12 transform -translate-x-1/2">
+													<defs>
+														{/* Move arc higher to accommodate larger text */}
+														<path id={`nameArc-${opp.id}`} d="M 40,60 A 25,20 0 1,1 160,60" fill="transparent"/>
+													</defs>
+													<text className="text-lg fill-white font-semibold">
+														<textPath href={`#nameArc-${opp.id}`} startOffset="50%" textAnchor="middle">
+															{opp.name.length > 15 ? `${opp.name.substring(0, 15)}...` : opp.name}
+														</textPath>
+													</text>
+												</svg>
+											{/* Avatar in center */}
+											<span className="text-5xl z-10 relative">{opp.avatar}</span>
+										</div>
+
                         {/* Card icons for each opponent */}
                         <div
                             key={`debug-card-${opp.id}0`}
-                            className="absolute drop-shadow-xl z-10 w-12 h-16 bg-blue-800 border-2 border-white rounded shadow-lg text-xs flex items-center justify-center"
-                            style={{transform: 'translate(-10%, -20%) rotate(-6deg)'}}
+                            className="absolute drop-shadow-xl z-10 w-12 h-16 bg-blue-800 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            style={{transform: 'translate(-10%, -2%) rotate(-6deg)'}}
                         ></div>
                         <div
                             key={`debug-card-${opp.id}1`}
-                            className="absolute drop-shadow-xl z-20 w-12 h-16 bg-blue-700 border-2 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            className="absolute drop-shadow-xl z-20 w-12 h-16 bg-blue-700 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
                             style={{
-                                transform: 'translate(10%, -20%) rotate(-3deg)',
+                                transform: 'translate(10%, -3%) rotate(-3deg)',
                             }}
                         ></div>
                         {/* Display number of cards on each hand */}
                         <div
                             key={`debug-card-${opp.id}2`}
-                            className="absolute drop-shadow-xl z-30 w-12 h-16 bg-blue-600 border-2 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            className="absolute drop-shadow-xl z-30 w-12 h-16 bg-blue-600 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
                             style={{
-                                transform: 'translate(30%, -20%)',
+                                transform: 'translate(30%, -4%)',
                             }}
                         >
                             <div className="text-center flex flex-col items-center justify-center h-full">
@@ -493,7 +547,6 @@ export default function CheatGame() {
                                 <div className="text-xs opacity-75">cards</div>
                             </div>
                         </div>
-
                     </div>
                 );
             })}
@@ -533,7 +586,7 @@ export default function CheatGame() {
                 </div>
 
                 {/* Call Bluff Button */}
-                {isMyTurn && state.pile_size > 0 && state.currentRank && !hasActed && (
+                {isMyTurn && state.pile_size > 0 && state.current_rank && !hasActed && (
                     <div className="absolute top-full mt-20 left-1/2 pop-in" style={{ transform: 'translateX(-50%)' }}>
                         <button
                             onClick={callBluff}
@@ -587,7 +640,7 @@ export default function CheatGame() {
                      {revealedCards.wasLying ? (
                         <>
                         <p className="mb-2">
-                          {revealedCards.accused === 0 ? "You" : `Player ${revealedCards.accused}`} declared:
+                          {revealedCards.accused === state.your_id ? "You" : `${revealedCards.accused_name}`} declared:
                           <span className="text-yellow-400 font-bold ml-2">{revealedCards.declaredRank}</span>
                         </p>
                         <p className="text-lg opacity-75">Actually played:</p>
@@ -595,7 +648,7 @@ export default function CheatGame() {
                      )
                      : (
                         <p className="mb-2">
-                          {revealedCards.caller === 0 ? "You pick" : `Player ${revealedCards.caller} picks`} up the pile.
+                          {revealedCards.caller === state.your_id ? "You pick" : `${revealedCards.caller_name } picks`} up the pile.
                         </p>
                      )}
                   </div>
@@ -681,7 +734,7 @@ export default function CheatGame() {
 
                         {/* Cards */}
                         <div className="flex justify-center items-end mb-4" style={{ paddingLeft: '2rem', paddingRight: '2rem' }}>
-                            {state.yourHand.map((card, index) => {
+                            {state.your_hand.map((card, index) => {
                                 const { rank, suit, isRed } = parseCard(card);
                                 return (
                                     <button
