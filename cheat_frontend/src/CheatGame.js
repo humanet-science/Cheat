@@ -45,6 +45,9 @@ export default function CheatGame() {
 	const [discards, setDiscards] = useState([]); // Track all discarded ranks
 	const [discardAnimation, setDiscardAnimation] = useState(null); // {playerId, rank}
 
+	// Player status messages
+	const [statusMessages, setStatusMessages] = useState([]);
+
 	// Player colours
 	const gradients = [
 		'bg-gradient-to-br from-blue-500 to-purple-600',
@@ -203,6 +206,18 @@ export default function CheatGame() {
 				text: `+${msg.card_count}`,
 				type: 'play'
 			});
+
+			// Add status message
+			const rankText = msg.declared_rank === "A" ? "Ace" :
+											 msg.declared_rank === "K" ? "King" :
+											 msg.declared_rank === "Q" ? "Queen" :
+											 msg.declared_rank === "J" ? "Jack" : msg.declared_rank;
+
+			const countText = msg.card_count === 1 ? "One" :
+												msg.card_count === 2 ? "Two" : "Three";
+
+			addStatusMessage(msg.current_player, `${countText} ${rankText}${msg.card_count > 1 ? 's' : ''}!`);
+
 
 			await new Promise(r => setTimeout(r, 1000)); // Wait for animation
     	    setAnimatingCards(null);
@@ -428,6 +443,49 @@ export default function CheatGame() {
 		setHasActed(true);
 	};
 
+	const StatusMessage = ({ playerId, message, position }) => {
+		return (
+			<div
+				className="absolute pointer-events-none z-30"
+				style={{
+					left: `${position.x}px`,
+					top: `${position.y}px`,
+					animation: 'floatUp 3s ease-out forwards'
+				}}
+			>
+				<div className="bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">
+					{message}
+				</div>
+			</div>
+		);
+	};
+
+	const addStatusMessage = (playerId, message) => {
+
+		const playerElement = document.getElementById(`player-${playerId}`);
+		if (playerElement) {
+			const rect = playerElement.getBoundingClientRect();
+			const position = {
+				x: rect.left + rect.width / 2,
+				y: rect.top
+			};
+
+			const newMessage = {
+				id: Math.random(),
+				playerId,
+				message,
+				position
+			};
+
+		setStatusMessages(prev => [...prev, newMessage]);
+
+		// Remove after animation
+		setTimeout(() => {
+			setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+		}, 3000);
+		}
+	};
+
 	if (!hasJoined) {
     return <WelcomePage onJoinGame={handleJoinGame} />;
   }
@@ -492,6 +550,7 @@ export default function CheatGame() {
                 return (
                     <div
                         key={opp.id}
+												id={`player-${opp.id}`}
                         style={{
                             position: 'absolute',
                             left: `calc(50% + ${x}px)`,
@@ -855,6 +914,16 @@ export default function CheatGame() {
             </div>
             </div>
         )}
+
+				{/* Status messages floating above players */}
+				{statusMessages.map(msg => (
+					<StatusMessage
+						key={msg.id}
+						playerId={msg.playerId}
+						message={msg.message}
+						position={msg.position}
+					/>
+				))}
 
         {/* Discard tracker - top left corner */}
         {discards.length > 0 && (

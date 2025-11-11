@@ -6,10 +6,12 @@ class RandomBot(Player):
 
     """ Random bot that inherits from the parent Player class"""
 
-    def __init__(self, id: int, name: str, avatar: str, p_call: float = 0.3, p_lie: float = 0.3):
+    def __init__(self, id: int, name: str, avatar: str, p_call: float = 0.3, p_lie: float = 0.3,
+                 verbosity: float = 0.3):
         super().__init__(id=id, name=name, avatar=avatar, type="bot")
         self.p_call = p_call
         self.p_lie = p_lie
+        self.verbosity = verbosity
 
     def make_move(self, game):
 
