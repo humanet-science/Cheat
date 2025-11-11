@@ -126,10 +126,10 @@ const WelcomePage = ({ onJoinGame }) => {
 													key={index}
 													type="button"
 													onClick={() => setSelectedAvatar(avatar)}
-													className={`text-4xl p-3 rounded-xl transition-all transform hover:scale-110 ${
+													className={`text-4xl p-3 rounded-xl transform-gpu transition-transform ${
 														selectedAvatar === avatar
 															? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-300'
-															: 'bg-gray-100 hover:bg-gray-200'
+															: 'bg-gray-100 hover:bg-gray-200 hover:scale-110'
 													}`}
 												>
 													{avatar}

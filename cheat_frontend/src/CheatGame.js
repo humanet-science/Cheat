@@ -47,6 +47,7 @@ export default function CheatGame() {
 
 	// Player status messages
 	const [statusMessages, setStatusMessages] = useState([]);
+    const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 
 	// Player colours
 	const gradients = [
@@ -92,7 +93,7 @@ export default function CheatGame() {
 				setIsMyTurn(msg.current_player === msg.your_id);
 			}
 
-			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over"].includes(msg.type)) {
+			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over", "message"].includes(msg.type)) {
 				setActionQueue((prev) => [...prev, msg]);
 			}
 
@@ -130,21 +131,32 @@ export default function CheatGame() {
 
 		if (processingRef.current || animatingCards) return;
 
-		processingRef.current = true;
-
 		// Get the first action
 		const msg = actionQueue[0];
 
+        // Pause play if the relevant player is currently speaking
+        if (["card_played", "bluff_called", "message"].includes(msg.type)){
+            if (msg && (msg.current_player || msg.player_id || msg.sender_id)) {
+                const playerId = msg.current_player || msg.player_id || msg.sender_id;
+                if (playerId && speakingPlayers.has(playerId)) {
+                    return;
+                }
+            }
+        }
+
+        // Currently processing an action
+        processingRef.current = true;
+
 		if (msg.type === "state") {
 
-				// Unpack
-				const { type, ...currentState } = msg;
+                // Unpack
+                const { type, ...currentState } = msg;
 
 			  // Get the previous state
 				const prevState = prevStateRef.current;
 
 				// First, sync declaredRank with backend so that the declared rank always matches
-				// whatf people are currently playing. If this is NULL, it means a new round has started and a new
+				// what people are currently playing. If this is NULL, it means a new round has started and a new
 				// rank can be declared.
 				if (msg.current_rank !== null) {
 						setDeclaredRank(msg.current_rank);
@@ -213,11 +225,8 @@ export default function CheatGame() {
 											 msg.declared_rank === "Q" ? "Queen" :
 											 msg.declared_rank === "J" ? "Jack" : msg.declared_rank;
 
-			const countText = msg.card_count === 1 ? "One" :
-												msg.card_count === 2 ? "Two" : "Three";
-
+			const countText = msg.card_count === 1 ? "One" : msg.card_count === 2 ? "Two" : "Three";
 			addStatusMessage(msg.current_player, `${countText} ${rankText}${msg.card_count > 1 ? 's' : ''}!`);
-
 
 			await new Promise(r => setTimeout(r, 1000)); // Wait for animation
     	    setAnimatingCards(null);
@@ -261,42 +270,52 @@ export default function CheatGame() {
 		// Cards have been discarded: set a message
 		} else if (msg.type === "discard") {
 
-			// Parse: "Player 2 discards 7, K, A."
-			const match = msg.result.match(/Player (\d+) discards (.+)\./);
-			if (match) {
-					const playerId = parseInt(match[1]);
-					const ranksStr = match[2]; // "7, K, A"
-					const ranks = ranksStr.split(', '); // ["7", "K", "A"]
+            // Parse: "Player 2 discards 7, K, A."
+            const match = msg.result.match(/Player (\d+) discards (.+)\./);
+            if (match) {
+                const playerId = parseInt(match[1]);
+                const ranksStr = match[2]; // "7, K, A"
+                const ranks = ranksStr.split(', '); // ["7", "K", "A"]
 
-					// Calculate player position for animation
-					const totalPlayers = state.num_players;
-					const angle = 90 + (360 / totalPlayers) * playerId;
-					const angleRad = (angle * Math.PI) / 180;
-					const radius = 300;
-					const x = Math.cos(angleRad) * radius;
-					const y = Math.sin(angleRad) * radius;
+                // Calculate player position for animation
+                const totalPlayers = state.num_players;
+                const angle = 90 + (360 / totalPlayers) * playerId;
+                const angleRad = (angle * Math.PI) / 180;
+                const radius = 300;
+                const x = Math.cos(angleRad) * radius;
+                const y = Math.sin(angleRad) * radius;
 
-					// Show animation
-					soundManager.play('discard');
-					setDiscardAnimation({
-						playerId,
-						ranks,
-						x,
-						y,
-						message: playerId === state.your_id
-							? `You discard ${ranksStr}!`
-							: `Discards ${ranksStr}!`
-					});
+                // Show animation
+                soundManager.play('discard');
 
-					// Add all ranks to discard list
-					setDiscards(prev => [...prev, ...ranks]);
+                // Add to status messages instead of separate discardAnimation
+                const message = playerId === state.your_id
+                    ? `You discard ${ranksStr}s`
+                    : `Discarding ${ranksStr}s`;
+                addStatusMessage(playerId, message, {x, y});
 
-					// Wait for animation
-					await new Promise(r => setTimeout(r, 1500));
-					setDiscardAnimation(null);
-			}
+                // Add all ranks to discard list
+                setDiscards(prev => [...prev, ...ranks]);
 
-		// Game is over
+                // Wait for animation
+                await new Promise(r => setTimeout(r, 1500));
+                setDiscardAnimation(null);
+            }
+
+        // Opinion status sent
+        } else if (msg.type === "message") {
+
+            // Calculate the start position of the animation
+            const totalPlayers = msg.num_players;
+            const angle = 90 + (360 / (totalPlayers)) * (msg.sender_id);
+            const angleRad = (angle * Math.PI) / 180;
+            const radius = 300;
+            const x = Math.cos(angleRad) * radius;
+            const y = Math.sin(angleRad) * radius;
+
+			addStatusMessage(msg.sender_id, msg.message, {x, y});
+
+        // Game is over
 		} else if (msg.type === "game_over") {
 
 			setWinner(msg.winner);
@@ -319,9 +338,9 @@ export default function CheatGame() {
 
 	useEffect(() => {
         if (actionQueue.length > 0 && !processingRef.current) {
-                processActionQueue();
+            processActionQueue();
         }
-    }, [actionQueue, animatingCards]);
+    }, [actionQueue, animatingCards, speakingPlayers]);
 
 	// Checks whether the rank needs to be declared; if not, the text box disappears.
 	// Also validates the rank, so that only valid ranks are sent to the backend.
@@ -427,6 +446,22 @@ export default function CheatGame() {
       }
     }, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
+    // Floating message bubbles
+    useEffect(() => {
+      statusMessages.forEach(msg => {
+        const element = document.getElementById(`status-${msg.id}`);
+        if (element && !element.dataset.animated) {
+          element.style.animation = 'floatUp_Bubble 3s ease-out forwards';
+          element.dataset.animated = 'true';
+
+          // Remove after animation
+          setTimeout(() => {
+            setStatusMessages(prev => prev.filter(m => m.id !== msg.id));
+          }, 3000);
+        }
+      });
+    }, [statusMessages]);
+
 	const toggleCard = (card) => {
 		setSelectedCards((sel) => {
 			const newSelection = sel.includes(card)
@@ -438,32 +473,16 @@ export default function CheatGame() {
 	};
 
 	const callBluff = () => {
-		console.log("Calling bluff");
 		ws.send(JSON.stringify({ type: "call" }));
 		setHasActed(true);
-	};
-
-	const StatusMessage = ({ playerId, message, position }) => {
-		return (
-			<div
-				className="absolute pointer-events-none z-30"
-				style={{
-					left: `${position.x}px`,
-					top: `${position.y}px`,
-					animation: 'floatUp 3s ease-out forwards'
-				}}
-			>
-				<div className="bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">
-					{message}
-				</div>
-			</div>
-		);
 	};
 
 	const addStatusMessage = (playerId, message) => {
 
 		const playerElement = document.getElementById(`player-${playerId}`);
 		if (playerElement) {
+            // Add player to speaking set
+            setSpeakingPlayers(prev => new Set(prev).add(playerId));
 			const rect = playerElement.getBoundingClientRect();
 			const position = {
 				x: rect.left + rect.width / 2,
@@ -481,7 +500,12 @@ export default function CheatGame() {
 
 		// Remove after animation
 		setTimeout(() => {
-			setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+            setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+            setSpeakingPlayers(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(playerId);
+              return newSet;
+            });
 		}, 3000);
 		}
 	};
@@ -507,9 +531,9 @@ export default function CheatGame() {
         {gameOver && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-7xl font-bold z-50">
                 <div className="mb-6 satisfy-regular">
-                    {winner === state.your_id
+                    {winner === state.your_name
                         ? "🎉 You win! 🎉"
-                        : `Player ${winner} wins!`}
+                        : `${winner} wins!`}
                 </div>
                 <button
                     onClick={() => {
@@ -531,6 +555,22 @@ export default function CheatGame() {
                 </button>
             </div>
         )}
+
+        {statusMessages.map(msg => (
+          <div
+            key={msg.id}
+            id={`status-${msg.id}`}
+            className="absolute pointer-events-none z-50 backdrop-blur bg-amber-50 bg-opacity-20 rounded-3xl p-3 drop-shadow-lg"
+            style={{
+              left: `${msg.position.x}px`,
+              top: `${msg.position.y}px`,
+            }}
+          >
+            <div className="text-white text-lg font-semibold whitespace-nowrap">
+              {msg.message}
+            </div>
+          </div>
+        ))}
 
         {/* Center Pile Section with Opponents */}
         <div className="flex-1 flex items-center justify-center relative">
@@ -612,37 +652,37 @@ export default function CheatGame() {
 
             {/* Pile in center */}
             <div className="fixed left-1/2 top-1/2 z-20" style={{ transform: "translate(-50%, -50%)"}}>
-                <div className="text-center">
-                    {declaredRank && !isNewRound && (
-                        <div className="p-4 w-28 h-28 drop-shadow-lg absolute" style={{ left: '-120px', top: '-120px' }}>
-                            <div className="text-lg opacity-75 z-50">Playing</div>
-                            <div className="text-6xl font-bold text-yellow-400">{declaredRank || "—"}</div>
-                        </div>)}
+                {/*<div className="text-center">*/}
+                {/*    {declaredRank && !isNewRound && (*/}
+                {/*        <div className="p-4 w-28 h-28 drop-shadow-lg absolute" style={{ left: '-120px', top: '-120px' }}>*/}
+                {/*            <div className="text-lg opacity-75 z-50">Playing</div>*/}
+                {/*            <div className="text-6xl font-bold text-yellow-400">{declaredRank || "—"}</div>*/}
+                {/*        </div>)}*/}
 
-                        <div className="absolute" style={{ left: '120px', top: '120px' }}>
-                            {pileCards.length > 0 && (
-                                    <>
-                                        <div className="text-lg opacity-75">Pile</div>
-                                        <div className="text-5xl font-bold opacity-75">{pileCards.length}</div>
-                                    </>
-                            )}
-                            {/* Pile animation popup */}
-                            {pileAnimation && (
-                                <div
-                                    className={`absolute z-40 pointer-events-none text-5xl font-bold`}
-                                    style={{
-                                        left: '40px',
-                                        top: '50px',
-                                        transform: 'translate(-20%, 50%)',
-                                        animation: 'popUp 1.5s ease-out',
-                                        textShadow: '0 0 10px rgba(0,0,0,1)'
-                                    }}
-                                >
-                                    {pileAnimation.text}
-                                </div>
-                            )}
-                        </div>
-                </div>
+                {/*        <div className="absolute" style={{ left: '120px', top: '120px' }}>*/}
+                {/*            {pileCards.length > 0 && (*/}
+                {/*                    <>*/}
+                {/*                        <div className="text-lg opacity-75">Pile</div>*/}
+                {/*                        <div className="text-5xl font-bold opacity-75">{pileCards.length}</div>*/}
+                {/*                    </>*/}
+                {/*            )}*/}
+                {/*            /!* Pile animation popup *!/*/}
+                {/*            {pileAnimation && (*/}
+                {/*                <div*/}
+                {/*                    className={`absolute z-40 pointer-events-none text-5xl font-bold`}*/}
+                {/*                    style={{*/}
+                {/*                        left: '40px',*/}
+                {/*                        top: '50px',*/}
+                {/*                        transform: 'translate(-20%, 50%)',*/}
+                {/*                        animation: 'popUp 1.5s ease-out',*/}
+                {/*                        textShadow: '0 0 10px rgba(0,0,0,1)'*/}
+                {/*                    }}*/}
+                {/*                >*/}
+                {/*                    {pileAnimation.text}*/}
+                {/*                </div>*/}
+                {/*            )}*/}
+                {/*        </div>*/}
+                {/*</div>*/}
 
                 {/* Call Bluff Button */}
                 {isMyTurn && state.pile_size > 0 && state.current_rank && !hasActed && (
@@ -899,31 +939,21 @@ export default function CheatGame() {
             </div>
         )}
 
-        {/* Discard animation - floating message from player */}
-        {discardAnimation && (
-            <div
-            className="absolute z-30 pointer-events-none"
-            style={{
-                left: `calc(50% + ${discardAnimation.x}px)`,
-                top: `calc(50% + ${discardAnimation.y}px)`,
-                animation: 'floatUp 4s ease-out',
-            }}
-            >
-            <div className="text-2xl font-bold text-grey-400 drop-shadow-lg">
-                {discardAnimation.message}
-            </div>
-            </div>
-        )}
-
-				{/* Status messages floating above players */}
-				{statusMessages.map(msg => (
-					<StatusMessage
-						key={msg.id}
-						playerId={msg.playerId}
-						message={msg.message}
-						position={msg.position}
-					/>
-				))}
+        {/*/!* Discard animation - floating message from player *!/*/}
+        {/*{discardAnimation && (*/}
+        {/*    <div*/}
+        {/*    className="absolute z-30 pointer-events-none"*/}
+        {/*    style={{*/}
+        {/*        left: `calc(50% + ${discardAnimation.x}px)`,*/}
+        {/*        top: `calc(50% + ${discardAnimation.y}px)`,*/}
+        {/*        animation: 'floatUp 4s ease-out',*/}
+        {/*    }}*/}
+        {/*    >*/}
+        {/*    <div className="text-2xl font-bold text-grey-400 drop-shadow-lg">*/}
+        {/*        {discardAnimation.message}*/}
+        {/*    </div>*/}
+        {/*    </div>*/}
+        {/*)}*/}
 
         {/* Discard tracker - top left corner */}
         {discards.length > 0 && (

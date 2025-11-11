@@ -241,3 +241,15 @@
     transform: translateY(0);
   }
 }
+
+@keyframes floatUp_Bubble {
+  0% {
+    transform: translate(-50%, -20%) scale(1);
+  }
+  5% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -120%) scale(1);
+  }
+}

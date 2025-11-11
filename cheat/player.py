@@ -40,6 +40,10 @@ class Player:
         # To be implemented by subclasses
         raise NotImplementedError
 
+    async def broadcast_message(self, game, *args, **kwargs):
+        # Base implementation: humans override with frontend, bots have their own internal message broadcasting
+        # mechanisms
+        return None
 
 class HumanPlayer(Player):
     def __init__(self, id: int, name: str, avatar: str, ws: WebSocket = None):

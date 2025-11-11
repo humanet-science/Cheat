@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket,WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 
-from cheat.game import CheatGame
+from cheat.game import CheatGame, GameAction
 from cheat.bots import RandomBot
 from cheat.player import Player
 
@@ -92,6 +92,7 @@ def get_player_state(player) -> dict:
         "your_id": player.id,
         "your_hand": [str(card) for card in player.hand],
         "your_type": player.type,
+        "your_name": player.name
     }
 
 async def send_message(player, message):
@@ -140,8 +141,29 @@ async def check_for_fours(player: Player = None):
         await broadcast_to_all({"type": "discard", "result": msg, **get_game_info()})
         await send_state_to_all()
 
+async def collect_messages(*, player_id: int = None, exclude_player_id: int = None, message_type: str = None) -> bool:
+
+    if player_id is not None:
+        _query_players = [game.players[player_id]]
+    elif exclude_player_id is not None:
+        _query_players = [p for p in game.players if p.id != exclude_player_id]
+    else:
+        _query_players = game.players
+
+    msg_was_broadcast = False
+    for player in _query_players:
+        if player.type == "bot":
+            msg = player.broadcast_message(game, message_type)
+            msg_was_broadcast = msg is not None
+            if msg is not None:
+                await broadcast_to_all({"type": "message", "sender_id": player.id, "message": msg, **get_game_info()})
+
+    return msg_was_broadcast
+
 async def play(player: Player, declared_rank: str, cards: list) -> None:
+
     """ Play a card """
+    await collect_messages(player_id=player.id, message_type="thinking")
     game.play_turn(player, declared_rank, cards)
     print(f"Player {player.name} plays {cards} and declared {declared_rank}.")
 
@@ -154,6 +176,9 @@ async def play(player: Player, declared_rank: str, cards: list) -> None:
         **get_game_info()
     })
 
+    # Collect opinions
+    await collect_messages(exclude_player_id=player.id)
+
     # Move to next player
     game.next_player()
     await send_state_to_all()
@@ -161,12 +186,12 @@ async def play(player: Player, declared_rank: str, cards: list) -> None:
 async def call(player: Player) -> bool:
     """ Call a play."""
 
-    # Get the last play before calling bluff
-    last_player, declared_rank, cards_played = game.history[-1]
+    # Get the data from the last game play
+    last_player, declared_rank, cards_played = game.last_play()
+    await collect_messages(player_id=player.id, message_type="thinking")
 
     # Result of the call
     result = game.call_bluff(player.id)
-    print(f'Result of call: {result}')
 
     # Check who picks up the pile to determine who goes next
     if f"Player {player.id} picks up" in result:
@@ -202,6 +227,9 @@ async def call(player: Player) -> bool:
 
     # Send updated state to all clients after bluff
     await send_state_to_all()
+
+    # Collect opinions
+    await collect_messages()
 
     return was_lying
 
@@ -271,6 +299,7 @@ async def game_loop(ws: WebSocket):
             current_player = game.players[game.turn]
             print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
 
+            # Human's turn
             if current_player.type == "human":
 
                 # Get new input

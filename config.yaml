@@ -6,11 +6,13 @@ bots:
     avatar: 🦊
     p_call: 0.2
     p_lie: 0.1
+    verbosity: 0.5
   - type: RandomBot
     name: B0Ttled Up
     avatar: 🍾
     p_call: 0.3
     p_lie: 0.2
+    verbosity: 0.1
   - type: RandomBot
     name: Beep Boop
     p_call: 0.4
@@ -19,10 +21,12 @@ bots:
   - type: RandomBot
     p_call: 0.5
     p_lie: 0.1
-    name: Chloe the bot
+    name: ChattyBot
     avatar: 🐭
+    verbosity: 0.8
   - type: RandomBot
     p_call: 0.3
     p_lie: 0.6
     name: B0Tanical
     avatar: 🌼
+    verbosity: 0.4
