@@ -18,11 +18,14 @@ class GameAction:
 
 
 class CheatGame:
-    def __init__(self, players: List[Player]):
+    def __init__(self, players: List[Player], experimental_mode: bool):
 
         # Set up the players
         self.players = players
         self.num_players = len(players)
+
+        # Whether we are using an experimental setup
+        self.experimental_mode = experimental_mode
 
         # Load and shuffle the deck, then deal out the cards
         self.deck = [Card(r, s) for r in RANKS for s in SUITS]

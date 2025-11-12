@@ -5,6 +5,7 @@ import WelcomePage from './WelcomePage';
 
 export default function CheatGame() {
 
+	const [experimentalMode, setExperimentalMode] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
 
 	const [ws, setWs] = useState(null);
@@ -52,6 +53,10 @@ export default function CheatGame() {
 	const [messageInput, setMessageInput] = useState("");
 	const [showMessageInput, setShowMessageInput] = useState(false);
 
+	// Allowed messages for experimental mode -- TODO: set this from config
+	const allowedMessages = [
+    "Taunt", "Surprise", "Shock", "Thinking", "Doubt", "Approval"
+	];
 	// Player colours
 	const gradients = [
 		'bg-gradient-to-br from-blue-500 to-purple-600',
@@ -90,6 +95,7 @@ export default function CheatGame() {
 				const { type, ...currentState } = msg;
 				setState(currentState);
 				setHasJoined(true);
+				setExperimentalMode(msg.experimental_mode);
 				if (msg.current_player === msg.your_id) {
 					setHasActed(false);
 				}
@@ -556,19 +562,24 @@ export default function CheatGame() {
 		}
 	};
 
-	// Human message
-	const sendMessage = useCallback(() => {
-    if (messageInput.trim() && ws) {
-        // Send message to backend
-        ws.send(JSON.stringify({
-            type: "human_message",
-            message: messageInput.trim(),
-					  sender_id: state.your_id
-        }));
+	// Human message: sends the message input by default
+	const sendMessage = useCallback((customMessage = null) => {
+			const messageToSend = customMessage || messageInput.trim();
 
-        setMessageInput("");
-    }
-}, [messageInput, ws, state?.your_id]);
+			if (messageToSend && ws) {
+					ws.send(JSON.stringify({
+							type: "human_message",
+							message: messageToSend,
+							sender_id: state.your_id
+					}));
+
+					addStatusMessage(state.your_id, messageToSend);
+
+					if (!customMessage) {
+							setMessageInput(""); // Only clear if it was from the input
+					}
+			}
+	}, [messageInput, ws, state?.your_id]);
 
 	// Human click on opponent
 	const handlePlayerClick = (opponent) => {
@@ -1021,7 +1032,7 @@ export default function CheatGame() {
                     Play {selectedCards.length} Card{selectedCards.length !== 1 ? "s" : ""}
                 </button>
             </div>
-        ) : (
+        ) : !experimentalMode ? (
             // Message Input
             <div className="flex items-center gap-3 animate-fadeIn">
                 <input
@@ -1047,7 +1058,36 @@ export default function CheatGame() {
                     Send
                 </button>
             </div>
-        )}
+        ) : (
+					// Experimental mode: Predefined message bubbles
+    <div className="flex flex-col gap-1">
+        <div className="flex gap-2">
+            {allowedMessages.slice(0, 6).map((msg, index) => (
+                <button
+                    key={index}
+                    onClick={() => sendMessage(msg)}
+                    className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
+                    text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75 hover:scale-110 active:scale-95 whitespace-nowrap"
+                >
+                    {msg}
+                </button>
+            ))}
+        </div>
+        <div className="flex gap-1">
+            {allowedMessages.slice(6, 10).map((msg, index) => (
+                <button
+                    key={index + 6}
+                    onClick={() => sendMessage(msg)}
+                    className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
+                    text-sm transition-all duration-200 hover:scale-110 active:scale-95 whitespace-nowrap"
+                >
+                    {msg}
+                </button>
+            ))}
+        </div>
+    </div>
+				)
+				}
     </div>
 </div>
 

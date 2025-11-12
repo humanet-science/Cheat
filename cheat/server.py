@@ -74,7 +74,7 @@ def reset_game():
             ))
         # TODO: add more bot types
 
-    game = CheatGame(players=game_players)
+    game = CheatGame(players=game_players, experimental_mode = game_config["game"].get("experimental_mode", False))
 
 # Initialize on startup
 reset_game()
@@ -89,7 +89,8 @@ def get_game_info() -> dict:
         "hands": [len(p.hand) for p in game.players],
         "num_players": game.num_players,
         "pile_size": len(game.pile),
-        "human_ids": [player.id for player in game.players if player.type == 'human']
+        "human_ids": [player.id for player in game.players if player.type == 'human'],
+        "experimental_mode": game.experimental_mode
     }
 
 def get_player_state(player) -> dict:
