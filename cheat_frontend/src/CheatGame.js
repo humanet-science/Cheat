@@ -13,6 +13,7 @@ import CardRevealOverlay from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
+import GameMenu from './components/Menu';
 
 // Hooks and utils
 import {getPlayerColor, getPlayerPositions, parseCard} from './utils/cardUtils';
@@ -535,6 +536,32 @@ export default function CheatGame() {
 			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
 				<div className="text-white opacity-5 text-9xl satisfy-regular">Cheat!</div>
 			</div>
+
+			{/* Menu */}
+			<GameMenu
+				ws={ws}
+				onQuit={() => {
+					if (ws) {
+						ws.send(JSON.stringify({ type: "quit", player_id: state.your_id}));
+					}
+					setHasJoined(false);
+					setGameOver(false);
+					setWinner(null);
+					setSelectedCards([]);
+					setActionQueue([]);
+					// Close the WebSocket connection
+					ws?.close();
+					setWs(null);
+				}}
+				onRestart={() => {
+					if (ws) {
+						ws.send(JSON.stringify({ type: "new_game" }));
+							setSelectedCards([]);
+							setActionQueue([]);
+							setPileCards([])
+					}
+				}}
+			/>
 
 			{/* Game over */}
 			{gameOver && (<div

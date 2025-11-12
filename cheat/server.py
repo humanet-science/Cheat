@@ -286,6 +286,12 @@ async def game_loop(ws: WebSocket):
                     reset_game()
                     await send_state_to_all()
 
+                if data.get("type") == "quit":
+                    print(f"Player {data.get('player_id')} requested quit")
+                    reset_game()
+                    await ws.close()
+                    break
+
                 else:
                     # Game actions go to the queue
                     await message_queue.put(data)
@@ -298,122 +304,136 @@ async def game_loop(ws: WebSocket):
 
     try:
 
-        # First, wait for the initial message, which is either "play" or "call"
-        initial_data = await message_queue.get()
-        print(f"Received initial data {initial_data}")
-        if initial_data["type"] == "play":
-            declared_rank = initial_data["declared_rank"]
-            cards = initial_data["cards"]
-            await play(game.players[game.turn], declared_rank, cards)
-
-        elif initial_data["type"] == "call":
-            await call(game.players[game.turn])
-
-        # Now start the loop
+        # OUTER LOOP: Keep connection alive for multiple games
         while True:
 
-            # Check for new messages without blocking
+            # Reset game at the start of each new game session
+            reset_game()
+            await send_state_to_all()
+
             try:
-                data = await asyncio.wait_for(message_queue.get(), timeout=0.1)
-                print(f"Received data {data}")
+                # First, wait for the initial message, which is either "play" or "call"
+                initial_data = await message_queue.get()
+                print(f"Received initial data {initial_data}")
+                if initial_data["type"] == "play":
+                    declared_rank = initial_data["declared_rank"]
+                    cards = initial_data["cards"]
+                    await play(game.players[game.turn], declared_rank, cards)
 
-                # Restart loop with new game
-                if data["type"] == "new_game":
-                    print("Starting a new game")
-                    reset_game()
-                    await send_state_to_all()
-                    continue
+                elif initial_data["type"] == "call":
+                    await call(game.players[game.turn])
 
-            except asyncio.TimeoutError:
-                pass  # No new messages, continue game
+                # Now start the loop
+                while True:
 
-            # Get the current player
-            current_player = game.players[game.turn]
-            print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
+                    # Check for new messages without blocking
+                    try:
+                        data = await asyncio.wait_for(message_queue.get(), timeout=0.1)
+                        print(f"Received data {data}")
 
-            # Check if current player has won.
-            # TODO: humans could forget to call last card, which would cause the game to not realise a winner for an
-            # entire cycle ...
-            await check_for_winner(current_player)
-            if game.game_over:
-                reset_game()
-                await asyncio.sleep(0.1)
-                continue
+                        # Restart loop with new game
+                        if data["type"] == "new_game":
+                            print("Starting a new game")
+                            reset_game()
+                            await send_state_to_all()
+                            continue
 
-            # Human's turn
-            if current_player.type == "human":
+                    except asyncio.TimeoutError:
+                        pass  # No new messages, continue game
 
-                # Get new input
-                data = await message_queue.get()
+                    # Get the current player
+                    current_player = game.players[game.turn]
+                    print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
 
-                # 0 is currently the only human player
-                if current_player.id == 0:
+                    # Check if current player has won.
+                    # TODO: humans could forget to call last card, which would cause the game to not realise a winner for an
+                    # entire cycle ...
+                    await check_for_winner(current_player)
+                    if game.game_over:
+                        await asyncio.sleep(0.1)
+                        break
 
-                    # Card has been played
-                    if data["type"] == "play":
+                    # Human's turn
+                    if current_player.type == "human":
 
-                        # Humans could forget to call the last player's card and miss that they had been lying
-                        last_player, _, _ = game.last_play()
-                        if last_player is not None:
-                            await check_for_winner(game.players[last_player])
-                            if game.game_over:
-                                reset_game()
-                                await asyncio.sleep(0.1)
+                        # Get new input
+                        data = await message_queue.get()
+
+                        # 0 is currently the only human player
+                        if current_player.id == 0:
+
+                            # Card has been played
+                            if data["type"] == "play":
+
+                                # Humans could forget to call the last player's card and miss that they had been lying
+                                last_player, _, _ = game.last_play()
+                                if last_player is not None:
+                                    await check_for_winner(game.players[last_player])
+                                    if game.game_over:
+                                        await asyncio.sleep(0.1)
+                                        break
+
+                                declared_rank = data["declared_rank"]
+                                cards = data["cards"]
+                                await play(current_player, declared_rank, cards)
+
+                            # Calling a bluff
+                            elif data["type"] == "call":
+                                await call(current_player)
+
+                        else:
+                            # It's another human's turn (for future multiplayer)
+                            # Just wait - their WebSocket will handle it
+                            continue
+
+                    current_player = game.players[game.turn]
+                    print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
+                    if current_player.type == 'bot':
+
+                        # Discard any fours
+                        await check_for_fours()
+
+                        # Pick an action
+                        action = current_player.choose_action(game)
+
+                        # Play card
+                        if action[0] == "play":
+
+                            # Check for win
+                            game_is_over = await check_for_winner(current_player)
+                            if game_is_over:
                                 continue
 
-                        declared_rank = data["declared_rank"]
-                        cards = data["cards"]
-                        await play(current_player, declared_rank, cards)
+                            _, declared_rank, cards = action
+                            await play(current_player, declared_rank, cards)
 
-                    # Calling a bluff
-                    elif data["type"] == "call":
-                        await call(current_player)
+                        # Call previous play
+                        elif action[0] == "call":
 
-                else:
-                    # It's another human's turn (for future multiplayer)
-                    # Just wait - their WebSocket will handle it
-                    continue
+                            was_lying = await call(current_player)
 
-            current_player = game.players[game.turn]
-            print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
-            if current_player.type == 'bot':
+                            # If the call was successful, they play
+                            if was_lying:
+                                game_is_over = await check_for_winner(current_player)
+                                if game_is_over:
+                                    continue
+                                await collect_messages(player_id=current_player.id, message_type="suspicions_confirmed")
+                                _, declared_rank, cards = current_player.make_move(game)
+                                await play(current_player, declared_rank, cards)
+                            else:
+                                await collect_messages(player_id=current_player.id, message_type="surprise") # or pile picked up ... also the accused can say something ...
 
-                # Discard any fours
-                await check_for_fours()
+                    # Add a small delay to account for the animations in the frontend: this way the backend is not always
+                    # too many steps ahead of the frontend
+                    await asyncio.sleep(1)
 
-                # Pick an action
-                action = current_player.choose_action(game)
-
-                # Play card
-                if action[0] == "play":
-
-                    # Check for win
-                    game_is_over = await check_for_winner(current_player)
-                    if game_is_over:
-                        continue
-
-                    _, declared_rank, cards = action
-                    await play(current_player, declared_rank, cards)
-
-                # Call previous play
-                elif action[0] == "call":
-
-                    was_lying = await call(current_player)
-
-                    # If the call was successful, they play
-                    if was_lying:
-                        game_is_over = await check_for_winner(current_player)
-                        if game_is_over:
-                            continue
-                        await collect_messages(player_id=current_player.id, message_type="suspicions_confirmed")
-                        _, declared_rank, cards = current_player.make_move(game)
-                        await play(current_player, declared_rank, cards)
-                    else:
-                        await collect_messages(player_id=current_player.id, message_type="surprise") # or pile picked up ... also the accused can say something ...
-
-            # Add a small delay to account for the animations in the frontend: this way the backend is not always
-            # too many steps ahead of the frontend
-            await asyncio.sleep(1)
+            except WebSocketDisconnect:
+                print(f"WebSocket disconnected")
+                break  # Break outer loop completely
+            except Exception as e:
+                print(f"Game error: {e}")
+                # Don't break - continue to next game
+                continue
 
     except WebSocketDisconnect:
         print(f"Client 0 disconnected")
@@ -423,11 +443,6 @@ async def game_loop(ws: WebSocket):
         game.players[0].connected = False
         game.players[0].ws = None
         receiver_task.cancel()
-
-        # Reset game when no humans are connected
-        if not any(player.connected and player.type == "human" for player in game.players):
-            print("All players disconnected - resetting game")
-            reset_game()
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
