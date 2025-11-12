@@ -196,6 +196,25 @@
   }
 }
 
+@keyframes cardPickup {
+  0% {
+    transform:
+      translate(var(--start-x), var(--start-y))
+      rotate(var(--start-rotation));
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform:
+      /* Calculate target position based on player position */
+      translate(calc(var(--target-x) - 50%), calc(var(--target-y) - 50%))
+      rotate(0deg);
+    opacity: 0;
+  }
+}
+
 .perspective-1000 {
   perspective: 1000px;
 }

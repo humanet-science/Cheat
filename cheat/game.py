@@ -70,7 +70,7 @@ class CheatGame:
     def last_play(self):
         """ Returns the last hand that was played from the history"""
         if len(self.history) == 0:
-            return None
+            return None, None, None
 
         last_play_idx = -1
         while self.history[last_play_idx].type != "play":
@@ -167,11 +167,13 @@ class CheatGame:
 
     def check_winner(self, player) -> bool:
         # Declare a winner if all cards on hands can be truthfully discarded in play
-        if len(player.hand) == 0  or (all([c.rank==player.hand[0].rank for c in player.hand]) and player.hand[0].rank != "A" and (self.current_rank is None or self.current_rank == player.hand[0].rank)):
+        if len(player.hand) == 0  or (
+                all([c.rank==player.hand[0].rank for c in player.hand]) and player.hand[0].rank != "A" and (
+                self.current_rank is None or self.current_rank == player.hand[0].rank)
+        ):
             self.game_over = True
             self.winner = player.id
             self.history.append(
                 GameAction(type="win", player_id=player.id, timestamp=datetime.now(), data=None)
             )
-            return True
-        return False
+        return self.game_over

@@ -34,6 +34,7 @@ export default function CheatGame() {
 	const [animatingCards, setAnimatingCards] = useState(null); // {playerId, cards, targetPosition, starting x, starting y}
 	const [revealedCards, setRevealedCards] = useState(null); // {cards, wasLying}
 	const [pileAnimation, setPileAnimation] = useState(null); // {text, type}
+  const [pilePickupAnimation, setPilePickupAnimation] = useState(null);
 
 	// Cards on the pile
 	const [pileCards, setPileCards] = useState([]);
@@ -47,7 +48,9 @@ export default function CheatGame() {
 
 	// Player status messages
 	const [statusMessages, setStatusMessages] = useState([]);
-    const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
+	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
+	const [messageInput, setMessageInput] = useState("");
+	const [showMessageInput, setShowMessageInput] = useState(false);
 
 	// Player colours
 	const gradients = [
@@ -93,9 +96,23 @@ export default function CheatGame() {
 				setIsMyTurn(msg.current_player === msg.your_id);
 			}
 
-			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over", "message"].includes(msg.type)) {
+			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over", "bot_message"].includes(msg.type)) {
 				setActionQueue((prev) => [...prev, msg]);
 			}
+
+			if (msg.type === "human_message") {
+
+            // Calculate the start position of the animation
+            const totalPlayers = msg.num_players;
+            const angle = 90 + (360 / (totalPlayers)) * (msg.sender_id);
+            const angleRad = (angle * Math.PI) / 180;
+            const radius = 300;
+            const x = Math.cos(angleRad) * radius;
+            const y = Math.sin(angleRad) * radius;
+
+						addStatusMessage(msg.sender_id, msg.message, {x, y});
+
+		}
 
 		};
 
@@ -134,23 +151,23 @@ export default function CheatGame() {
 		// Get the first action
 		const msg = actionQueue[0];
 
-        // Pause play if the relevant player is currently speaking
-        if (["card_played", "bluff_called", "message"].includes(msg.type)){
-            if (msg && (msg.current_player || msg.player_id || msg.sender_id)) {
-                const playerId = msg.current_player || msg.player_id || msg.sender_id;
-                if (playerId && speakingPlayers.has(playerId)) {
-                    return;
-                }
-            }
-        }
+		// Pause play if the relevant player is currently speaking
+		if (["card_played", "bluff_called", "bot_message", "discard"].includes(msg.type)){
+				if (msg && (msg.current_player || msg.sender_id || msg.caller)) {
+						const playerId = msg.sender_id || msg.caller || msg.current_player;
+						if (playerId && speakingPlayers.has(playerId)) {
+								return;
+						}
+				}
+		}
 
-        // Currently processing an action
-        processingRef.current = true;
+		// Currently processing an action
+		processingRef.current = true;
 
 		if (msg.type === "state") {
 
-                // Unpack
-                const { type, ...currentState } = msg;
+				// Unpack
+				const { type, ...currentState } = msg;
 
 			  // Get the previous state
 				const prevState = prevStateRef.current;
@@ -192,15 +209,15 @@ export default function CheatGame() {
 			const y = Math.sin(angleRad) * radius;
 
 			// Generate final positions for each card BEFORE animating
-            const newCards = Array(msg.card_count)
-                .fill(0)
-                .map((_, i) => ({
-                  id: Math.random(),
-                  rotation: Math.random() * 60 - 30, // -30 to +30 degrees
-                  offsetX: Math.random() * 100 - 50,  // -50 to +50 px
-                  offsetY: Math.random() * 100 - 50,
-                  startRotation: -(5 + (i * 5))  // Starting rotation from hand
-            }));
+			const newCards = Array(msg.card_count)
+					.fill(0)
+					.map((_, i) => ({
+						id: Math.random(),
+						rotation: Math.random() * 60 - 30, // -30 to +30 degrees
+						offsetX: Math.random() * 100 - 50,  // -50 to +50 px
+						offsetY: Math.random() * 100 - 50,
+						startRotation: -(5 + (i * 5))  // Starting rotation from hand
+			}));
 
 			// Animate cards moving to pile
 			soundManager.play('cardPlay');
@@ -262,48 +279,76 @@ export default function CheatGame() {
 
 			// Clear after showing cards
 			await new Promise(r => setTimeout(r, 3000)); // wait before clearing
+
+			// Determine who picks up the pile
+			const pickupPlayerId = msg.was_lying ? msg.accused : msg.caller;
+			// TODO only do this once!
+			// Calculate target position using your existing method
+			const totalPlayers = msg.num_players;
+			const angle = 90 + (360 / totalPlayers) * pickupPlayerId;
+			const angleRad = (angle * Math.PI) / 180;
+			const radius = 300;
+			const targetX = Math.cos(angleRad) * radius;
+			const targetY = Math.sin(angleRad) * radius;
+
+			// Start pile pickup animation
+			if (pileCards.length > 0) {
+				  soundManager.play('pick_up');
+					setPilePickupAnimation({
+							playerId: pickupPlayerId,
+						  targetX,
+              targetY,
+							cards: [...pileCards] // Copy current pile cards
+					});
+
+					setPileCards([]);
+
+					// Wait for pickup animation
+					await new Promise(r => setTimeout(r, 1000));
+					setPilePickupAnimation(null);
+			}
+
 			setRevealedCards(null);
 			setPileAnimation(null);
-			setPileCards([]);
 			setLastPlayedCount(0);
 
 		// Cards have been discarded: set a message
 		} else if (msg.type === "discard") {
 
-            // Parse: "Player 2 discards 7, K, A."
-            const match = msg.result.match(/Player (\d+) discards (.+)\./);
-            if (match) {
-                const playerId = parseInt(match[1]);
-                const ranksStr = match[2]; // "7, K, A"
-                const ranks = ranksStr.split(', '); // ["7", "K", "A"]
+			// Parse: "Player 2 discards 7, K, A."
+			const match = msg.result.match(/Player (\d+) discards (.+)\./);
+			if (match) {
+					const playerId = parseInt(match[1]);
+					const ranksStr = match[2]; // "7, K, A"
+					const ranks = ranksStr.split(', '); // ["7", "K", "A"]
 
-                // Calculate player position for animation
-                const totalPlayers = state.num_players;
-                const angle = 90 + (360 / totalPlayers) * playerId;
-                const angleRad = (angle * Math.PI) / 180;
-                const radius = 300;
-                const x = Math.cos(angleRad) * radius;
-                const y = Math.sin(angleRad) * radius;
+					// Calculate player position for animation
+					const totalPlayers = state.num_players;
+					const angle = 90 + (360 / totalPlayers) * playerId;
+					const angleRad = (angle * Math.PI) / 180;
+					const radius = 300;
+					const x = Math.cos(angleRad) * radius;
+					const y = Math.sin(angleRad) * radius;
 
-                // Show animation
-                soundManager.play('discard');
+					// Show animation
+					soundManager.play('discard');
 
-                // Add to status messages instead of separate discardAnimation
-                const message = playerId === state.your_id
-                    ? `You discard ${ranksStr}s`
-                    : `Discarding ${ranksStr}s`;
-                addStatusMessage(playerId, message, {x, y});
+					// Add to status messages instead of separate discardAnimation
+					const message = playerId === state.your_id
+							? `You discard ${ranksStr}s`
+							: `Discarding ${ranksStr}s`;
+					addStatusMessage(playerId, message, {x, y});
 
-                // Add all ranks to discard list
-                setDiscards(prev => [...prev, ...ranks]);
+					// Add all ranks to discard list
+					setDiscards(prev => [...prev, ...ranks]);
 
-                // Wait for animation
-                await new Promise(r => setTimeout(r, 1500));
-                setDiscardAnimation(null);
-            }
+					// Wait for animation
+					await new Promise(r => setTimeout(r, 1500));
+					setDiscardAnimation(null);
+			}
 
-        // Opinion status sent
-        } else if (msg.type === "message") {
+		// Opinion status sent
+		} else if (msg.type === "bot_message") {
 
             // Calculate the start position of the animation
             const totalPlayers = msg.num_players;
@@ -313,7 +358,7 @@ export default function CheatGame() {
             const x = Math.cos(angleRad) * radius;
             const y = Math.sin(angleRad) * radius;
 
-			addStatusMessage(msg.sender_id, msg.message, {x, y});
+						addStatusMessage(msg.sender_id, msg.message, {x, y});
 
         // Game is over
 		} else if (msg.type === "game_over") {
@@ -349,13 +394,13 @@ export default function CheatGame() {
         setIsNewRound(declaredRank === null || declaredRank === "");
 
         if (!isMyTurn || selectedCards.length === 0 || selectedCards.length > 3){
-            setShowRankInput(false);
+            // setShowRankInput(false);
             return;
         }
 
         // Only require declared rank for new rounds
         if (isNewRound && !declaredRank){
-            setShowRankInput(false);
+            // setShowRankInput(false);
             return;
         }
 
@@ -437,6 +482,7 @@ export default function CheatGame() {
       soundManager.loadSound('callBluff', '/sounds/pop_low.mp3');
       soundManager.loadSound('discard', '/sounds/discard.wav');
       soundManager.loadSound('win', '/sounds/win.wav');
+			soundManager.loadSound('pick_up', '/sounds/pick_up.mp3', 0.2);
     }, []);
 
     // Play sound when Call Bluff! button pops up
@@ -481,8 +527,8 @@ export default function CheatGame() {
 
 		const playerElement = document.getElementById(`player-${playerId}`);
 		if (playerElement) {
-            // Add player to speaking set
-            setSpeakingPlayers(prev => new Set(prev).add(playerId));
+			// Add player to speaking set
+			setSpeakingPlayers(prev => new Set(prev).add(playerId));
 			const rect = playerElement.getBoundingClientRect();
 			const position = {
 				x: rect.left + rect.width / 2,
@@ -509,6 +555,19 @@ export default function CheatGame() {
 		}, 3000);
 		}
 	};
+
+	const sendMessage = useCallback(() => {
+    if (messageInput.trim() && ws) {
+        // Send message to backend
+        ws.send(JSON.stringify({
+            type: "human_message",
+            message: messageInput.trim(),
+					  sender_id: state.your_id
+        }));
+
+        setMessageInput("");
+    }
+}, [messageInput, ws, state?.your_id]);
 
 	if (!hasJoined) {
     return <WelcomePage onJoinGame={handleJoinGame} />;
@@ -556,6 +615,7 @@ export default function CheatGame() {
             </div>
         )}
 
+		    {/* Status messages as floating bubbles from players */}
         {statusMessages.map(msg => (
           <div
             key={msg.id}
@@ -579,6 +639,7 @@ export default function CheatGame() {
                 const totalOpponents = opponents.length;
 
                 // Calculate angle for each opponent (evenly spread around pile)
+							  // TODO: do this once at the start
                 const angle = 90 + (360 / (totalOpponents + 1)) * (index + 1);
                 const angleRad = (angle * Math.PI) / 180;
                 const radius = 300; // Distance from pile center
@@ -597,7 +658,7 @@ export default function CheatGame() {
                             top: `calc(50% + ${y}px)`,
                             transform: 'translate(-50%, -50%)'
                         }}
-                        className={`rounded-full p-4 w-24 h-24 border-2 ${getPlayerColor(opp.id)} ${
+                        className={`rounded-full z-10 p-4 w-24 h-24 border-2 ${getPlayerColor(opp.id)} ${
                             state.current_player === opp.id
                                 ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]"
                                 : ""
@@ -716,97 +777,92 @@ export default function CheatGame() {
               })}
             </div>
 
-            {/* Revealed cards overlay */}
-            {revealedCards && (
-              <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-                <div className="text-center">
-                  {/* Dramatic result text */}
-                  <div
-                    className="text-8xl font-bold mb-2 satisfy-regular"
-                    style={{
-                      animation: 'dramaticZoom 0.8s ease-out',
-                      color: revealedCards.wasLying ? '#ef4444' : '#9BE9B7',
-                      textShadow: revealedCards.wasLying
-                        ? '0 0 50px #ef4444'
-                        : '0 0 50px rgba(34, 197, 94, 0.8)'
-                    }}
-                  >
-                    {revealedCards.wasLying ? '🎭 Busted!' : "No lies detected!"}
+            {/* Revealed cards panel - non-overlay */}
+{revealedCards && (
+  <div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
+    <div className="text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl">
+      {/* Dramatic result text */}
+      <div
+        className="text-5xl font-bold mb-4 satisfy-regular"
+        style={{
+          animation: 'dramaticZoom 0.8s ease-out',
+          color: revealedCards.wasLying ? '#ef4444' : '#9BE9B7',
+          textShadow: revealedCards.wasLying
+            ? '0 0 50px #ef4444'
+            : '0 0 50px rgba(34, 197, 94, 0.8)'
+        }}
+      >
+        {revealedCards.wasLying ? '🎭 Busted!' : "No lies detected!"}
+      </div>
+
+      {/* Player info */}
+      <div className="text-2xl mb-6 text-white drop-shadow-lg">
+        {revealedCards.wasLying ? (
+          <p className="mb-2">
+            {revealedCards.accused === state.your_id ? "You" : `${revealedCards.accused_name}`} played:
+          </p>
+        ) : (
+          <p className="mb-2">
+            {revealedCards.caller === state.your_id ? "You pick" : `${revealedCards.caller_name} picks`} up the pile.
+          </p>
+        )}
+      </div>
+
+      {/* Cards - only show if they were lying */}
+      {revealedCards.wasLying && (
+        <div className="flex justify-center gap-6 perspective-1000">
+          {revealedCards.cards.map((card, i) => {
+            const { rank, suit, isRed } = parseCard(card);
+            return (
+              <div
+                key={i}
+                className="relative"
+                style={{
+                  animation: `cardFlipReveal 1s ease-out ${i * 0.15}s both`
+                }}
+              >
+                {/* Card back (shows first during flip) */}
+                <div
+                  className="absolute inset-0 w-20 h-28 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg border-4 border-white shadow-2xl"
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    animation: `cardFlipOut 1s ease-out ${i * 0.15}s both`
+                  }}
+                >
+                  <div className="absolute inset-2 border-2 border-blue-400 rounded"></div>
+                </div>
+
+                {/* Card front (reveals after flip) */}
+                <div
+                  className="w-20 h-28 bg-white rounded-lg border-4 border-red-400 shadow-2xl relative"
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    animation: `cardFlipIn 1s ease-out ${i * 0.15}s both`
+                  }}
+                >
+                  {/* Top-left corner */}
+                  <div className={`absolute top-1 left-2 text-sm leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                    <div className="font-bold text-lg">{rank}{suit}</div>
                   </div>
 
-                  {/* Player info */}
-                  <div className="text-2xl mb-8 text-white">
-                     {revealedCards.wasLying ? (
-                        <>
-                        <p className="mb-2">
-                          {revealedCards.accused === state.your_id ? "You" : `${revealedCards.accused_name}`} declared:
-                          <span className="text-yellow-400 font-bold ml-2">{revealedCards.declaredRank}</span>
-                        </p>
-                        <p className="text-lg opacity-75">Actually played:</p>
-                        </>
-                     )
-                     : (
-                        <p className="mb-2">
-                          {revealedCards.caller === state.your_id ? "You pick" : `${revealedCards.caller_name } picks`} up the pile.
-                        </p>
-                     )}
+                  {/* Center suit */}
+                  <div className={`absolute inset-0 flex items-center justify-center text-5xl ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                    {suit}
                   </div>
 
-                  {/* Cards - only show if they were lying */}
-                  {revealedCards.wasLying ? (
-                    <div className="flex justify-center gap-6 perspective-1000">
-                      {revealedCards.cards.map((card, i) => {
-                        const { rank, suit, isRed } = parseCard(card);
-                        return (
-                          <div
-                            key={i}
-                            className="relative"
-                            style={{
-                              animation: `cardFlipReveal 1s ease-out ${i * 0.15}s both`
-                            }}
-                          >
-                            {/* Card back (shows first during flip) */}
-                            <div
-                              className="absolute inset-0 w-20 h-28 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg border-4 border-white shadow-2xl"
-                              style={{
-                                backfaceVisibility: 'hidden',
-                                animation: `cardFlipOut 1s ease-out ${i * 0.15}s both`
-                              }}
-                            >
-                              <div className="absolute inset-2 border-2 border-blue-400 rounded"></div>
-                            </div>
-
-                            {/* Card front (reveals after flip) */}
-                            <div
-                              className="w-20 h-28 bg-white rounded-lg border-4 border-red-400 shadow-2xl relative"
-                              style={{
-                                backfaceVisibility: 'hidden',
-                                animation: `cardFlipIn 1s ease-out ${i * 0.15}s both`
-                              }}
-                            >
-                              {/* Top-left corner */}
-                              <div className={`absolute top-1 left-2 text-sm leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                                <div className="font-bold text-lg">{rank}{suit}</div>
-                              </div>
-
-                              {/* Center suit */}
-                              <div className={`absolute inset-0 flex items-center justify-center text-5xl ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                                {suit}
-                              </div>
-
-                              {/* Bottom-right corner */}
-                              <div className={`absolute bottom-1 right-2 text-sm leading-none transform rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                                <div className="font-bold text-lg">{rank}{suit}</div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : <></>}
+                  {/* Bottom-right corner */}
+                  <div className={`absolute bottom-1 right-2 text-sm leading-none transform rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+                    <div className="font-bold text-lg">{rank}{suit}</div>
+                  </div>
                 </div>
               </div>
-            )}
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
             {/* My Hand Section */}
             <div
@@ -814,9 +870,10 @@ export default function CheatGame() {
                 position: 'fixed',
                 left: '50%',
                 bottom: '20px',
-                transform: 'translateX(-50%)'
+                transform: 'translateX(-50%)',
             }}
             className="z-10"
+					  id="player-0"
             >
                 <div className="flex justify-center">
                     <div className="rounded-xl p-4">
@@ -874,45 +931,106 @@ export default function CheatGame() {
                             })}
                     </div>
 
-                    {/* Play Controls */}
-                    {isMyTurn && !hasActed && (
-                        <div className="h-10 flex items-center justify-center gap-4">
-                            {/* Only show rank input for new rounds */}
-                            {isMyTurn && showRankInput && (
-                                <input
-                                    type="text"
-                                    placeholder="Rank (e.g. 7)"
-                                    value={declaredRank}
-                                    onChange={(e) => setDeclaredRank(e.target.value.toUpperCase())}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            play();
-                                        }
-                                    }}
-                                    className={`px-4 py-2 rounded-lg border-2 border-blue-600 bg-blue-900 text-white text-center font-bold
-                                    text-lg w-40 transition-transform ${rankError ? "animate-wiggle border-red-500 bg-red-500" : "border-blue-600 bg-blue-900"}`}
-                                />
-                            )}
-                            <button
-                                onClick={play}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        play();
-                                    }
-                                }}
-                                disabled={
-                                    selectedCards.length === 0 ||
-                                    selectedCards.length > 3 ||
-                                    (isNewRound && !declaredRank)
-                                }
-                                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-8 rounded-lg transition-colors"
-                            >
-                                Play {selectedCards.length} Card{selectedCards.length !== 1 ? "s" : ""}
-                            </button>
-                        </div>
-                    )}
+{/* Play Controls / Message Input with Morphing Effect */}
+<div className={`
+    relative flex items-center justify-center gap-4 
+    transition-all duration-500 ease-in-out
+    ${isMyTurn && !hasActed ? 'h-12 scale-100' : 'h-12 scale-95'}
+`}>
+    {/* Background bubble that morphs */}
+    <div className={`
+        absolute inset-0 rounded-2xl backdrop-blur-sm bg-opacity-20
+        transition-all duration-500 ease-in-out
+        ${isMyTurn && !hasActed 
+            ? 'scale-100' 
+            : 'scale-105'
+        }
+    `}></div>
+
+    {/* Content */}
+    <div className="relative z-10 flex items-center gap-4 transition-all duration-300">
+        {isMyTurn && !hasActed ? (
+            // Play Controls
+            <div className="flex items-center gap-4 animate-fadeIn">
+                {showRankInput && (
+                    <input
+                        type="text"
+                        placeholder="Rank (e.g. 7)"
+                        value={declaredRank}
+                        onChange={(e) => {
+													setDeclaredRank(e.target.value.toUpperCase())
+												}}
+                        onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+																e.preventDefault();
+																console.log("Selected Cards length", selectedCards.length);
+																// Only play if cards are actually selected AND rank is valid
+																if (selectedCards.length > 0) {
+																		play();
+																} else {
+																		// Optional: Show some feedback that cards need to be selected
+																		console.log("Cannot play - no cards selected");
+																}
+														}
+												}}
+                        className={`
+                            px-4 py-2 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
+                            w-40 transition-all duration-300 transform
+                            ${rankError 
+                                ? 'animate-wiggle border-red-500 bg-red-500 scale-105' 
+                                : 'border-blue-400 hover:border-blue-300 hover:scale-105'
+                            }
+                        `}
+                    />
+                )}
+                <button
+                    onClick={play}
+                    disabled={
+                        selectedCards.length === 0 ||
+                        selectedCards.length > 3 ||
+                        (isNewRound && !declaredRank)
+                    }
+                    className={`
+                        px-6 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
+                        ${selectedCards.length === 0 || (isNewRound && !declaredRank)
+                            ? 'bg-gray-600 cursor-not-allowed scale-95'
+                            : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'
+                        }
+                    `}
+                >
+                    Play {selectedCards.length} Card{selectedCards.length !== 1 ? "s" : ""}
+                </button>
+            </div>
+        ) : (
+            // Message Input
+            <div className="flex items-center gap-3 animate-fadeIn">
+                <input
+                    type="text"
+                    placeholder="Send a message..."
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                    className="px-4 py-1 rounded-xl backdrop-blur-lg opacity-50 text-gray-950 text-center font-medium text-lg w-64
+                    transition-all duration-300 hover:scale-105 focus:scale-105"
+                />
+                <button
+                    onClick={sendMessage}
+                    disabled={!messageInput.trim()}
+                    className={`
+                        px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
+                        ${!messageInput.trim()
+                            ? 'bg-gray-600 cursor-not-allowed scale-95'
+                            : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'
+                        }
+                    `}
+                >
+                    Send
+                </button>
+            </div>
+        )}
+    </div>
+</div>
+
                     </div>
                 </div>
         </div>
@@ -939,21 +1057,26 @@ export default function CheatGame() {
             </div>
         )}
 
-        {/*/!* Discard animation - floating message from player *!/*/}
-        {/*{discardAnimation && (*/}
-        {/*    <div*/}
-        {/*    className="absolute z-30 pointer-events-none"*/}
-        {/*    style={{*/}
-        {/*        left: `calc(50% + ${discardAnimation.x}px)`,*/}
-        {/*        top: `calc(50% + ${discardAnimation.y}px)`,*/}
-        {/*        animation: 'floatUp 4s ease-out',*/}
-        {/*    }}*/}
-        {/*    >*/}
-        {/*    <div className="text-2xl font-bold text-grey-400 drop-shadow-lg">*/}
-        {/*        {discardAnimation.message}*/}
-        {/*    </div>*/}
-        {/*    </div>*/}
-        {/*)}*/}
+				{/* Pile pickup animation - cards flying to player's hand */}
+				{pilePickupAnimation && (
+						<div className="absolute z-0 pointer-events-none" style={{ left: '50%', top: '50%', zIndex: 0 }}>
+								{pilePickupAnimation.cards.map((card, i) => (
+										<div
+												key={`pickup-${card.id}`}
+												className="absolute w-12 h-16 z-0 bg-blue-600 rounded border-2 border-white shadow-lg"
+												style={{
+														animation: `cardPickup 0.5s ease-out forwards`,
+														animationDelay: `${i * 0.05}s`,
+														'--start-x': `${card.offsetX}px`,
+														'--start-y': `${card.offsetY}px`,
+														'--start-rotation': `${card.rotation}deg`,
+														'--target-x': `${pilePickupAnimation.targetX}px`,
+														'--target-y': `${pilePickupAnimation.targetY}px`
+												}}
+										/>
+								))}
+						</div>
+				)}
 
         {/* Discard tracker - top left corner */}
         {discards.length > 0 && (

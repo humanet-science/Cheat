@@ -4,6 +4,7 @@ suspicions = [
     "Flip Flip Flip!",
     "That's some BS",
     "Yeah right",
+    "Lotta liars these days"
 ]
 
 suspicions_confirmed = [
