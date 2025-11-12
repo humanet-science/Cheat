@@ -1,5 +1,6 @@
 game:
   num_players: 5
+  seed: 42
 bots:
   - type: RandomBot
     name: His Botness

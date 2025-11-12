@@ -1,5 +1,5 @@
 import yaml
-
+import random
 from datetime import datetime
 from fastapi import FastAPI, WebSocket,WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +13,10 @@ from cheat.player import Player
 game_config_path = Path(__file__).parent.parent / "config.yaml"
 with open(game_config_path, "r") as f:
     game_config = yaml.safe_load(f)
+
+# Set the seed for reproducibility
+seed = game_config['game'].get('seed')
+random.seed(seed)
 
 app = FastAPI()
 app.add_middleware(

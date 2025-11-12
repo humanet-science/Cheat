@@ -556,6 +556,7 @@ export default function CheatGame() {
 		}
 	};
 
+	// Human message
 	const sendMessage = useCallback(() => {
     if (messageInput.trim() && ws) {
         // Send message to backend
@@ -568,6 +569,23 @@ export default function CheatGame() {
         setMessageInput("");
     }
 }, [messageInput, ws, state?.your_id]);
+
+	// Human click on opponent
+	const handlePlayerClick = (opponent) => {
+    if (!ws || gameOver) return;
+
+    const cardText = opponent.cardCount === 1 ? "1 card" : `${opponent.cardCount} cards`;
+    const message = `Woah, ${opponent.name} only has ${cardText} left!`;
+
+    // Send to backend to broadcast
+    ws.send(JSON.stringify({
+        type: "human_message",
+        message: message
+    }));
+
+    // Show immediately for the clicker
+    addStatusMessage(state.your_id, message);
+};
 
 	if (!hasJoined) {
     return <WelcomePage onJoinGame={handleJoinGame} />;
@@ -656,13 +674,14 @@ export default function CheatGame() {
                             position: 'absolute',
                             left: `calc(50% + ${x}px)`,
                             top: `calc(50% + ${y}px)`,
-                            transform: 'translate(-50%, -50%)'
+                            transform: 'translate(-50%, -50%)',
                         }}
-                        className={`rounded-full z-10 p-4 w-24 h-24 border-2 ${getPlayerColor(opp.id)} ${
+                        className={`player-opponent rounded-full z-10 p-4 w-24 h-24 border-2 ${getPlayerColor(opp.id)} ${
                             state.current_player === opp.id
                                 ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]"
                                 : ""
-                        }`}
+                        } cursor-pointer transition-all duration-200 group`}
+												onClick={() => handlePlayerClick(opp)}
                     >
 											<div className="text-center flex flex-col items-center justify-center h-full relative">
 												{/* Curved player name */}
@@ -678,18 +697,19 @@ export default function CheatGame() {
 													</text>
 												</svg>
 											{/* Avatar in center */}
-											<span className="text-5xl z-10 relative">{opp.avatar}</span>
+											<span className="text-5xl z-10 relative group-hover:scale-110 transition-all">{opp.avatar}</span>
 										</div>
 
                         {/* Card icons for each opponent */}
                         <div
                             key={`debug-card-${opp.id}0`}
-                            className="absolute drop-shadow-xl z-10 w-12 h-16 bg-blue-800 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            className="opponent-card-1 absolute drop-shadow-xl z-10 w-12 h-16 bg-blue-800 border-0 border-white
+                            rounded shadow-lg text-xs flex items-center justify-center transition-all"
                             style={{transform: 'translate(-10%, -2%) rotate(-6deg)'}}
                         ></div>
                         <div
                             key={`debug-card-${opp.id}1`}
-                            className="absolute drop-shadow-xl z-20 w-12 h-16 bg-blue-700 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            className="opponent-card-2 transition-all absolute drop-shadow-xl z-20 w-12 h-16 bg-blue-700 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
                             style={{
                                 transform: 'translate(10%, -3%) rotate(-3deg)',
                             }}
@@ -697,7 +717,7 @@ export default function CheatGame() {
                         {/* Display number of cards on each hand */}
                         <div
                             key={`debug-card-${opp.id}2`}
-                            className="absolute drop-shadow-xl z-30 w-12 h-16 bg-blue-600 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
+                            className="opponent-card-3 transition-all absolute drop-shadow-xl z-30 w-12 h-16 bg-blue-600 border-0 border-white rounded shadow-lg text-xs flex items-center justify-center"
                             style={{
                                 transform: 'translate(30%, -4%)',
                             }}
