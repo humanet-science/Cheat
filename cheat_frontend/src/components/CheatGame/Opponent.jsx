@@ -1,5 +1,4 @@
 import React from "react";
-import {getPlayerPositions} from "../../utils/cardUtils"
 
 export function OpponentIcons({opponents, playerPositions, handlePlayerClick, state, getPlayerColor}) {
 

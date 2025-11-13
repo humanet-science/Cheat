@@ -105,7 +105,7 @@ const WelcomePage = ({onJoinGame}) => {
 						{/* Avatar Selection */}
 						<div className="mb-6">
 							<label className="block text-gray-500 text-sm font-bold mb-4">
-								Choose Your Avatar
+								Choose your Avatar
 							</label>
 							<div className="h-40 overflow-y-auto scrollbar-thin border border-gray-200 rounded-lg p-3 bg-gray-50">
 								<div className="grid grid-cols-4 gap-3">

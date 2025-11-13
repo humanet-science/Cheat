@@ -191,9 +191,9 @@ export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInpu
 								</div>
 							) : (
 								// Experimental mode: Predefined message bubbles
-								<div className="flex flex-col gap-1">
+								<div className="flex flex-col gap-1 mt-10">
 									<div className="flex gap-2">
-										{allowedMessages.slice(0, 6).map((msg, index) => (
+										{allowedMessages.slice(0, 5).map((msg, index) => (
 											<button
 												key={index}
 												onClick={() => sendMessage(msg)}
@@ -205,7 +205,7 @@ export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInpu
 										))}
 									</div>
 									<div className="flex gap-1">
-										{allowedMessages.slice(6, 10).map((msg, index) => (
+										{allowedMessages.slice(5, ).map((msg, index) => (
 											<button
 												key={index + 6}
 												onClick={() => sendMessage(msg)}

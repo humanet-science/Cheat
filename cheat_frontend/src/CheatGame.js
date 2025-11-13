@@ -23,7 +23,7 @@ import {useScreenSize} from "./components/CheatGame/hooks/useScreenSize";
 import {Logo} from './utils/Logo';
 
 // Constants
-import {PREDEFINED_MESSAGES, VALID_RANKS} from "./utils/constants";
+import {VALID_RANKS} from "./utils/constants";
 
 export default function CheatGame() {
 
@@ -76,6 +76,7 @@ export default function CheatGame() {
 	const [statusMessages, setStatusMessages] = useState([]);
 	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 	const [messageInput, setMessageInput] = useState("");
+	const predefinedMessagesRef = useRef({});
 
 	// Positions of the players at the table: these are dynamically adapted to the screen dimensions
 	// We also need a const playerPositions array to trigger re-renders when the screen changes
@@ -109,6 +110,7 @@ export default function CheatGame() {
 				setHasJoined(true);
 				setExperimentalMode(msg.experimental_mode);
 				playerPositionsRef.current = getPlayerPositions(msg.num_players);
+				predefinedMessagesRef.current = msg.predefined_messages;
 				setPlayerPositions(playerPositionsRef.current);
 				setNumPlayers(msg.num_players);
 				if (msg.current_player === msg.your_id) {
@@ -526,11 +528,8 @@ export default function CheatGame() {
 
 		// Send to backend to broadcast
 		ws.send(JSON.stringify({
-			type: "human_message", message: message
+			type: "human_message", message: message, sender_id: state.your_id
 		}));
-
-		// Show immediately for the clicker
-		addStatusMessage(state.your_id, message);
 	};
 
 	if (!hasJoined) {
@@ -637,7 +636,7 @@ export default function CheatGame() {
 					play={play}
 					setDeclaredRank={setDeclaredRank}
 					messageInput={messageInput}
-					allowedMessages={PREDEFINED_MESSAGES}
+					allowedMessages={predefinedMessagesRef.current}
 					declaredRank={declaredRank}
 					parseCard={parseCard}
 					toggleCard={toggleCard}

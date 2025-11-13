@@ -13,10 +13,6 @@ export const PREDEFINED_MESSAGES = [
 	"Taunt", "Surprise", "Shock", "Thinking", "Doubt", "Approval"
 ];
 
-// Any other constants you have
-export const CARD_RADIUS = 300;
-export const ANIMATION_DURATION = 300;
-
 export const AVATARS = [
 	'🐶', '🐱', '🐯', '🐰', '🐮', '🐹', '🐨',
 	'🐼', '🐙', '🐵', '🐧', '🐦', '🦊', '🐷', '🐸', '🦁'

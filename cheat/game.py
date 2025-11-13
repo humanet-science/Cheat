@@ -203,7 +203,7 @@ class CheatGame:
         # Declare a winner if all cards on hands can be truthfully discarded in play
         if len(player.hand) == 0  or (
                 all([c.rank==player.hand[0].rank for c in player.hand]) and player.hand[0].rank != "A" and (
-                self.current_rank is None or self.current_rank == player.hand[0].rank)
+                self.current_rank is None or (self.current_rank == player.hand[0].rank and self.turn == player.id))
         ):
             self.game_over = True
             self.winner = player.id

@@ -15,14 +15,30 @@ suspicions_confirmed = [
 
 surprise = [
     "Oh, how surprising!",
-    "Not lying -- how unusual",
+    "Not lying for once",
     "New strategy eh?"
 ]
 
 pile_picked_up = [
     "So many liars here",
     "Yikes",
-    "Oh dear ..."
+    "Oh dear ...",
+    "So many aces ...",
+    "Everyone out here lying"
+]
+
+small_pile_picked_up = [
+    "Worth a shot",
+    "Thought I'd give it a go"
+]
+
+taunt_blatant_lie = [
+    "The nerve!",
+    "Jeez!",
+    "So cheeky",
+    "Damn son",
+    "Classic",
+    "I'm not surprised"
 ]
 
 thinking_new_play = [
@@ -42,5 +58,7 @@ message_types = {
     "suspicious": suspicions,
     "suspicions_confirmed": suspicions_confirmed,
     "pile_picked_up": pile_picked_up,
-    "surprise": surprise
+    "surprise": surprise,
+    "taunt_blatant_lie": taunt_blatant_lie,
+    "small_pile_picked_up": small_pile_picked_up
 }
