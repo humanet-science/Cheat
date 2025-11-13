@@ -1,3 +1,4 @@
+import asyncio
 import yaml
 import random
 from datetime import datetime
@@ -28,7 +29,14 @@ app.add_middleware(
 )
 
 def reset_game():
+
     global game
+
+    # Just start a new round if the game has already been initialised
+    if 'game' in globals() and game is not None:
+        game.new_round()
+        return
+
     num_players = game_config['game']['num_players']
 
     # Preserve existing human players from previous game
@@ -74,7 +82,17 @@ def reset_game():
             ))
         # TODO: add more bot types
 
-    game = CheatGame(players=game_players, experimental_mode = game_config["game"].get("experimental_mode", False))
+    # Set up a new game
+    game = CheatGame(
+        players = game_players, experimental_mode = game_config["game"].get("experimental_mode", False),
+        out_dir = game_config["game"].get("out_dir")
+    )
+
+    # Write metadata to folder
+    import os
+    file_path = os.path.join(game.out_path, "game_config.yaml")
+    with open(file_path, "w") as f:
+        yaml.dump(game_config, f)
 
 # Initialize on startup
 reset_game()
@@ -161,13 +179,13 @@ async def collect_messages(*, player_id: int = None, exclude_player_id: int = No
     for player in _query_players:
         if player.type == "bot":
             msg = player.broadcast_message(game, message_type)
-
-            # Log the message
-            game.history.append(
-                GameAction(type="bot_message", player_id=player.id, timestamp=datetime.now(), data=msg)
-            )
             msg_was_broadcast = msg is not None
             if msg is not None:
+
+                # Log and broadcast the message
+                game.log(
+                    GameAction(type="bot_message", player_id=player.id, timestamp=datetime.now(), data=msg)
+                )
                 await broadcast_to_all({"type": "bot_message",
                                         "sender_id": player.id,
                                         "message": msg,
@@ -249,7 +267,6 @@ async def call(player: Player) -> bool:
     return was_lying
 
 # Global message queue
-import asyncio
 message_queue = asyncio.Queue()
 
 async def game_loop(ws: WebSocket):
@@ -262,11 +279,17 @@ async def game_loop(ws: WebSocket):
                 # Receive data from frontend
                 data = await ws.receive_json()
 
+                # Restart loop with new game
+                if data.get("type") == "new_game":
+                    print("Starting a new game")
+                    reset_game()
+                    await send_state_to_all()
+
                 # Handle chat messages immediately (non-blocking)
                 if data.get("type") == "human_message":
 
                     # Log the message
-                    game.history.append(
+                    game.log(
                         GameAction(type="human_message", player_id=data["sender_id"], timestamp=datetime.now(),
                                    data=data["message"])
                     )
@@ -279,12 +302,6 @@ async def game_loop(ws: WebSocket):
                         'message': data["message"],
                         'num_players': len(game.players)
                     })
-
-                # Restart loop with new game
-                if data.get("type") == "new_game":
-                    print("Starting a new game")
-                    reset_game()
-                    await send_state_to_all()
 
                 if data.get("type") == "quit":
                     print(f"Player {data.get('player_id')} requested quit")
@@ -308,13 +325,12 @@ async def game_loop(ws: WebSocket):
         while True:
 
             # Reset game at the start of each new game session
-            reset_game()
             await send_state_to_all()
 
             try:
                 # First, wait for the initial message, which is either "play" or "call"
                 initial_data = await message_queue.get()
-                print(f"Received initial data {initial_data}")
+                print(f"Received initial data {initial_data} for round {game.round}")
                 if initial_data["type"] == "play":
                     declared_rank = initial_data["declared_rank"]
                     cards = initial_data["cards"]
@@ -486,7 +502,6 @@ async def websocket_endpoint(ws: WebSocket):
 
 if __name__ == "__main__":
     import argparse
-    import asyncio
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5050) # Port 3000 is reserved for AirPlay on macOS

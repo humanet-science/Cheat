@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback, useMemo} from "react";
+import React, {useCallback, useEffect, useRef, useState,} from "react";
 import confetti from "canvas-confetti";
 import WelcomePage from './WelcomePage';
 import PlayerHand from './components/CheatGame/PlayerHand';
@@ -9,7 +9,7 @@ import PilePickUpAnimation from "./components/CheatGame/Animations/PilePickUp";
 import DiscardAnimation from "./components/CheatGame/Animations/Discard";
 
 // Components
-import CardRevealOverlay from "./components/CheatGame/GameOverlay";
+import {CardRevealOverlay, GameOverOverlay} from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
@@ -19,9 +19,11 @@ import GameMenu from './components/Menu';
 import {getPlayerColor, getPlayerPositions, parseCard} from './utils/cardUtils';
 import {soundManager} from './utils/soundManager';
 import {useActionQueue} from './components/CheatGame/hooks/useActionQueue';
+import {useScreenSize} from "./components/CheatGame/hooks/useScreenSize";
+import {Logo} from './utils/Logo';
 
 // Constants
-import {VALID_RANKS, PREDEFINED_MESSAGES} from "./utils/constants";
+import {PREDEFINED_MESSAGES, VALID_RANKS} from "./utils/constants";
 
 export default function CheatGame() {
 
@@ -75,8 +77,12 @@ export default function CheatGame() {
 	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 	const [messageInput, setMessageInput] = useState("");
 
-	// Positions of the players at the table
+	// Positions of the players at the table: these are dynamically adapted to the screen dimensions
+	// We also need a const playerPositions array to trigger re-renders when the screen changes
 	const playerPositionsRef = useRef({});
+	const [playerPositions, setPlayerPositions] = useState({});
+  const [numPlayers, setNumPlayers] = useState(0);
+	const { width, height } = useScreenSize();
 
 	const handleJoinGame = (playerName, avatar) => {
 
@@ -103,6 +109,8 @@ export default function CheatGame() {
 				setHasJoined(true);
 				setExperimentalMode(msg.experimental_mode);
 				playerPositionsRef.current = getPlayerPositions(msg.num_players);
+				setPlayerPositions(playerPositionsRef.current);
+				setNumPlayers(msg.num_players);
 				if (msg.current_player === msg.your_id) {
 					setHasActed(false);
 				}
@@ -268,19 +276,12 @@ export default function CheatGame() {
 				const ranksStr = match[2]; // "7, K, A"
 				const ranks = ranksStr.split(', '); // ["7", "K", "A"]
 
-				// Calculate player position for animation
-				const totalPlayers = state.num_players;
-				const angle = 90 + (360 / totalPlayers) * playerId;
-				const angleRad = (angle * Math.PI) / 180;
-				const radius = 300;
-				const x = Math.cos(angleRad) * radius;
-				const y = Math.sin(angleRad) * radius;
-
 				// Show animation
 				soundManager.play('discard');
 
 				// Add to status messages instead of separate discardAnimation
 				const message = playerId === state.your_id ? `You discard ${ranksStr}s` : `Discarding ${ranksStr}s`;
+				const {x, y} = playerPositionsRef.current[playerId];
 				addStatusMessage(playerId, message, {x, y});
 
 				// Add all ranks to discard list
@@ -294,14 +295,7 @@ export default function CheatGame() {
 			// Opinion status sent
 		} else if (msg.type === "bot_message") {
 
-			// Calculate the start position of the animation
-			const totalPlayers = msg.num_players;
-			const angle = 90 + (360 / (totalPlayers)) * (msg.sender_id);
-			const angleRad = (angle * Math.PI) / 180;
-			const radius = 300;
-			const x = Math.cos(angleRad) * radius;
-			const y = Math.sin(angleRad) * radius;
-
+			const {x, y} = playerPositionsRef.current[msg.sender_id];
 			addStatusMessage(msg.sender_id, msg.message, {x, y});
 
 			// Game is over
@@ -328,6 +322,25 @@ export default function CheatGame() {
 			processActionQueue();
 		}
 	}, [actionQueue, animatingCards, speakingPlayers]);
+
+	useEffect(() => {
+		const aspectRatio = width / height;
+		let radiusX, radiusY;
+
+		if (aspectRatio > 1.5) {  // Wide screen
+			radiusX = Math.min(width * 0.3, height*1.5);   // Use more horizontal space
+			radiusY = height * 0.3;  // But don't squash vertically
+		} else if (aspectRatio < 0.5) {
+			radiusX = width * 0.35;
+			radiusY = Math.min(radiusX * 2, height*0.3);
+		} else {  // Tall/narrow screen
+			radiusX = Math.min(width, height) * 0.35;
+			radiusY = radiusX * 0.9;
+		}
+		const positions = getPlayerPositions(numPlayers, radiusX, radiusY);
+		playerPositionsRef.current = positions;
+		setPlayerPositions(positions);
+	}, [width, height, numPlayers]);
 
 	// Checks whether the rank needs to be declared; if not, the text box disappears.
 	// Also validates the rank, so that only valid ranks are sent to the backend.
@@ -534,10 +547,10 @@ export default function CheatGame() {
 
 			{/* Game logo */}
 			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-				<div className="text-white opacity-5 text-9xl satisfy-regular">Cheat!</div>
+				<Logo className="opacity-20" style={{width: "20rem", height: "auto"}} animationDuration="0s"/>
 			</div>
 
-			{/* Menu */}
+			{/* Game menu */}
 			<GameMenu
 				ws={ws}
 				onQuit={() => {
@@ -563,32 +576,25 @@ export default function CheatGame() {
 				}}
 			/>
 
-			{/* Game over */}
-			{gameOver && (<div
-				className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 text-white text-7xl font-bold z-50">
-				<div className="mb-6 satisfy-regular">
-					{winner === state.your_name ? "🎉 You win! 🎉" : `${winner} wins!`}
-				</div>
-				<button
-					onClick={() => {
-						ws.send(JSON.stringify({type: "new_game"}));
-						setGameOver(false);
-						setWinner(null);
-						setSelectedCards([]);     // clear any lingering selections
-						setDeclaredRank("");      // reset the rank box
-						setHasActed(false);       // reset action flag
-						setPileCards([]);
-						setActionQueue([]);
-						setIsNewRound(true);
-						setIsMyTurn(true);
-						setDiscards([]);
-					}}
-					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
-				>
-					New Game
-				</button>
-			</div>)}
+			{/* Game is over */}
+			<GameOverOverlay
+				gameOver={gameOver}
+				winner={winner}
+				state={state}
+				ws={ws}
+				setGameOver={setGameOver}
+				setWinner={setWinner}
+				setSelectedCards={setSelectedCards}
+				setDeclaredRank={setDeclaredRank}
+				setHasActed={setHasActed}
+				setPileCards={setPileCards}
+				setActionQueue={setActionQueue}
+				setIsNewRound={setIsNewRound}
+				setIsMyTurn={setIsMyTurn}
+				setDiscards={setDiscards}
+			/>
 
+			{/* Status Message bubbles floating up from each player */}
 			<StatusMessage statusMessages={statusMessages}/>
 
 			{/* Section containing players and cards*/}
@@ -597,6 +603,7 @@ export default function CheatGame() {
 				{/* Opponents arranged in semi-circle around pile */}
 				<OpponentIcons
 					opponents={opponents}
+					playerPositions={playerPositions}
 					handlePlayerClick={handlePlayerClick}
 					state={state}
 					getPlayerColor={getPlayerColor}
@@ -635,6 +642,7 @@ export default function CheatGame() {
 					parseCard={parseCard}
 					toggleCard={toggleCard}
 					setMessageInput={setMessageInput}
+					playerPositions={playerPositions}
 				/>
 
 				<CardFlyAnimation animatingCards={animatingCards}/>

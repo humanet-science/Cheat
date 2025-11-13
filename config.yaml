@@ -2,6 +2,7 @@ game:
   num_players: 5
   seed: 42
   experimental_mode: False
+  out_dir: /Users/thomasgaskin/Projects/Cheat_Game/game_data
 
 bots:
   - type: RandomBot

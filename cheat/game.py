@@ -1,9 +1,12 @@
 import random
+import os
+import json
 from cheat.player import Player
 from cheat.card import Card, RANKS, SUITS, str_to_Card
 from dataclasses import dataclass
 from typing import List, Any
 from datetime import datetime
+import uuid
 
 class InvalidMove(Exception):
     pass
@@ -18,11 +21,16 @@ class GameAction:
 
 
 class CheatGame:
-    def __init__(self, players: List[Player], experimental_mode: bool):
+    def __init__(self, players: List[Player], experimental_mode: bool,
+                 *, out_dir: str, round: int = 1, game_id: str = None):
 
         # Set up the players
         self.players = players
         self.num_players = len(players)
+
+        # Round and unique game id
+        self.round = round
+        self.game_id = str(uuid.uuid4())[:8] if game_id is None else game_id
 
         # Whether we are using an experimental setup
         self.experimental_mode = experimental_mode
@@ -51,12 +59,35 @@ class CheatGame:
         self.game_over = False
         self.winner = None
 
+        # Create a folder for the game results
+        _date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = os.path.expanduser(
+            os.path.join(out_dir, f"game_{_date_time}")
+        )
+        os.makedirs(out_path, exist_ok=True)
+        self.out_path = out_path
+
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
 
     def get_current_player(self) -> Player:
         return self.players[self.turn]
-
+    
+    def new_round(self):
+        """ Reset to a new game """
+        self.deck = [Card(r, s) for r in RANKS for s in SUITS]
+        random.shuffle(self.deck)
+        for p in self.players:
+            p.hand = []
+        self.deal_cards()
+        self.pile = []
+        self.discarded_ranks = []
+        self.turn = 0
+        self.current_rank = None
+        self.game_over = False
+        self.winner = None
+        self.round += 1 
+        
     def deal_cards(self):
         """ Deal out the cards to the players"""
         while self.deck:
@@ -106,7 +137,7 @@ class CheatGame:
             player.hand.remove(c)
         self.pile.extend([str_to_Card(c) for c in cards_played])
         player.sort_hand()
-        self.history.append(
+        self.log(
             GameAction(type="play", player_id=player.id, timestamp=datetime.now(),
                        data=dict(declared_rank=declared_rank, cards_played=[str_to_Card(c) for c in cards_played]))
         )
@@ -116,7 +147,7 @@ class CheatGame:
         last_player, declared_rank, cards_played = self.last_play()
 
         lying = not all(str_to_Card(c).rank == declared_rank for c in cards_played)
-        self.history.append(
+        self.log(
             GameAction(type="call", player_id=caller_idx, timestamp=datetime.now(),
                        data=dict(was_lying=lying, accused_id=last_player)
                        )
@@ -126,17 +157,17 @@ class CheatGame:
             self.players[last_player].hand.extend(self.pile)
             self.players[last_player].sort_hand()
             result = f"Player {last_player} lied! Picks up {len(self.pile)} cards."
-            self.history.append(
+            self.log(
                 GameAction(type="pick_up", player_id=self.players[last_player].id, timestamp=datetime.now(),
-                           data=self.pile)
+                           data={"pile": [str(c) for c in self.pile]})
             )
         else:
             self.players[caller_idx].hand.extend(self.pile)
             self.players[caller_idx].sort_hand()
             result = f"Player {last_player} told the truth! Player {caller_idx} picks up {len(self.pile)} cards."
-            self.history.append(
+            self.log(
                 GameAction(type="pick_up", player_id=caller_idx, timestamp=datetime.now(),
-                           data=self.pile)
+                           data={"pile": [str(c) for c in self.pile]})
             )
 
         # Clear the pile
@@ -160,7 +191,7 @@ class CheatGame:
                 player.hand = [c for c in player.hand if str_to_Card(c).rank != r]
         if discarded_ranks:
             self.discarded_ranks.extend(discarded_ranks)
-            self.history.append(
+            self.log(
                 GameAction(type="discard", player_id=player.id, timestamp=datetime.now(),
                            data=discarded_ranks
                            )
@@ -176,7 +207,35 @@ class CheatGame:
         ):
             self.game_over = True
             self.winner = player.id
-            self.history.append(
+            self.log(
                 GameAction(type="win", player_id=player.id, timestamp=datetime.now(), data=None)
             )
         return self.game_over
+
+    def write_data(self, *, file_name: str = "game_history"):
+        """ Write the history to a json file. This function can be called periodically for backup purposes.
+        If for any reason writing fails, an exception is printed but the game is not stopped. """
+        if not self.history:
+            return
+
+        try:
+            file_path = os.path.join(self.out_path, f"{file_name}.jsonl")
+            with open(file_path, 'a') as f:
+                for action in self.history:
+                    record = {
+                        'game_id': self.game_id,
+                        'round': self.round,
+                        'type': action.type,
+                        'player_id': action.player_id,
+                        'timestamp': action.timestamp.isoformat(),
+                        'data': action.data if action.type != 'play' else dict(declared_rank=action.data['declared_rank'],
+                                                                               cards_played=[str(c) for c in action.data['cards_played']])
+                    }
+                    f.write(json.dumps(record) + '\n')
+        except Exception as e:
+            print(f"Error saving game data: {e}")
+    
+    def log(self, action: GameAction, **kwargs):
+        """ Logs a new action to the database """
+        self.history.append(action)
+        self.write_data(**kwargs)

@@ -26,11 +26,12 @@ import React from "react";
  */
 export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInput, experimentalMode, rankError,
 												 selectedCards, state, sendMessage, play, setDeclaredRank, messageInput, allowedMessages,
-												 declaredRank, parseCard, toggleCard, setMessageInput}
+												 declaredRank, parseCard, toggleCard, setMessageInput, playerPositions}
 ) {
 	return (
-		<div style={{position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)'}}
-				 className="z-10"
+		<div style={{position: 'fixed', left: `calc(50% + ${playerPositions[0]?.x || 0}px)`,
+    top: `calc(50% + ${playerPositions[0]?.y || 0}px)`, transform: 'translate(-50%, -50%)'}}
+				 className="z-30"
 				 id="player-0"
 		>
 			<div className="flex justify-center">
@@ -100,7 +101,7 @@ export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInpu
 										`}>
 						{/* Background bubble that morphs */}
 						<div className={`
-														absolute inset-0 rounded-2xl backdrop-blur-sm bg-opacity-20
+														absolute inset-0 rounded-2xl
 														transition-all duration-500 ease-in-out
 														${isMyTurn && !hasActed
 							? 'scale-100'

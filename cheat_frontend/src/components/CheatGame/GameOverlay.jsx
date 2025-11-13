@@ -8,7 +8,7 @@ import React from "react";
  * @returns {JSX.Element|null}
  * @constructor
  */
-export default function CardRevealOverlay({revealedCards, parseCard, state}) {
+export function CardRevealOverlay({revealedCards, parseCard, state}) {
 	if (!revealedCards) return null;
 	return (
 		<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -99,5 +99,37 @@ export default function CardRevealOverlay({revealedCards, parseCard, state}) {
 				)}
 			</div>
 		</div>
+	)
+}
+
+export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWinner, setSelectedCards, setDeclaredRank,
+																setHasActed, setPileCards, setActionQueue, setIsNewRound, setIsMyTurn, setDiscards}){
+	if (!gameOver) return null;
+	return (
+		<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
+				<div
+				className="text-center text-5xl items-center justify-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl">
+				<div className="mb-6 satisfy-regular">
+					{winner === state.your_name ? "🎉 You win! 🎉" : `${winner} wins!`}
+				</div>
+				<button
+					onClick={() => {
+						ws.send(JSON.stringify({type: "new_game"}));
+						setGameOver(false);
+						setWinner(null);
+						setSelectedCards([]);     // clear any lingering selections
+						setDeclaredRank("");      // reset the rank box
+						setHasActed(false);       // reset action flag
+						setPileCards([]);
+						setActionQueue([]);
+						setIsNewRound(true);
+						setIsMyTurn(true);
+						setDiscards([]);
+					}}
+					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
+				>
+					New Game
+				</button>
+				</div></div>
 	)
 }

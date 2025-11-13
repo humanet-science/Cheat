@@ -1,6 +1,6 @@
 // WelcomePage.js
 import React, {useState, useEffect} from 'react';
-import AnimatedLogo from './AnimatedLogo';
+import {Logo} from './utils/Logo';
 import {AVATARS} from "./utils/constants";
 
 const WelcomePage = ({onJoinGame}) => {
@@ -57,7 +57,7 @@ const WelcomePage = ({onJoinGame}) => {
 				`}>
 				{/* Logo - Always the same size and position */}
 				<div className="w-full max-w-md"> {/* Fixed container size */}
-					<AnimatedLogo
+					<Logo
 						className="mx-auto"
 						style={{
 							width: "80%", height: "auto",
