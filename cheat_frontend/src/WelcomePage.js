@@ -14,16 +14,25 @@ const WelcomePage = ({onJoinGame}) => {
     const [isWaiting, setIsWaiting] = useState(false);
 
     useEffect(() => {
-        const subtitleTimer = setTimeout(() => {
+
+        // Draw the logo
+        const drawingTimer = setTimeout(() => {
             setShowSubtitle(true);
         }, 800);
 
-        const drawingTimer = setTimeout(() => {
+        // Move the logo up and add subtitles
+        const movingTimer = setTimeout(() => {
+            setAnimationPhase('moving');
+        }, 2000)
+
+        // Add the subtitles
+        const subtitleTimer = setTimeout(() => {
             setAnimationPhase('buttons-visible');
-        }, 2000);
+        }, 3000);
 
         return () => {
             clearTimeout(subtitleTimer);
+            clearTimeout(movingTimer);
             clearTimeout(drawingTimer);
         };
     }, []);
@@ -40,14 +49,14 @@ const WelcomePage = ({onJoinGame}) => {
     };
 
     return (<div
-        className="min-h-screen bg-gradient-to-br from-green-900 to-blue-900 flex flex-col items-center justify-center p-4">
-        <div className="relative w-full max-w-md h-96 mx-auto  border-red-500 border-2">
+        className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="relative w-full max-w-md h-96 mx-auto">
 
             {/* Logo Container */}
             <div className={`
-                    w-full flex flex-col items-center  border-amber-100 border-2
+                    w-full flex flex-col items-center
                     transition-all duration-1000 ease-in-out
-                    ${animationPhase === 'drawing' ? 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/4' : animationPhase === 'buttons-visible' ? 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2' : 'absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full'}
+                    ${animationPhase === 'drawing' ? 'translate-y-1/4 transform' : animationPhase === 'form-visible' ? '-translate-y-full' : ''}
                 `}>
                 <div className="w-full max-w-md">
                     <Logo
@@ -68,17 +77,11 @@ const WelcomePage = ({onJoinGame}) => {
                 </div>
             </div>
 
-            <div className={`flex border-2 border-amber-200 gap-4 w-full justify-center lex-col mt-8 transition-all duration-1000 ease-in-out 
+            <div className={`flex gap-4 w-full justify-center lex-col mt-4 transition-opacity
                 ${
-                  animationPhase === 'buttons-visible'
-                    ? 'opacity-100 top-1/2 -translate-y-20'
-                    : 'opacity-0 top-1/2 translate-y-8'
+                  animationPhase === 'moving' ? 'opacity-100 duration-700 delay-200' : animationPhase === 'buttons-visible' ? 'duration-500' : 'opacity-0'
                 } `
             }>
-
-            {/*/!* Action Buttons - Only show after drawing *!/*/}
-            {/*{animationPhase === 'buttons-visible' && (*/}
-
                     <button
                         onClick={handleNewGameClick}
                         className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
@@ -94,12 +97,12 @@ const WelcomePage = ({onJoinGame}) => {
             </div>
 
 
-            {/* Welcome Box - Slides in when New Game is clicked */}
+            {/* Welcome Box, slides in when New Game is clicked */}
             <div className={`
-                    w-full max-w-md mt-auto mb-8
-                    transition-all ease-in-out transform z-10
-                    ${animationPhase === 'form-visible' ? 'opacity-100 absolute top-5 mt-5 left-1/2 transform -translate-x-1/2 -translate-y-0 drop-shadow-lg' : 'opacity-0 absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-1/3'}
-                    ${animationPhase === 'form-visible' ? 'flex-1 justify-start' : 'flex-0'}
+                    w-full max-w-md mt-10 pb-10
+                    transition-all ease-in-out transform z-50
+                    ${animationPhase === 'form-visible' ? 'opacity-100 mt-5 drop-shadow-lg' : 'opacity-0 transform'}
+                    ${animationPhase === 'form-visible' ? 'flex-1 justify-start -translate-y-1/3' : 'flex-0'}
                 `} style={{transitionDuration: '1100ms'}}>
 
                 {animationPhase === 'form-visible' && (
