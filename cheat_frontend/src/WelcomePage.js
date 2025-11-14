@@ -12,7 +12,7 @@ const WelcomePage = ({onJoinGame}) => {
     const [gameMode, setGameMode] = useState('single');
     const [numPlayers, setNumPlayers] = useState(5);
     const [isWaiting, setIsWaiting] = useState(false);
-
+    const [showGameModeHelp, setShowGameModeHelp] = useState(false);
     useEffect(() => {
 
         // Draw the logo
@@ -78,22 +78,19 @@ const WelcomePage = ({onJoinGame}) => {
             </div>
 
             <div className={`flex gap-4 w-full justify-center lex-col mt-4 transition-opacity
-                ${
-                  animationPhase === 'moving' ? 'opacity-100 duration-700 delay-200' : animationPhase === 'buttons-visible' ? 'duration-500' : 'opacity-0'
-                } `
-            }>
-                    <button
-                        onClick={handleNewGameClick}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
-                    >
-                        New Game
-                    </button>
-                    <button
-                        onClick={() => alert('Tutorial coming soon!')}
-                        className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
-                    >
-                        Tutorial
-                    </button>
+                ${animationPhase === 'moving' ? 'opacity-100 duration-700 delay-200' : animationPhase === 'buttons-visible' ? 'duration-500' : 'opacity-0'} `}>
+                <button
+                    onClick={handleNewGameClick}
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+                >
+                    New Game
+                </button>
+                <button
+                    onClick={() => alert('Tutorial coming soon!')}
+                    className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+                >
+                    Tutorial
+                </button>
             </div>
 
 
@@ -109,14 +106,16 @@ const WelcomePage = ({onJoinGame}) => {
                     <div className="rounded-2xl bg-white p-8 max-w-md w-full shadow-2xl">
 
                         {/* Close Button */}
-                            <button
-                                onClick={() => setAnimationPhase('buttons-visible')}
-                                className="absolute top-1 right-1 text-gray-500 hover:text-gray-700 transition-colors"
-                            >
-                                <svg className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                        <button
+                            onClick={() => setAnimationPhase('buttons-visible')}
+                            className="absolute top-1 right-1 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            <svg className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
 
                         <form onSubmit={handleSubmit}>
                             {/* Player Name Input */}
@@ -125,7 +124,7 @@ const WelcomePage = ({onJoinGame}) => {
                                     type="text"
                                     value={playerName}
                                     onChange={(e) => setPlayerName(e.target.value)}
-                                    placeholder="Enter a player name..."
+                                    placeholder="Choose a player name ..."
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     maxLength={20}
                                     required
@@ -155,8 +154,23 @@ const WelcomePage = ({onJoinGame}) => {
                             {/* Game mode selection */}
                             <div className="mb-6">
                                 <label className="block text-gray-500 text-sm font-bold mb-4">
-                                    Game Mode
+                                    <span className="flex items-center gap-2">Game Mode
+
+                                      <button
+                                          onClick={() => setShowGameModeHelp(!showGameModeHelp)}
+                                          className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs hover:bg-gray-300 transition-colors"
+                                      >
+                                          ?
+                                      </button>
+                                                                {/* Help Tooltip */}
+                                {showGameModeHelp && (<div
+                                    className="mb-3 p-3 absolute left-1/3 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700">
+                                    In <strong>Single Player</strong> all opponents are bots; in <strong>Multiplayer</strong> some opponents are human.
+                                </div>)}
+                                    </span>
                                 </label>
+
+
                                 <div className="flex gap-4">
                                     <button
                                         type="button"
