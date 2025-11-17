@@ -85,9 +85,9 @@ export default function CheatGame() {
   const [numPlayers, setNumPlayers] = useState(0);
 	const { width, height } = useScreenSize();
 
-	const handleJoinGame = (playerName, avatar) => {
+	const handleJoinGame = (playerName, avatar, num_players) => {
 
-		console.log("handleJoinGame called with:", playerName, avatar)
+		console.log("handleJoinGame called with:", playerName, avatar, num_players)
 
 		const socket = new WebSocket("ws://localhost:5050/ws");
 		console.log("WebSocket created, connecting...");
@@ -96,8 +96,10 @@ export default function CheatGame() {
 
 			// Send player info immediately after connection
 			socket.send(JSON.stringify({
-				type: "player_join", name: playerName, avatar: avatar
+				type: "player_join", name: playerName, avatar: avatar, num_players
 			}));
+
+			setNumPlayers(num_players);
 		};
 
 		socket.onmessage = (event) => {
@@ -112,7 +114,6 @@ export default function CheatGame() {
 				playerPositionsRef.current = getPlayerPositions(msg.num_players);
 				predefinedMessagesRef.current = msg.predefined_messages;
 				setPlayerPositions(playerPositionsRef.current);
-				setNumPlayers(msg.num_players);
 				if (msg.current_player === msg.your_id) {
 					setHasActed(false);
 				}

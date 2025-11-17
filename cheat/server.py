@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def reset_game():
+def reset_game(num_players: int = None):
 
     global game
 
@@ -36,8 +36,6 @@ def reset_game():
     if 'game' in globals() and game is not None:
         game.new_round()
         return
-
-    num_players = game_config['game']['num_players']
 
     # Preserve existing human players from previous game
     human_players = []
@@ -68,10 +66,8 @@ def reset_game():
 
     # Bot players can always be reset when a new game starts
     # TODO for now ...
-    for i, bot_config in enumerate(game_config['bots']):
-        # TODO: how is the total number of players determined?
-        if i > num_players:
-            break
+    for i in range(num_players-1):
+        bot_config = game_config['bots'][i]
         if bot_config['type'] == "RandomBot":
             game_players.append(RandomBot(
                 id=i + 1,
@@ -94,9 +90,6 @@ def reset_game():
     file_path = os.path.join(game.out_path, "game_config.yaml")
     with open(file_path, "w") as f:
         yaml.dump(game_config, f)
-
-# Initialize on startup
-reset_game()
 
 # Make a state dictionary for a player that can be broadcast to the frontend
 def get_game_info() -> dict:
@@ -455,6 +448,8 @@ async def websocket_endpoint(ws: WebSocket):
         # Wait for player join info first
         data = await ws.receive_json()
         if data["type"] == "player_join":
+
+            reset_game(data["num_players"])
 
             # Update human player info
             game.players[0].name = data["name"]

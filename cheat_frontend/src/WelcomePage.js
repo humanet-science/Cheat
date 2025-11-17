@@ -44,7 +44,9 @@ const WelcomePage = ({onJoinGame}) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (playerName.trim() && selectedAvatar && acceptedTerms) {
-            onJoinGame(playerName.trim(), selectedAvatar, gameMode, numPlayers);
+					if (gameMode === 'single'){
+						onJoinGame(playerName.trim(), selectedAvatar, numPlayers);
+					}
         }
     };
 
@@ -233,7 +235,8 @@ const WelcomePage = ({onJoinGame}) => {
                             <button
                                 type="submit"
                                 disabled={!playerName.trim() || !selectedAvatar || !acceptedTerms}
-                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
+                                text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
                             >
                                 Join Game
                             </button>
