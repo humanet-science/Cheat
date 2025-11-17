@@ -2,7 +2,7 @@
 game:
   seed: 42
   experimental_mode: False
-  out_dir: /Users/thomasgaskin/Projects/Cheat_Game/game_data
+  out_dir: ~/Cheat_game_data/
 
 # Bot settings
 bots:

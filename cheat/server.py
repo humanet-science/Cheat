@@ -1,14 +1,17 @@
 import asyncio
+from contextlib import asynccontextmanager
 import yaml
 import random
-from datetime import datetime
-from fastapi import FastAPI, WebSocket,WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+import os
+from collections import deque
 
-from cheat.game import CheatGame, GameAction
+from cheat.game import CheatGame
 from cheat.bots import RandomBot
 from cheat.player import Player
+from typing import Literal
 
 # Path to configuration file, located in root
 game_config_path = Path(__file__).parent.parent / "config.yaml"
@@ -19,7 +22,35 @@ with open(game_config_path, "r") as f:
 seed = game_config['game'].get('seed')
 random.seed(seed)
 
-app = FastAPI()
+# Store the game manager task for potential cleanup
+game_manager_task = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global game_manager_task
+    # Startup code
+    try:
+        game_manager_task = asyncio.create_task(game_manager())
+        print("Game manager started")
+    except Exception as e:
+        print(f"Error starting game manager: {e}")
+        raise
+
+    yield
+
+    # Shutdown code
+    if game_manager_task and not game_manager_task.done():
+        game_manager_task.cancel()
+        try:
+            await game_manager_task
+        except asyncio.CancelledError:
+            print("Game manager task cancelled successfully")
+        except Exception as e:
+            print(f"Error during game manager shutdown: {e}")
+
+
+app = FastAPI(lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,459 +59,181 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def reset_game(num_players: int = None):
+# List of websockets waiting for each type of game
+waiting_queues = dict((k, dict(single=deque([]), multiplayer=deque([]))) for k in [1, 3, 4, 5, 6])
 
-    global game
+# Active games currently playing
+active_games = {} # {game_id: CheatGame instance}
 
-    # Just start a new round if the game has already been initialised
-    if 'game' in globals() and game is not None:
-        game.new_round()
-        return
+# Maximum number of parallel games server can handle
+MAX_NUM_ACTIVE_GAMES = 3
 
-    # Preserve existing human players from previous game
-    human_players = []
-    if 'game' in globals() and game:
-        human_players = [player for player in game.players if player.type == "human"]
+# WebSocket-to-Game dictionary for routing messages
+player_to_game = {} # {websocket: game_id} for routing messages
 
-    # Create players
+async def new_game(num_players: int, human_players: list, mode: Literal['single', 'multiplayer']) -> CheatGame:
+    """ Creates a new CheatGame instance. Returns a dictionary with the game_id as key and the game as value.
+
+    :param num_players: total number of players
+    :param human_players: list of human players. If the game_mode is 'single', the list only has one human player.
+        The remaining players are filled up with bots.
+    :param mode: game mode (can be 'single' or 'multiplayer')
+    :return: dict {game_id: game}
+    """
     game_players = []
+    game_players.extend(human_players)
 
-    # Add preserved human players or create default human
-    if human_players:
-        # Reset human player state but keep name, avatar, etc.
-        for human in human_players:
-            human.hand = []
-            human.connected = human.ws is not None  # Keep connection status
-            game_players.append(human)
-    else:
-        # First, add the human player if none are already present
-        # TODO: as we allow for multiplayer, integrate this with the bots
-        game_players.append(Player(
-            id=0,
-            name="", # these are set when human joins
-            avatar="",
-            type="human",
-            hand=[],
-            connected=False
-        ))
-
-    # Bot players can always be reset when a new game starts
-    # TODO for now ...
-    for i in range(num_players-1):
+    # Fill up with bots
+    for i in range(num_players - len(human_players)):
         bot_config = game_config['bots'][i]
         if bot_config['type'] == "RandomBot":
             game_players.append(RandomBot(
-                id=i + 1,
+                id=None,
                 name=bot_config['name'],
                 avatar=bot_config['avatar'],
                 p_call=bot_config.get('p_call', 0.3),
                 p_lie=bot_config.get('p_lie', 0.3),
                 verbosity=bot_config.get('verbosity', 0.3)
             ))
-        # TODO: add more bot types
+        # TODO: add other bots
+        # TODO: generalise player adding logic
 
-    # Set up a new game
+    # Now randomly shuffle the players if more than one human present
+    if len(human_players) > 1:
+        random.shuffle(game_players)
+
+    # Assign each player an id
+    for i, player in enumerate(game_players):
+        player.id = i
+
+    # Set up a new game. Each game maintains its own message queue
     game = CheatGame(
-        players = game_players, experimental_mode = game_config["game"].get("experimental_mode", False),
-        out_dir = game_config["game"].get("out_dir")
+        players=game_players,
+        experimental_mode=game_config["game"].get("experimental_mode", False),
+        game_mode=mode,
+        message_queue = asyncio.Queue(), # Set up a new queue
+        out_dir=game_config["game"].get("out_dir")
     )
 
+    for player in human_players:
+        player_to_game[id(player.ws)] = game.game_id
+
+    # Send welcome message with assigned ID
+    for player in game.players:
+        await player.send_message(
+            {"type": "new_round",
+             **player.get_info(),
+             **game.get_info()}
+        )
+
     # Write metadata to folder
-    import os
+    # TODO: currently the same for all games, but some game-specific data (e.g. num_players) must be set from frontend
     file_path = os.path.join(game.out_path, "game_config.yaml")
     with open(file_path, "w") as f:
         yaml.dump(game_config, f)
 
-# Make a state dictionary for a player that can be broadcast to the frontend
-def get_game_info() -> dict:
-    return {
-        "current_player": game.turn,
-        "current_player_name": game.players[game.turn].name,
-        "current_rank": game.current_rank,
-        "players": [player.get_public_info() for player in game.players],
-        "hands": [len(p.hand) for p in game.players],
-        "num_players": game.num_players,
-        "pile_size": len(game.pile),
-        "human_ids": [player.id for player in game.players if player.type == 'human'],
-        "experimental_mode": game.experimental_mode,
-        "predefined_messages": game_config.get("experiment", {}).get("predefined_messages", [])
-    }
+    # Return the game
+    return game
 
-def get_player_state(player) -> dict:
-    return {
-        "your_id": player.id,
-        "your_hand": [str(card) for card in player.hand],
-        "your_type": player.type,
-        "your_name": player.name
-    }
 
-async def send_message(player, message):
-    if player.connected and player.ws and hasattr(player, 'ws'):
-        try:
-            await player.ws.send_json(message)
-        except Exception as e:
-            print(f"Error sending to player {player.id}: {e}")
+async def try_start_game_from_queue(num_players, mode):
 
-async def broadcast_to_all(message: dict):
-    for player in game.players:
-        if player.type != 'bot':
-            await send_message(player, message)
+    queue = waiting_queues[num_players][mode]
 
-async def broadcast_to_others(exclude_player_id: int, message: dict):
-    for player in game.players:
-        if player.id != exclude_player_id and player.type != 'bot':
-            await send_message(player, message)
+    # Minimum number of players in queue required to start the game: 1 for single, 2 for 3-player, 3 for all others
+    min_players = 1 if (num_players == 1 or mode == 'single') else 2 if num_players == 3 else 3
 
-async def send_state_to_all():
-    """ Broadcast player-specific states to all players"""
-    for player in game.players:
-        if player.type != 'bot':
-            await player.ws.send_json({
-                "type": "state",
-                **get_player_state(player),
-                **get_game_info()
-            })
+    if len(queue) >= min_players and len(active_games) < MAX_NUM_ACTIVE_GAMES:
 
-async def check_for_winner(player: Player = None) -> bool:
-    """ Check if a player has won"""
-    for p in game.players if player is None else [player]:
-        if game.check_winner(p):
-            await broadcast_to_all({"type": "game_over", "winner": p.name})
-            break
-    return game.game_over
+        # Create a new game with the people in the front of the queue
+        _players = [waiting_queues[num_players][mode].popleft() for _ in range(min_players)]
+        _game = await new_game(num_players, human_players=_players, mode = mode)
 
+        # Add game to list of active games
+        active_games[_game.game_id] = _game
 
-async def check_for_fours(player: Player = None):
-    # Check if four of a kind can be discarded: by default, this is the current player, but can also be the previous
-    # player.
-    player = game.players[game.turn] if player is None else player
-    msg = game.four_of_a_kind_check(player)
-    print(f"Checking for four of a kind for player {player.name}; result: {msg}.")
+        # Start the game loop
+        while not _game.game_over:
+            await _game.broadcast_to_all({
+                "type": "new_round",
+                **_game.get_info()
+            }, append_state=True)
+            await _game.game_loop()
 
-    if msg:
-        await broadcast_to_all({"type": "discard", "result": msg, **get_game_info()})
-        await send_state_to_all()
+        # When game is over, remove from active games
+        active_games.pop(_game.game_id)
 
-async def collect_messages(*, player_id: int = None, exclude_player_id: int = None, message_type: str = None) -> bool:
+async def game_manager():
 
-    if player_id is not None:
-        _query_players = [game.players[player_id]]
-    elif exclude_player_id is not None:
-        _query_players = [p for p in game.players if p.id != exclude_player_id]
-    else:
-        _query_players = game.players
+    """Continuously check queues and start games when possible"""
+    while True:
+        if len(active_games) < MAX_NUM_ACTIVE_GAMES:
+            for key in waiting_queues.keys():
+                for mode in waiting_queues[key].keys():
+                    if len(waiting_queues[key][mode]) > 0:
+                        await try_start_game_from_queue(key, mode)
 
-    msg_was_broadcast = False
-    for player in _query_players:
-        if player.type == "bot":
-            msg = player.broadcast_message(game, message_type)
-            msg_was_broadcast = msg is not None
-            if msg is not None:
+        # Check every second
+        await asyncio.sleep(1)
 
-                # Log and broadcast the message
-                game.log(
-                    GameAction(type="bot_message", player_id=player.id, timestamp=datetime.now(), data=msg)
-                )
-                await broadcast_to_all({"type": "bot_message",
-                                        "sender_id": player.id,
-                                        "message": msg,
-                                        **get_game_info()})
-
-    return msg_was_broadcast
-
-async def play(player: Player, declared_rank: str, cards: list) -> None:
-
-    """ Play a card """
-    await collect_messages(player_id=player.id, message_type="thinking")
-    game.play_turn(player, declared_rank, cards)
-    print(f"Player {player.name} plays {cards} and declared {declared_rank}.")
-
-    # Broadcast the play
-    await broadcast_to_all({
-        "type": "card_played",
-        "cards": [str(c) for c in cards],
-        "declared_rank": declared_rank,
-        "card_count": len(cards),
-        **get_game_info()
-    })
-
-    # Collect opinions
-    await collect_messages(exclude_player_id=player.id)
-
-    # Move to next player
-    game.next_player()
-    await send_state_to_all()
-
-async def call(player: Player) -> bool:
-    """ Call a play."""
-
-    # Get the data from the last game play
-    last_player, declared_rank, cards_played = game.last_play()
-    await collect_messages(player_id=player.id, message_type="thinking")
-
-    # Result of the call
-    result = game.call_bluff(player.id)
-
-    # Check who picks up the pile to determine who goes next
-    if f"Player {player.id} picks up" in result:
-        print(f"Unsuccessful call by {game.players[game.turn].name}.")
-        was_lying = False
-    else:
-        print(f"Successful call by {game.players[game.turn].name}.")
-        was_lying = True
-
-    # Broadcast bluff result with revealed cards
-    await broadcast_to_all({
-        "type": "bluff_called",
-        "caller": player.id,
-        "caller_name": player.name,
-        "accused": game.players[last_player].id,
-        "accused_name": game.players[last_player].name,
-        "declared_rank": declared_rank,
-        "actual_cards": [str(c) for c in cards_played],
-        "was_lying": was_lying,
-        "result": result,
-        **get_game_info()
-    })
-
-    # Whoever picked up cards does a four-of-a-kind check
-    if was_lying:
-        await check_for_fours(game.players[last_player])
-    else:
-        await check_for_fours(player)
-
-    # Send updated state to all clients after bluff
-    await send_state_to_all()
-
-    # Collect opinions
-    await collect_messages()
-
-    # Unsuccessful call means caller skips a turn
-    if not was_lying:
-        game.next_player()
-    print(f"{game.players[game.turn].name}'s turn.")
-
-    return was_lying
-
-# Global message queue
-message_queue = asyncio.Queue()
-
-async def game_loop(ws: WebSocket):
-    """ Main game loop function"""
-
-    # Message receiver just puts messages in queue
-    async def message_receiver():
-        while True:
-            try:
-                # Receive data from frontend
-                data = await ws.receive_json()
-
-                # Restart loop with new game
-                if data.get("type") == "new_game":
-                    print("Starting a new game")
-                    reset_game()
-                    await send_state_to_all()
-
-                # Handle chat messages immediately (non-blocking)
-                elif data.get("type") == "human_message":
-                    # Log the message
-                    game.log(
-                        GameAction(type="human_message", player_id=data["sender_id"], timestamp=datetime.now(),
-                                   data=data["message"])
-                    )
-
-                    # Broadcast instantly to all players
-                    await broadcast_to_all({
-                        'type': 'human_message',
-                        'sender_id': data["sender_id"],
-                        'sender_name': game.players[data["sender_id"]].name,
-                        'message': data["message"],
-                        'num_players': len(game.players)
-                    })
-
-                elif data.get("type") == "quit":
-                    print(f"Player {data.get('player_id')} requested quit")
-                    reset_game()
-                    await ws.close()
-                    break
-
-                else:
-                    # Game actions go to the queue
-                    await message_queue.put(data)
-
-            except WebSocketDisconnect:
-                break
-
-    # Message receiver task which just runs permanently in the background
-    receiver_task = asyncio.create_task(message_receiver())
-
-    try:
-
-        # OUTER LOOP: Keep connection alive for multiple games
-        while True:
-
-            # Reset game at the start of each new game session
-            await send_state_to_all()
-
-            try:
-                # First, wait for the initial message, which is either "play" or "call"
-                initial_data = await message_queue.get()
-                print(f"Received initial data {initial_data} for round {game.round}")
-                if initial_data["type"] == "play":
-                    declared_rank = initial_data["declared_rank"]
-                    cards = initial_data["cards"]
-                    await play(game.players[game.turn], declared_rank, cards)
-
-                elif initial_data["type"] == "call":
-                    await call(game.players[game.turn])
-
-                # Now start the loop
-                while True:
-
-                    # Check for new messages without blocking
-                    try:
-                        data = await asyncio.wait_for(message_queue.get(), timeout=0.1)
-                        print(f"Received data {data}")
-
-                    except asyncio.TimeoutError:
-                        pass  # No new messages, continue game
-
-                    # Get the current player
-                    current_player = game.players[game.turn]
-                    print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
-
-                    # Check if current player has won.
-                    await check_for_winner(current_player)
-                    if game.game_over:
-                        await asyncio.sleep(0.1)
-                        break
-
-                    # Human's turn
-                    if current_player.type == "human":
-                        # Get new input
-                        data = await message_queue.get()
-
-                        # 0 is currently the only human player
-                        if current_player.id == 0:
-                            # Card has been played
-                            if data["type"] == "play":
-
-                                # Humans could forget to call the last player's card and miss that they had been lying
-                                last_player, _, _ = game.last_play()
-                                if last_player is not None:
-                                    await check_for_winner(game.players[last_player])
-                                    if game.game_over:
-                                        await asyncio.sleep(0.1)
-                                        break
-
-                                declared_rank = data["declared_rank"]
-                                cards = data["cards"]
-                                await play(current_player, declared_rank, cards)
-
-                            # Calling a bluff
-                            elif data["type"] == "call":
-                                await call(current_player)
-
-                        else:
-                            # It's another human's turn (for future multiplayer)
-                            # Their WebSocket will handle it
-                            continue
-
-                    current_player = game.players[game.turn]
-                    print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
-                    if current_player.type == 'bot':
-
-                        # Discard any fours
-                        await check_for_fours()
-
-                        # Pick an action
-                        action = current_player.choose_action(game)
-
-                        # Play card
-                        if action[0] == "play":
-
-                            # Check for win
-                            game_is_over = await check_for_winner(current_player)
-                            if game_is_over:
-                                continue
-
-                            _, declared_rank, cards = action
-                            await play(current_player, declared_rank, cards)
-
-                        # Call previous play
-                        elif action[0] == "call":
-
-                            was_lying = await call(current_player)
-
-                            # If the call was successful, they play
-                            if was_lying:
-                                game_is_over = await check_for_winner(current_player)
-                                if game_is_over:
-                                    continue
-                                _, declared_rank, cards = current_player.make_move(game)
-                                await play(current_player, declared_rank, cards)
-
-                    # Add a small delay to account for the animations in the frontend: this way the backend is not always
-                    # too many steps ahead of the frontend
-                    await asyncio.sleep(1)
-
-            except WebSocketDisconnect:
-                print(f"WebSocket disconnected")
-                break  # Break outer loop completely
-            except Exception as e:
-                print(f"Game error: {e}")
-                # Don't break - continue to next game
-                continue
-
-    except WebSocketDisconnect:
-        print(f"Client 0 disconnected")
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-    finally:
-        game.players[0].connected = False
-        game.players[0].ws = None
-        receiver_task.cancel()
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+
     await ws.accept()
+    _player = None
+    _current_game = None
     try:
-        # Wait for player join info first
+
+        # Wait for player join info
         data = await ws.receive_json()
+
+        # Create Player instance and append to relevant queue
         if data["type"] == "player_join":
 
-            reset_game(data["num_players"])
+            _player = Player(id=None, ws=ws, name=data["name"], avatar=data["avatar"], hand=[], type="human", connected=True)
+            waiting_queues[data["num_players"]][data["game_mode"]].append(_player)
 
-            # Update human player info
-            game.players[0].name = data["name"]
-            game.players[0].avatar = data["avatar"]
-            game.players[0].ws = ws
-            game.players[0].connected = True
+            print(
+                f"Player {data['name']} joined {data['num_players']}-player queue for mode {data['game_mode']}. "
+                f"WebSocket id: {id(ws)}. "
+                f"Queue size: {len(waiting_queues[data['num_players']][data['game_mode']])}."
+            )
+            
+            await ws.send_json({"type": "queue_joined", "message": "Waiting for other players ..."})
 
-            # Send welcome message with assigned ID
-            await ws.send_json({
-                "type": "new_game",
-                "your_id": 0,
-                "your_hand": [str(card) for card in game.players[0].hand],
-                "your_type": game.players[0].type,
-                **get_game_info()
-            })
+        # Keep connection alive and listen for messages
+        while True:
+            try:
+                message = await asyncio.wait_for(ws.receive_json(), timeout=1.0)
 
-            # Notify other players (for future multiplayer)
-            await broadcast_to_others(0, {
-                "type": "player_joined",
-                "player": game.players[0].get_public_info()
-            })
+                # Route the message to the correct game
+                if id(ws) in player_to_game.keys():
+                    _current_game = active_games[player_to_game[id(ws)]]
+                    await _current_game.message_queue.put({
+                        "player_id": _player.id,
+                        "message": message
+                    })
 
-        # Now continue with the game loop
-        await game_loop(ws)
+                else:
+                    print(f"Message received but player not in any active game: {message}")
 
+            except asyncio.TimeoutError:
+                # No message received, connection still alive
+                # Check if player has been assigned to a game
+                if _player and _player.id is not None and _current_game is None:
+                    for game_id, game in active_games.items():
+                        if _player in game.players:
+                            _current_game = game
+                            player_to_game[id(ws)] = game_id
+                            print(f"Player {_player.name} assigned to game {game_id}")
+                            break
+                continue
     except WebSocketDisconnect:
-        print(f"Player {game.players[0].id} disconnected")
 
-        # Update the human player's connection status in the game
-        game.players[0].connected = False
-        game.players[0].ws = None
+        # TODO: Handle player disconnect from queue or game
+        pass
+        # await handle_player_disconnect(ws)
 
 
 if __name__ == "__main__":

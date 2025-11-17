@@ -6,7 +6,7 @@ from cheat.card import Card, RANK_ORDER
 """ Generic Player class that applies to humans, bots, and LLMs equally """
 @dataclass
 class Player:
-    id: int
+    id: int | None
     ws: WebSocket = None
     name: str = ""
     avatar: str = ""
@@ -18,15 +18,17 @@ class Player:
         if self.hand is None:
             self.hand = []
 
-    def get_public_info(self):
-        return {
+    def get_info(self) -> dict:
+        """ State dictionary that can be broadcast to frontend"""
+        return dict(your_info={
             "id": self.id,
             "name": self.name,
             "avatar": self.avatar,
             "type": self.type,
+            "hand": [str(card) for card in self.hand],
             "connected": self.connected,
             "cardCount": len(self.hand)
-        }
+        })
 
     def sort_hand(self):
         """ Sort the hand by rank """
@@ -45,8 +47,18 @@ class Player:
         # mechanisms
         return None
 
+    async def send_message(self, message):
+        """ Send a message to the player's websocket"""
+        if self.connected and self.ws and hasattr(self, 'ws'):
+            try:
+                print(f"sending message type {message.get('type')} to player {self.id} on WebSocket: {id(self.ws)}")
+                await self.ws.send_json(message)
+                print(f"Message sent successfully!")
+            except Exception as e:
+                print(f"Error sending to player {self.id}: {e}")
+
 class HumanPlayer(Player):
-    def __init__(self, id: int, name: str, avatar: str, ws: WebSocket = None):
+    def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None):
         super().__init__(id=id, name=name, avatar=avatar, type="human", ws=ws)
 
     async def make_move(self, game):

@@ -13,6 +13,8 @@ const WelcomePage = ({onJoinGame}) => {
     const [numPlayers, setNumPlayers] = useState(5);
     const [isWaiting, setIsWaiting] = useState(false);
     const [showGameModeHelp, setShowGameModeHelp] = useState(false);
+    const [showNumPlayersHelp, setShowNumPlayersHelp] = useState(false);
+
     useEffect(() => {
 
         // Draw the logo
@@ -44,9 +46,7 @@ const WelcomePage = ({onJoinGame}) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (playerName.trim() && selectedAvatar && acceptedTerms) {
-					if (gameMode === 'single'){
-						onJoinGame(playerName.trim(), selectedAvatar, numPlayers);
-					}
+            onJoinGame(playerName.trim(), selectedAvatar, numPlayers, gameMode);
         }
     };
 
@@ -194,7 +194,20 @@ const WelcomePage = ({onJoinGame}) => {
                             {/* Number of players */}
                             <div className="mb-6">
                                 <label className="block text-gray-500 text-sm font-bold mb-4">
-                                    Number of Players
+                                    <span className="flex items-center gap-2">Number of Players
+
+                                      <button
+                                          onClick={() => setShowNumPlayersHelp(!showNumPlayersHelp)}
+                                          className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs hover:bg-gray-300 transition-colors"
+                                      >
+                                          ?
+                                      </button>
+                                                                {/* Help Tooltip */}
+                                {showNumPlayersHelp && (<div
+                                    className="mb-3 p-3 absolute left-1/2 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700">
+                                    In Multiplayer mode, at most 3 players will be human and at least one player will be a bot.
+                                </div>)}
+                                    </span>
                                 </label>
                                 <div className="flex gap-2">
                                     {[3, 4, 5, 6].map((count) => (<button
@@ -210,6 +223,7 @@ const WelcomePage = ({onJoinGame}) => {
 
                             {/* Terms and Conditions Checkbox */}
                             <div className="mb-6">
+
                                 <label className="flex items-start space-x-3">
                                     <input
                                         type="checkbox"
