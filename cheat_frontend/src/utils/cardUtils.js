@@ -6,7 +6,7 @@ import {PLAYER_GRADIENTS, CARD_RADIUS} from './constants';
  * @returns {string}
  */
 export const getPlayerColor = (playerId) => {
-	return PLAYER_GRADIENTS[playerId % PLAYER_GRADIENTS.length];
+    return PLAYER_GRADIENTS[playerId % PLAYER_GRADIENTS.length];
 };
 
 
@@ -20,29 +20,27 @@ export const getPlayerColor = (playerId) => {
  * @returns {{}}
  */
 export function getPlayerPositions(totalPlayers, yourId, radiusX = 400, radiusY = 250) {
-  const positions = {};
+    const positions = {};
+    for (let id = 0; id < totalPlayers; id++) {
+        const relativePosition = (id - yourId + totalPlayers) % totalPlayers;
+        const angle = 90 + (360 / totalPlayers) * relativePosition;
+        const angleRad = (angle * Math.PI) / 180;
+        const x = Math.cos(angleRad) * radiusX;  // Wider X radius
+        const y = Math.sin(angleRad) * radiusY;  // Shorter Y radius
+        positions[id] = {x, y, angle};
+    }
 
-  for (let id = 0; id < totalPlayers; id++) {
-		const relativePosition = (id - yourId + totalPlayers) % totalPlayers;
-		console.log("Your id", yourId, "relativePos", relativePosition, "id", id);
-
-    const angle = 90 + (360 / totalPlayers) * relativePosition;
-    const angleRad = (angle * Math.PI) / 180;
-    const x = Math.cos(angleRad) * radiusX;  // Wider X radius
-    const y = Math.sin(angleRad) * radiusY;  // Shorter Y radius
-    positions[id] = {x, y, angle};
-  }
-
-  return positions;
+    return positions;
 }
+
 // Helper function to visualise cards
 export const parseCard = (cardStr) => {
-		// Extract rank and suit from string
-		const rank = cardStr.slice(0, -1);
-		const suit = cardStr.slice(-1);
+    // Extract rank and suit from string
+    const rank = cardStr.slice(0, -1);
+    const suit = cardStr.slice(-1);
 
-		// Determine color based on suit
-		const isRed = suit === '♥' || suit === '♦';
+    // Determine color based on suit
+    const isRed = suit === '♥' || suit === '♦';
 
-		return {rank, suit, isRed};
+    return {rank, suit, isRed};
 };

@@ -3,8 +3,6 @@ import React from "react";
 export function OpponentIcons({opponents, playerPositions, handlePlayerClick, state, getPlayerColor}) {
 
 	return (opponents.map((opp, index) => {
-		console.log("opps", opponents);
-		console.log("pos", playerPositions);
 		// Get the player position
 		return (<div
 			key={opp.id}

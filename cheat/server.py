@@ -222,14 +222,21 @@ async def websocket_endpoint(ws: WebSocket):
                 message = await asyncio.wait_for(ws.receive_json(), timeout=1.0)
                 print(f"Received data for {player.name}: {message}")
 
+                # Player has left the waiting queue
+                if message["type"] == "exit_queue":
+                    waiting_queues[data["num_players"]][data["game_mode"]].remove(player)
+                    print(f"Removed player {player.name} from queue.")
+
                 # Route the message to the correct game
-                if id(ws) in player_to_game:
+                elif id(ws) in player_to_game:
                     game_id = player_to_game[id(ws)]
                     if game_id in active_games:
                         game = active_games[game_id]
                         await game.handle_message(player, message)
                     else:
                         print(f"Game {game_id} no longer active")
+
+                # Unknown message
                 else:
                     print(f"Message received but player not in any active game: {message}")
 

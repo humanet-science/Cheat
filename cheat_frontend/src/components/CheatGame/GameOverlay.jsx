@@ -104,7 +104,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 
 export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWinner, setSelectedCards, setDeclaredRank,
 																setHasActed, setPileCards, setActionQueue, setIsNewRound, setIsMyTurn, setDiscards,
-																setHasJoined, setState}){
+																setState}){
 	if (!gameOver) return null;
 	return (
 		<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -145,7 +145,6 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 						setIsNewRound(true);
 						setIsMyTurn(true);
 						setDiscards([]);
-						setHasJoined(false);
 						setState(null);
 					}}
 					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"

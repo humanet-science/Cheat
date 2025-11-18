@@ -372,8 +372,6 @@ class CheatGame:
     async def handle_message(self, player, data):
 
         """ Handle messages received through a player's websocket"""
-        print(f'Here with {data}')
-
         # New round
         if data.get("type") == "new_round":
             # TODO: new round requires all other human players to also click 'new round'
