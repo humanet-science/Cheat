@@ -1,3 +1,5 @@
+import copy
+import traceback
 import random
 import os
 import json
@@ -59,7 +61,6 @@ class CheatGame:
 
         # Queue of current messages
         self.message_queue = message_queue
-        self.message_receiver_tasks = {} # Track tasks by player ID or WebSocket
 
         # Whether we are using an experimental setup
         self.experimental_mode = experimental_mode
@@ -248,7 +249,7 @@ class CheatGame:
         """ Check if a player has won"""
         for p in self.players if player is None else [player]:
             if self.check_winner(p):
-                await self.broadcast_to_all({"type": "game_over", "winner": p.name})
+                await self.broadcast_to_all({"type": "round_over", "winner": p.name})
                 break
         return self.round_over
 
@@ -275,6 +276,7 @@ class CheatGame:
                     f.write(json.dumps(record) + '\n')
         except Exception as e:
             print(f"Error saving game data: {e}")
+            traceback.print_exc()
 
     def log(self, action: GameAction, **kwargs):
         """ Logs a new action to the database """
@@ -298,7 +300,12 @@ class CheatGame:
     async def broadcast_to_all(self, message: dict, *, append_state: bool = False):
         """ Broadcast a message to all human players in game. If specified, can also append each player's state """
         for player in self.players:
-            await player.send_message(message.update(player.get_info() if append_state else {}))
+            if append_state:
+                msg = copy.deepcopy(message)
+                msg.update(player.get_info())
+                await player.send_message(msg)
+            else:
+                await player.send_message(message)
 
     async def broadcast_to_others(self, exclude_player_id: int, message: dict):
         """ Broadcast a message to all except one human players in game """
@@ -347,7 +354,7 @@ class CheatGame:
         msg_was_broadcast = False
         for player in _query_players:
             if player.type == "bot":
-                msg = player.broadcast_message(message_type)
+                msg = player.broadcast_message(self, message_type)
                 msg_was_broadcast = msg is not None
                 if msg is not None:
     
@@ -362,71 +369,47 @@ class CheatGame:
     
         return msg_was_broadcast
 
-    async def start_message_receiver(self):
-        """ Start listening to all human's WebSockets"""
-        for player in self.players:
-            if player.type == "human" and player.ws:
-
-                # Start listening to each human player's WebSocket
-                task = asyncio.create_task(self.message_receiver(player.ws))
-                self.message_receiver_tasks[player.id] = task
-                self.message_receiver_tasks[player.ws] = task
-
-    async def stop_message_receiver(self):
-        for task in self.message_receiver_tasks.values():
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass  # Expected when cancelling tasks
-
-            self.message_receiver_tasks.clear()
-
-    async def message_receiver(self, ws):
+    async def handle_message(self, player, data):
 
         """ Handle messages received through a player's websocket"""
-        while True:
-            try:
+        print(f'Here with {data}')
 
-                #  Receive data from frontend
-                data = await ws.receive_json()
+        # New round
+        if data.get("type") == "new_round":
+            # TODO: new round requires all other human players to also click 'new round'
+            print("--------------------")
+            print("Starting a new round")
+            self.new_round()
+            await self.send_state_to_all()
 
-                # New round
-                if data.get("type") == "new_round":
-                    # TODO: new round requires all other human players to also click 'new round'
-                    print("Starting a new round")
-                    self.new_round()
-                    await self.send_state_to_all()
+        # Handle chat messages immediately (non-blocking)
+        elif data.get("type") == "human_message":
+            # Log the message
+            self.log(
+                GameAction(type="human_message", player_id=data["sender_id"], timestamp=datetime.now(),
+                           data=data["message"])
+            )
 
-                # Handle chat messages immediately (non-blocking)
-                elif data.get("type") == "human_message":
-                    # Log the message
-                    self.log(
-                        GameAction(type="human_message", player_id=data["sender_id"], timestamp=datetime.now(),
-                                   data=data["message"])
-                    )
+            # Broadcast instantly to all players
+            await self.broadcast_to_all({
+                'type': 'human_message',
+                'sender_id': data["sender_id"],
+                'sender_name': self.players[data["sender_id"]].name,
+                'message': data["message"],
+                'num_players': len(self.players)
+            })
 
-                    # Broadcast instantly to all players
-                    await self.broadcast_to_all({
-                        'type': 'human_message',
-                        'sender_id': data["sender_id"],
-                        'sender_name': self.players[data["sender_id"]].name,
-                        'message': data["message"],
-                        'num_players': len(self.players)
-                    })
+        elif data.get("type") == "quit":
 
-                elif data.get("type") == "quit":
-                    # TODO need to handle this
-                    pass
-                    # print(f"Player {data.get('player_id')} requested quit")
-                    # reset_game()
-                    # await ws.close()
-                    # break
+            await self.broadcast_to_all({
+                "type": "game_ended",
+                "reason": "player_quit",
+                "player_id": player.id
+            })
 
-            # TODO: how to handle player disconnect?
-            except WebSocketDisconnect:
-                    break
+            self.game_over = True
+        else:
+            await self.message_queue.put(data)
 
     async def play(self, player: Player, declared_rank: str, cards: list) -> None:
 
@@ -498,15 +481,13 @@ class CheatGame:
         # Unsuccessful call means caller skips a turn
         if not was_lying:
             self.next_player()
+            await self.send_state_to_all()
         print(f"{self.players[self.turn].name}'s turn.")
 
         return was_lying
 
     async def game_loop(self):
         """ Main game loop function."""
-
-        # Start the message receiver task which just runs permanently in the background
-        await self.start_message_receiver()
 
         # Outer loop: keeps connection alive for multiple rounds
         try:
@@ -545,7 +526,7 @@ class CheatGame:
     
                         # Check if current player has won.
                         await self.check_for_winner(current_player)
-                        if self.game_over:
+                        if self.round_over:
                             await asyncio.sleep(0.1)
                             break
     
@@ -553,32 +534,25 @@ class CheatGame:
                         if current_player.type == "human":
                             # Get new input
                             data = await self.message_queue.get()
-    
-                            # 0 is currently the only human player
-                            if current_player.id == 0:
-                                # Card has been played
-                                if data["type"] == "play":
-    
-                                    # Humans could forget to call the last player's card and miss that they had been lying
-                                    last_player, _, _ = self.last_play()
-                                    if last_player is not None:
-                                        await self.check_for_winner(self.players[last_player])
-                                        if self.game_over:
-                                            await asyncio.sleep(0.1)
-                                            break
-    
-                                    declared_rank = data["declared_rank"]
-                                    cards = data["cards"]
-                                    await self.play(current_player, declared_rank, cards)
-    
-                                # Calling a bluff
-                                elif data["type"] == "call":
-                                    await self.call(current_player)
-    
-                            else:
-                                # It's another human's turn (for future multiplayer)
-                                # Their WebSocket will handle it
-                                continue
+
+                            # Card has been played
+                            if data["type"] == "play":
+
+                                # Humans could forget to call the last player's card and miss that they had been lying
+                                last_player, _, _ = self.last_play()
+                                if last_player is not None:
+                                    await self.check_for_winner(self.players[last_player])
+                                    if self.round_over:
+                                        await asyncio.sleep(0.1)
+                                        break
+
+                                declared_rank = data["declared_rank"]
+                                cards = data["cards"]
+                                await self.play(current_player, declared_rank, cards)
+
+                            # Calling a bluff
+                            elif data["type"] == "call":
+                                await self.call(current_player)
     
                         current_player = self.players[self.turn]
                         print(f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})")
@@ -624,6 +598,7 @@ class CheatGame:
                     break  # Break outer loop completely
                 except Exception as e:
                     print(f"Game error: {e}")
+                    traceback.print_exc()
                     # Don't break - continue to next game
                     continue
     
@@ -631,6 +606,6 @@ class CheatGame:
             print(f"Client disconnected")
         except Exception as e:
             print(f"WebSocket error: {e}")
+            traceback.print_exc()
         finally:
-            await self.stop_message_receiver()
             self.game_over = True

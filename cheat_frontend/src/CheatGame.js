@@ -36,6 +36,7 @@ export default function CheatGame() {
 	const [declaredRank, setDeclaredRank] = useState("");
 	const [hasActed, setHasActed] = useState(false); // Track if player has acted
 	const prevStateRef = useRef(null);
+	const selfId = useRef({});
 	const [showRankInput, setShowRankInput] = useState(false); // Whether the rank input box should be shown
 	const [opponents, setOpponents] = useState([]);
 
@@ -114,7 +115,8 @@ export default function CheatGame() {
 				setState(currentState);
 				setHasJoined(true);
 				setExperimentalMode(msg.experimental_mode);
-				playerPositionsRef.current = getPlayerPositions(msg.num_players);
+				playerPositionsRef.current = getPlayerPositions(msg.num_players, msg.your_info.id);
+				selfId.current = msg.your_info.id;
 				predefinedMessagesRef.current = msg.predefined_messages;
 				setPlayerPositions(playerPositionsRef.current);
 				if (msg.current_player === msg.your_id) {
@@ -123,7 +125,7 @@ export default function CheatGame() {
 				setIsMyTurn(msg.current_player === msg.your_id);
 			}
 
-			if (["state", "state_update", "card_played", "bluff_called", "discard", "game_over", "bot_message"].includes(msg.type)) {
+			if (["state", "state_update", "card_played", "bluff_called", "discard", "round_over", "bot_message"].includes(msg.type)) {
 				addToQueue(msg);
 			}
 
@@ -173,7 +175,7 @@ export default function CheatGame() {
 			// rank can be declared.
 			if (msg.current_rank !== null) {
 				setDeclaredRank(msg.current_rank);
-			} else if (prevState?.your_id === msg.current_player) {
+			} else if (prevState?.your_info.id === msg.current_player) {
 				setDeclaredRank("");
 			}
 
@@ -182,10 +184,10 @@ export default function CheatGame() {
 			setState(currentState);
 
 			// Reset hasActed if it becomes your turn
-			if (msg.current_player === msg.your_id) {
+			if (msg.current_player === msg.your_info.id) {
 				setHasActed(false);
 			}
-			setIsMyTurn(msg.current_player === msg.your_id);
+			setIsMyTurn(msg.current_player === msg.your_info.id);
 
 			// Small delay to let state update
 			await new Promise(r => setTimeout(r, 100));
@@ -195,7 +197,7 @@ export default function CheatGame() {
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg?.player_id && msg?.your_id && msg.player_id === msg.your_id));
+			setIsMyTurn(Boolean(msg?.player_id && msg?.your_info.id && msg.player_id === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
 			const newCards = Array(msg.card_count)
@@ -286,7 +288,7 @@ export default function CheatGame() {
 				soundManager.play('discard');
 
 				// Add to status messages instead of separate discardAnimation
-				const message = playerId === state.your_id ? `You discard ${ranksStr}s` : `Discarding ${ranksStr}s`;
+				const message = playerId === state.your_info.id ? `You discard ${ranksStr}s` : `Discarding ${ranksStr}s`;
 				const {x, y} = playerPositionsRef.current[playerId];
 				addStatusMessage(playerId, message, {x, y});
 
@@ -305,7 +307,7 @@ export default function CheatGame() {
 			addStatusMessage(msg.sender_id, msg.message, {x, y});
 
 			// Game is over
-		} else if (msg.type === "game_over") {
+		} else if (msg.type === "round_over") {
 
 			setWinner(msg.winner);
 			setGameOver(true);
@@ -343,7 +345,7 @@ export default function CheatGame() {
 			radiusX = Math.min(width, height) * 0.35;
 			radiusY = radiusX * 0.9;
 		}
-		const positions = getPlayerPositions(numPlayers, radiusX, radiusY);
+		const positions = getPlayerPositions(numPlayers, selfId.current, radiusX, radiusY);
 		playerPositionsRef.current = positions;
 		setPlayerPositions(positions);
 	}, [width, height, numPlayers]);
@@ -379,7 +381,11 @@ export default function CheatGame() {
 
 		// Optimistically update your hand immediately
 		setState(prevState => ({
-			...prevState, your_hand: prevState.your_hand.filter(card => !selectedCards.includes(card))
+			...prevState,
+			your_info: {
+				...prevState.your_info,
+				hand: prevState.your_info.hand.filter(card => !selectedCards.includes(card))
+			}
 		}));
 
 		setSelectedCards([]);
@@ -414,16 +420,16 @@ export default function CheatGame() {
 
 	useEffect(() => {
 		if (!state) return;
-		if (state.players && state.your_id !== undefined) {
+		if (state.players && state.your_info.id !== undefined) {
 			const newOpponents = state.players
-				.filter((player) => player.id !== state.your_id)
+				.filter((player) => player.your_info.id !== state.your_info.id)
 				.map((player) => ({
-					id: player.id,
-					name: player.name,
-					avatar: player.avatar,
-					cardCount: player.cardCount,
-					type: player.type,
-					connected: player.connected
+					id: player.your_info.id,
+					name: player.your_info.name,
+					avatar: player.your_info.avatar,
+					cardCount: player.your_info.cardCount,
+					type: player.your_info.type,
+					connected: player.your_info.connected
 				}));
 
 			setOpponents(newOpponents);
@@ -512,10 +518,10 @@ export default function CheatGame() {
 
 		if (messageToSend && ws) {
 			ws.send(JSON.stringify({
-				type: "human_message", message: messageToSend, sender_id: state.your_id
+				type: "human_message", message: messageToSend, sender_id: state.your_info.id
 			}));
 
-			addStatusMessage(state.your_id, messageToSend);
+			addStatusMessage(state.your_info.id, messageToSend);
 
 			if (!customMessage) {
 				setMessageInput(""); // Only clear if it was from the input
@@ -532,7 +538,7 @@ export default function CheatGame() {
 
 		// Send to backend to broadcast
 		ws.send(JSON.stringify({
-			type: "human_message", message: message, sender_id: state.your_id
+			type: "human_message", message: message, sender_id: state.your_info.id
 		}));
 	};
 
@@ -558,7 +564,7 @@ export default function CheatGame() {
 				ws={ws}
 				onQuit={() => {
 					if (ws) {
-						ws.send(JSON.stringify({ type: "quit", player_id: state.your_id}));
+						ws.send(JSON.stringify({ type: "quit", player_id: state.your_info.id}));
 					}
 					setHasJoined(false);
 					setGameOver(false);
@@ -582,7 +588,7 @@ export default function CheatGame() {
 			{/* Game is over */}
 			<GameOverOverlay
 				gameOver={gameOver}
-				winner={winner}
+				winner={winner}f
 				state={state}
 				ws={ws}
 				setGameOver={setGameOver}
@@ -595,6 +601,8 @@ export default function CheatGame() {
 				setIsNewRound={setIsNewRound}
 				setIsMyTurn={setIsMyTurn}
 				setDiscards={setDiscards}
+				setHasJoined={setHasJoined}
+				setState={setState}
 			/>
 
 			{/* Status Message bubbles floating up from each player */}
@@ -646,6 +654,7 @@ export default function CheatGame() {
 					toggleCard={toggleCard}
 					setMessageInput={setMessageInput}
 					playerPositions={playerPositions}
+					yourId={selfId.current}
 				/>
 
 				<CardFlyAnimation animatingCards={animatingCards}/>

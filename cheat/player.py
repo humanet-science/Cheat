@@ -51,9 +51,7 @@ class Player:
         """ Send a message to the player's websocket"""
         if self.connected and self.ws and hasattr(self, 'ws'):
             try:
-                print(f"sending message type {message.get('type')} to player {self.id} on WebSocket: {id(self.ws)}")
                 await self.ws.send_json(message)
-                print(f"Message sent successfully!")
             except Exception as e:
                 print(f"Error sending to player {self.id}: {e}")
 

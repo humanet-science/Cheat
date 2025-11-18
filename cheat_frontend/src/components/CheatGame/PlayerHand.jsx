@@ -26,11 +26,11 @@ import React from "react";
  */
 export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInput, experimentalMode, rankError,
 												 selectedCards, state, sendMessage, play, setDeclaredRank, messageInput, allowedMessages,
-												 declaredRank, parseCard, toggleCard, setMessageInput, playerPositions}
+												 declaredRank, parseCard, toggleCard, setMessageInput, playerPositions, yourId}
 ) {
 	return (
-		<div style={{position: 'fixed', left: `calc(50% + ${playerPositions[0]?.x || 0}px)`,
-    top: `calc(50% + ${playerPositions[0]?.y || 0}px)`, transform: 'translate(-50%, -50%)'}}
+		<div style={{position: 'fixed', left: `calc(50% + ${playerPositions[yourId]?.x || 0}px)`,
+    top: `calc(50% + ${playerPositions[yourId]?.y || 0}px)`, transform: 'translate(-50%, -50%)'}}
 				 className="z-30"
 				 id="player-0"
 		>
@@ -49,7 +49,7 @@ export default function PlayerHand({isMyTurn, hasActed, isNewRound, showRankInpu
 
 					{/* Cards */}
 					<div className="flex justify-center items-end mb-4" style={{paddingLeft: '2rem', paddingRight: '2rem'}}>
-						{state.your_hand.map((card, index) => {
+						{state.your_info.hand.map((card, index) => {
 							const {rank, suit, isRed} = parseCard(card);
 							return (
 								<button

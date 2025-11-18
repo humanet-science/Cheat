@@ -103,7 +103,8 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 }
 
 export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWinner, setSelectedCards, setDeclaredRank,
-																setHasActed, setPileCards, setActionQueue, setIsNewRound, setIsMyTurn, setDiscards}){
+																setHasActed, setPileCards, setActionQueue, setIsNewRound, setIsMyTurn, setDiscards,
+																setHasJoined, setState}){
 	if (!gameOver) return null;
 	return (
 		<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -112,9 +113,10 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 				<div className="mb-6 satisfy-regular">
 					{winner === state.your_name ? "🎉 You win! 🎉" : `${winner} wins!`}
 				</div>
+				<div className="flex gap-4">
 				<button
 					onClick={() => {
-						ws.send(JSON.stringify({type: "new_game"}));
+						ws.send(JSON.stringify({type: "new_round"}));
 						setGameOver(false);
 						setWinner(null);
 						setSelectedCards([]);     // clear any lingering selections
@@ -128,8 +130,28 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 					}}
 					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
 				>
-					New Game
+					Next Round
 				</button>
+					<button
+					onClick={() => {
+						ws.send(JSON.stringify({type: "quit"}));
+    				setGameOver(false);
+						setWinner(null);
+						setSelectedCards([]);     // clear any lingering selections
+						setDeclaredRank("");      // reset the rank box
+						setHasActed(false);       // reset action flag
+						setPileCards([]);
+						setActionQueue([]);
+						setIsNewRound(true);
+						setIsMyTurn(true);
+						setDiscards([]);
+						setHasJoined(false);
+						setState(null);
+					}}
+					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+				>
+					Leave Game
+				</button></div>
 				</div></div>
 	)
 }

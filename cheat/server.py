@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import yaml
 import random
+import traceback
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
@@ -71,7 +72,7 @@ MAX_NUM_ACTIVE_GAMES = 3
 # WebSocket-to-Game dictionary for routing messages
 player_to_game = {} # {websocket: game_id} for routing messages
 
-async def new_game(num_players: int, human_players: list, mode: Literal['single', 'multiplayer']) -> CheatGame:
+def new_game(num_players: int, human_players: list, mode: Literal['single', 'multiplayer']) -> CheatGame:
     """ Creates a new CheatGame instance. Returns a dictionary with the game_id as key and the game as value.
 
     :param num_players: total number of players
@@ -118,13 +119,13 @@ async def new_game(num_players: int, human_players: list, mode: Literal['single'
     for player in human_players:
         player_to_game[id(player.ws)] = game.game_id
 
-    # Send welcome message with assigned ID
-    for player in game.players:
-        await player.send_message(
-            {"type": "new_round",
-             **player.get_info(),
-             **game.get_info()}
-        )
+    # # Send welcome message with assigned ID
+    # for player in game.players:
+    #     await player.send_message(
+    #         {"type": "new_round",
+    #          **player.get_info(),
+    #          **game.get_info()}
+    #     )
 
     # Write metadata to folder
     # TODO: currently the same for all games, but some game-specific data (e.g. num_players) must be set from frontend
@@ -147,13 +148,14 @@ async def try_start_game_from_queue(num_players, mode):
 
         # Create a new game with the people in the front of the queue
         _players = [waiting_queues[num_players][mode].popleft() for _ in range(min_players)]
-        _game = await new_game(num_players, human_players=_players, mode = mode)
+        _game = new_game(num_players, human_players=_players, mode = mode)
 
         # Add game to list of active games
         active_games[_game.game_id] = _game
 
         # Start the game loop
         while not _game.game_over:
+            print(f'Starting new game {_game.game_id} with {len(_game.players)} players.')
             await _game.broadcast_to_all({
                 "type": "new_round",
                 **_game.get_info()
@@ -161,7 +163,14 @@ async def try_start_game_from_queue(num_players, mode):
             await _game.game_loop()
 
         # When game is over, remove from active games
-        active_games.pop(_game.game_id)
+        print(f"Game {_game.game_id} ended")
+        if _game.game_id in active_games:
+            active_games.pop(_game.game_id)
+
+        # Remove player mappings
+        for player in _game.players:
+            if id(player.ws) in player_to_game:
+                del player_to_game[id(player.ws)]
 
 async def game_manager():
 
@@ -179,62 +188,86 @@ async def game_manager():
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-
     await ws.accept()
-    _player = None
-    _current_game = None
-    try:
+    player = None
 
+    try:
         # Wait for player join info
         data = await ws.receive_json()
 
         # Create Player instance and append to relevant queue
         if data["type"] == "player_join":
-
-            _player = Player(id=None, ws=ws, name=data["name"], avatar=data["avatar"], hand=[], type="human", connected=True)
-            waiting_queues[data["num_players"]][data["game_mode"]].append(_player)
+            player = Player(
+                id=None,
+                ws=ws,
+                name=data["name"],
+                avatar=data["avatar"],
+                hand=[],
+                type="human",
+                connected=True
+            )
+            waiting_queues[data["num_players"]][data["game_mode"]].append(player)
 
             print(
                 f"Player {data['name']} joined {data['num_players']}-player queue for mode {data['game_mode']}. "
                 f"WebSocket id: {id(ws)}. "
                 f"Queue size: {len(waiting_queues[data['num_players']][data['game_mode']])}."
             )
-            
-            await ws.send_json({"type": "queue_joined", "message": "Waiting for other players ..."})
+
+            await ws.send_json({"type": "queue_joined", "message": "Waiting for other players..."})
 
         # Keep connection alive and listen for messages
         while True:
             try:
                 message = await asyncio.wait_for(ws.receive_json(), timeout=1.0)
+                print(f"Received data for {player.name}: {message}")
 
                 # Route the message to the correct game
-                if id(ws) in player_to_game.keys():
-                    _current_game = active_games[player_to_game[id(ws)]]
-                    await _current_game.message_queue.put({
-                        "player_id": _player.id,
-                        "message": message
-                    })
-
+                if id(ws) in player_to_game:
+                    game_id = player_to_game[id(ws)]
+                    if game_id in active_games:
+                        game = active_games[game_id]
+                        await game.handle_message(player, message)
+                    else:
+                        print(f"Game {game_id} no longer active")
                 else:
                     print(f"Message received but player not in any active game: {message}")
 
             except asyncio.TimeoutError:
-                # No message received, connection still alive
-                # Check if player has been assigned to a game
-                if _player and _player.id is not None and _current_game is None:
-                    for game_id, game in active_games.items():
-                        if _player in game.players:
-                            _current_game = game
-                            player_to_game[id(ws)] = game_id
-                            print(f"Player {_player.name} assigned to game {game_id}")
-                            break
                 continue
+
     except WebSocketDisconnect:
+        print(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        traceback.print_exc()
+    finally:
 
-        # TODO: Handle player disconnect from queue or game
-        pass
-        # await handle_player_disconnect(ws)
+        # Cleanup: mark player as disconnected and remove from mappings
+        if player:
+            player.connected = False
 
+            # Remove from waiting queue if still there
+            for num_players in waiting_queues:
+                for mode in waiting_queues[num_players]:
+                    if player in waiting_queues[num_players][mode]:
+                        waiting_queues[num_players][mode].remove(player)
+                        print(f"Removed {player.name} from queue")
+                        break
+
+            # Mark as disconnected in active game if present
+            if id(ws) in player_to_game:
+                game_id = player_to_game[id(ws)]
+                if game_id in active_games:
+                    _game = active_games[game_id]
+                    for p in _game.players:
+                        if p is player:  # Use 'is' for object identity
+                            p.connected = False
+                            print(f"Marked {p.name} as disconnected in game {game_id}")
+                            break
+
+                # Remove from player_to_game mapping
+                del player_to_game[id(ws)]
 
 if __name__ == "__main__":
     import argparse

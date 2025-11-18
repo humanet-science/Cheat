@@ -48,7 +48,7 @@ thinking_new_play = [
 
 thinking = [
     "Do I believe this?",
-    "Can they be trusted?"
+    "Can this be trusted?"
 ] + thinking_new_play
 
 # Dictionary of message types

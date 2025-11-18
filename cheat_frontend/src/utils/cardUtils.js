@@ -19,15 +19,18 @@ export const getPlayerColor = (playerId) => {
  * @param radiusY
  * @returns {{}}
  */
-export function getPlayerPositions(totalPlayers, radiusX = 400, radiusY = 250) {
+export function getPlayerPositions(totalPlayers, yourId, radiusX = 400, radiusY = 250) {
   const positions = {};
 
-  for (let i = 0; i < totalPlayers; i++) {
-    const angle = 90 + (360 / totalPlayers) * i;
+  for (let id = 0; id < totalPlayers; id++) {
+		const relativePosition = (id - yourId + totalPlayers) % totalPlayers;
+		console.log("Your id", yourId, "relativePos", relativePosition, "id", id);
+
+    const angle = 90 + (360 / totalPlayers) * relativePosition;
     const angleRad = (angle * Math.PI) / 180;
     const x = Math.cos(angleRad) * radiusX;  // Wider X radius
     const y = Math.sin(angleRad) * radiusY;  // Shorter Y radius
-    positions[i] = {x, y, angle};
+    positions[id] = {x, y, angle};
   }
 
   return positions;

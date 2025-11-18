@@ -3,17 +3,16 @@ import React from "react";
 export function OpponentIcons({opponents, playerPositions, handlePlayerClick, state, getPlayerColor}) {
 
 	return (opponents.map((opp, index) => {
-
+		console.log("opps", opponents);
+		console.log("pos", playerPositions);
 		// Get the player position
-		const position = playerPositions[index + 1];
-
 		return (<div
 			key={opp.id}
 			id={`player-${opp.id}`}
 			style={{
 				position: 'absolute',
-				left: `calc(50% + ${position.x}px)`,
-				top: `calc(50% + ${position.y}px)`,
+				left: `calc(50% + ${playerPositions[opp.id].x}px)`,
+				top: `calc(50% + ${playerPositions[opp.id].y}px)`,
 				transform: 'translate(-50%, -50%)',
 			}}
 			className={`player-opponent rounded-full z-10 p-4 w-[clamp(10,7vw,20)] h-[clamp(10,7vw,20)] border-2 ${getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
