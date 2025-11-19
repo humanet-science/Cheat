@@ -1,3 +1,4 @@
 hypercorn
 fastapi
 pyyaml
+colorlog

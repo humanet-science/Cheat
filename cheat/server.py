@@ -14,6 +14,13 @@ from cheat.bots import RandomBot
 from cheat.player import Player
 from typing import Literal
 
+from cheat.logging_config import setup_logging
+
+# Set up logging
+loggers = setup_logging()
+server_log = loggers['server']
+ws_log = loggers['websocket']
+
 # Path to configuration file, located in root
 game_config_path = Path(__file__).parent.parent / "config.yaml"
 with open(game_config_path, "r") as f:
@@ -22,6 +29,7 @@ with open(game_config_path, "r") as f:
 # Set the seed for reproducibility
 seed = game_config['game'].get('seed')
 random.seed(seed)
+server_log.info(f"Random seed set to: {seed}")
 
 # Store the game manager task for potential cleanup
 game_manager_task = None
@@ -32,9 +40,9 @@ async def lifespan(app: FastAPI):
     # Startup code
     try:
         game_manager_task = asyncio.create_task(game_manager())
-        print("Game manager started")
+        server_log.info("Game manager started")
     except Exception as e:
-        print(f"Error starting game manager: {e}")
+        server_log.error(f"Error starting game manager: {e}")
         raise
 
     yield
@@ -45,9 +53,9 @@ async def lifespan(app: FastAPI):
         try:
             await game_manager_task
         except asyncio.CancelledError:
-            print("Game manager task cancelled successfully")
+            server_log.info("Game manager task cancelled successfully")
         except Exception as e:
-            print(f"Error during game manager shutdown: {e}")
+            server_log.error(f"Error during game manager shutdown: {e}")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -136,36 +144,71 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
     # Return the game
     return game
 
-
 async def try_start_game_from_queue(num_players, mode):
-
     queue = waiting_queues[num_players][mode]
 
-    # Minimum number of players in queue required to start the game: 1 for single, 2 for 3-player, 3 for all others
+    # Minimum number of players in queue required to start the game
     min_players = 1 if (num_players == 1 or mode == 'single') else 2 if num_players == 3 else 3
 
     if len(queue) >= min_players and len(active_games) < MAX_NUM_ACTIVE_GAMES:
-
         # Create a new game with the people in the front of the queue
         _players = [waiting_queues[num_players][mode].popleft() for _ in range(min_players)]
-        _game = new_game(num_players, human_players=_players, mode = mode)
+        _game = new_game(num_players, human_players=_players, mode=mode)
 
         # Add game to list of active games
         active_games[_game.game_id] = _game
 
-        # Start the game loop
+        # Start the game loop as a separate task (non-blocking)
+        asyncio.create_task(run_game(_game))
+
+
+async def run_game(_game: CheatGame):
+    """Run a single game to completion"""
+    try:
+        server_log.info(f'Starting new game with {len(_game.players)} players; game id: {_game.game_id}.')
         while not _game.game_over:
-            print(f'Starting new game {_game.game_id} with {len(_game.players)} players.')
+
             await _game.broadcast_to_all({
                 "type": "new_round",
                 **_game.get_info()
             }, append_state=True)
-            await _game.game_loop()
+
+            # Replace any disconnected humans with bots
+            await _game.replace_disconnected_players_with_bots()
+
+            # Play a round
+            await _game.play_round()
+
+            # Wait for confirmation of new round from frontend
+            if _game.round_over and not _game.game_over:
+                server_log.info(f"Round {_game.round} ended in game {_game.game_id}, waiting for continuation")
+                await _game.wait_for_new_round()
 
         # When game is over, remove from active games
-        print(f"Game {_game.game_id} ended")
+        server_log.info(f"Game {_game.game_id} ended.")
+
+        # Check player connection status
+        for player in _game.players:
+            if player.type == "human":
+                server_log.debug(f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}")
+
+        # Notify all connected human players that the game is over
+        for player in _game.players:
+            if player.type == "human" and player.connected and player.ws:
+                try:
+                    await player.ws.send_json({"type": "quit_confirmed"})
+                    server_log.info(f"Sent quit_confirmed to {player.name}")
+                except Exception as e:
+                    server_log.error(f"Error sending quit_confirmed to {player.name}: {e}")
+
+    except Exception as e:
+        server_log.error(f"Error in game {_game.game_id}: {e}")
+        traceback.print_exc()
+    finally:
+        # Cleanup
         if _game.game_id in active_games:
             active_games.pop(_game.game_id)
+            server_log.info(f"Number of active games remaining: {len(active_games.keys())}.")
 
         # Remove player mappings
         for player in _game.players:
@@ -208,10 +251,11 @@ async def websocket_endpoint(ws: WebSocket):
             )
             waiting_queues[data["num_players"]][data["game_mode"]].append(player)
 
-            print(
+            ws_log.info(
                 f"Player {data['name']} joined {data['num_players']}-player queue for mode {data['game_mode']}. "
                 f"WebSocket id: {id(ws)}. "
-                f"Queue size: {len(waiting_queues[data['num_players']][data['game_mode']])}."
+                f"Queue size: {len(waiting_queues[data['num_players']][data['game_mode']])}. "
+                f"Number of active games: {len(active_games)}"
             )
 
             await ws.send_json({"type": "queue_joined", "message": "Waiting for other players..."})
@@ -220,12 +264,39 @@ async def websocket_endpoint(ws: WebSocket):
         while True:
             try:
                 message = await asyncio.wait_for(ws.receive_json(), timeout=1.0)
-                print(f"Received data for {player.name}: {message}")
 
                 # Player has left the waiting queue
                 if message["type"] == "exit_queue":
                     waiting_queues[data["num_players"]][data["game_mode"]].remove(player)
-                    print(f"Removed player {player.name} from queue.")
+                    ws_log.info(f"{player.name} exited queue.")
+
+                # Player has quit the game
+                elif message["type"] == "quit":
+
+                    player.connected = False
+                    ws_log.info(f"Player {player.name} quit game {player_to_game[id(ws)]}")
+
+                    # Check if game should end
+                    game_id = player_to_game[id(ws)]
+                    if game_id in active_games:
+                        game = active_games[game_id]
+                        human_players = [p for p in game.players if p.type == "human"]
+
+                        # If this is the last or only human player, just end the game
+                        if all(not p.connected for p in human_players):
+                            ws_log.info(f"All humans disconnected from game {game_id}.")
+                            await game.handle_message(player, {"type": "quit"})
+                            game.game_over = True
+
+                        # Replace player with bot if some humans still left
+                        else:
+                            await game.replace_player_with_bot(player)
+
+                        del player_to_game[id(ws)]
+
+                    # Send confirmation
+                    await ws.send_json({"type": "quit_confirmed"})
+                    ws_log.info(f"Quit confirmed")
 
                 # Route the message to the correct game
                 elif id(ws) in player_to_game:
@@ -234,19 +305,19 @@ async def websocket_endpoint(ws: WebSocket):
                         game = active_games[game_id]
                         await game.handle_message(player, message)
                     else:
-                        print(f"Game {game_id} no longer active")
+                        ws_log.info(f"Game {game_id} no longer active")
 
                 # Unknown message
                 else:
-                    print(f"Message received but player not in any active game: {message}")
+                    ws_log.error(f"Message received but player not in any active game: {message}")
 
             except asyncio.TimeoutError:
                 continue
 
     except WebSocketDisconnect:
-        print(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
+        ws_log.info(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        ws_log.error(f"WebSocket error: {e}")
         traceback.print_exc()
     finally:
 
@@ -268,10 +339,21 @@ async def websocket_endpoint(ws: WebSocket):
                 if game_id in active_games:
                     _game = active_games[game_id]
                     for p in _game.players:
-                        if p is player:  # Use 'is' for object identity
+                        if p is player:
                             p.connected = False
-                            print(f"Marked {p.name} as disconnected in game {game_id}")
+                            server_log.info(f"Marked {p.name} as disconnected in game {game_id}")
                             break
+
+                    # If this is the last or only human player, just end the game
+                    human_players = [p for p in _game.players if p.type == "human"]
+                    if all(not p.connected for p in human_players):
+                        ws_log.info(f"All humans disconnected from game {game_id}.")
+                        await _game.handle_message(player, {"type": "quit"})
+                        _game.game_over = True
+
+                    # Replace player with bot if some humans still left
+                    else:
+                        await _game.replace_player_with_bot(player)
 
                 # Remove from player_to_game mapping
                 del player_to_game[id(ws)]

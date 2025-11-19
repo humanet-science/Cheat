@@ -18,7 +18,7 @@ export function CenterPile({isMyTurn, state, hasActed, pileCards, lastPlayedCoun
 
 		{/* Call Bluff Button */}
 		{isMyTurn && state.pile_size > 0 && state.current_rank && !hasActed && (
-			<div className="absolute top-full mt-20 left-1/2 pop-in" style={{transform: 'translateX(-50%)'}}>
+			<div className="absolute top-full left-1/2 pop-in" style={{transform: 'translateX(-50%)'}}>
 				<button
 					onClick={callBluff}
 					className="w-full drop-shadow-[0_0px_40px_rgba(0,0,0,1)] bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6

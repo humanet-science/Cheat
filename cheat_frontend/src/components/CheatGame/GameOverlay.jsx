@@ -32,11 +32,11 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 				<div className="text-2xl mb-6 text-white drop-shadow-lg">
 					{revealedCards.wasLying ? (
 						<p className="mb-2">
-							{revealedCards.accused === state.your_id ? "You" : `${revealedCards.accused_name}`} played:
+							{revealedCards.accused === state.your_info.id ? "You" : `${revealedCards.accused_name}`} played:
 						</p>
 					) : (
 						<p className="mb-2">
-							{revealedCards.caller === state.your_id ? "You pick" : `${revealedCards.caller_name} picks`} up the
+							{revealedCards.caller === state.your_info.id ? "You pick" : `${revealedCards.caller_name} picks`} up the
 							pile.
 						</p>
 					)}
@@ -104,15 +104,29 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 
 export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWinner, setSelectedCards, setDeclaredRank,
 																setHasActed, setPileCards, setActionQueue, setIsNewRound, setIsMyTurn, setDiscards,
-																setState}){
+																onQuit, countdown, confirmedCount,totalHumans}){
 	if (!gameOver) return null;
 	return (
 		<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
 				<div
 				className="text-center text-5xl items-center justify-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl">
-				<div className="mb-6 satisfy-regular">
-					{winner === state.your_name ? "🎉 You win! 🎉" : `${winner} wins!`}
+				<div className="mb-2 satisfy-regular">
+					{winner === state.your_info.name ? "🎉 You win! 🎉" : `${winner} wins!`}
 				</div>
+
+				{/* Show countdown and player count */}
+        {((countdown !== null && countdown <= 3000) || (confirmedCount > 0)) && (
+            <div className="mb-2 text-sm ">
+                <div className="text-sm text-red-200">
+                    Exiting in {countdown}s
+                </div>
+							{confirmedCount > 0 && (
+                    <div className="mb-4 text-grey-200">
+                        {confirmedCount}/{totalHumans} players ready
+                    </div>
+                )}
+            </div>
+        )}
 				<div className="flex gap-4">
 				<button
 					onClick={() => {
@@ -125,7 +139,6 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 						setPileCards([]);
 						setActionQueue([]);
 						setIsNewRound(true);
-						setIsMyTurn(true);
 						setDiscards([]);
 					}}
 					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
@@ -134,19 +147,8 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 				</button>
 					<button
 					onClick={() => {
-						ws.send(JSON.stringify({type: "quit"}));
-    				setGameOver(false);
-						setWinner(null);
-						setSelectedCards([]);     // clear any lingering selections
-						setDeclaredRank("");      // reset the rank box
-						setHasActed(false);       // reset action flag
-						setPileCards([]);
-						setActionQueue([]);
-						setIsNewRound(true);
-						setIsMyTurn(true);
-						setDiscards([]);
-						setState(null);
-					}}
+            onQuit();
+          }}
 					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
 				>
 					Leave Game

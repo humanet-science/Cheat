@@ -3,6 +3,10 @@ from fastapi import WebSocket
 from typing import List
 from cheat.card import Card, RANK_ORDER
 
+# Get the logger
+import logging
+player_log = logging.getLogger('GAME')
+
 """ Generic Player class that applies to humans, bots, and LLMs equally """
 @dataclass
 class Player:
@@ -53,7 +57,7 @@ class Player:
             try:
                 await self.ws.send_json(message)
             except Exception as e:
-                print(f"Error sending to player {self.id}: {e}")
+                player_log.error(f"Error sending to player {self.id}: {e}")
 
 class HumanPlayer(Player):
     def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None):

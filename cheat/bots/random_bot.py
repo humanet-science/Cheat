@@ -1,8 +1,7 @@
 import random
-from cheat.game import RANKS, Card
+from cheat.card import RANKS, Card
 from cheat.player import Player
 from cheat.bots.bot_messages import message_types
-from typing import Any
 
 class RandomBot(Player):
     """ Random bot that inherits from the parent Player class"""
