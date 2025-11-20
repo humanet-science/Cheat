@@ -38,7 +38,12 @@ export const Logo = ({
 };
 
 export const HumanetLogo = ({}) => {
-	return (<div className="fixed bottom-4 right-4 flex items-center space-x-2 px-3 py-2 z-0">
+	return (
+		<a
+			href="https://humanet.science"
+  target="_blank"
+  rel="noopener noreferrer"
+			className="fixed bottom-4 right-4 flex items-center space-x-2 px-3 py-2 z-0 hover:scale-[1.05] transition-all duration-300 ease-out">
 		<img
 			src="/icons/LSE_logo.svg"
 			alt="Humanet Logo"
@@ -46,5 +51,5 @@ export const HumanetLogo = ({}) => {
 		/>
 		<div className="h-10 border-l border-gray-400"></div>
 		<span className="pl-2 text-gray-200 font-light text-2xl">Humanet Lab</span>
-	</div>)
+	</a>)
 };

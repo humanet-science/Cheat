@@ -79,7 +79,7 @@ function App() {
 	};
 
 	return (<div className="min-h-screen bg-gradient-to-br flex flex-col from-green-900 to-blue-900">
-		<div className="flex-1 overflow-auto z-10">
+		<div className="flex-1 overflow-auto">
 			{!gameStarted ? (<WelcomePage onGameStart={handleGameStart}/>) : (<CheatGame
 				socket={gameSocket}
 				gameConfig={gameConfig}
