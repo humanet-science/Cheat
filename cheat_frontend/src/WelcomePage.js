@@ -145,7 +145,7 @@ const WelcomePage = ({onGameStart}) => {
 	}
 	return (<div
 		className="min-h-screen flex flex-col items-center justify-center p-4">
-		<div className="relative w-full max-w-md h-96 mx-auto">
+		<div className="relative w-full max-w-md h-96 mx-auto z-10">
 
 			{/* Logo Container */}
 			<div className={`
@@ -192,7 +192,7 @@ const WelcomePage = ({onGameStart}) => {
 			{/* Welcome Box, slides in when New Game is clicked */}
 			<div className={`
                     w-full max-w-md mt-10 pb-10
-                    transition-all ease-in-out transform z-50
+                    transition-all ease-in-out transform z-10
                     ${animationPhase === 'form-visible' ? 'opacity-100 mt-5 drop-shadow-lg' : 'opacity-0 transform'}
                     ${animationPhase === 'form-visible' ? 'flex-1 justify-start -translate-y-1/3' : 'flex-0'}
                 `} style={{transitionDuration: '1100ms'}}>

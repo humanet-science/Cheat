@@ -115,7 +115,7 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 				</div>
 
 				{/* Show countdown and player count */}
-        {((countdown !== null && countdown <= 3000) || (confirmedCount > 0)) && (
+        {((countdown !== null && countdown <= 15) || (confirmedCount > 0)) && (
             <div className="mb-2 text-sm ">
                 <div className="text-sm text-red-200">
                     Exiting in {countdown}s
