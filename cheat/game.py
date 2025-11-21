@@ -22,7 +22,7 @@ class InvalidMove(Exception):
 @dataclass
 class GameAction:
     type: str  # "play", "call", "discard", "status_message"
-    player_id: int
+    player_id: int | None
     timestamp: datetime
     data: Any  # Flexible data storage
 
@@ -79,7 +79,7 @@ class CheatGame:
         self.discarded_ranks = []
 
         # Index of current player
-        self.turn = 0
+        self.turn = random.randint(0, len(self.players)-1)
 
         # Current rank being played
         self.current_rank = None
@@ -121,7 +121,7 @@ class CheatGame:
         self.deal_cards()
         self.pile = []
         self.discarded_ranks = []
-        self.turn = 0
+        self.turn = random.randint(0, len(self.players)-1)
         self.current_rank = None
         self.round_over = False
         self.winner = None
@@ -303,7 +303,7 @@ class CheatGame:
             "experimental_mode": self.experimental_mode,
         }
 
-    async def broadcast_to_all(self, message: dict, *, append_state: bool = False):
+    async def broadcast_to_all(self, message: dict, *, append_state: bool = True):
         """ Broadcast a message to all human players in game. If specified, can also append each player's state """
         for player in self.players:
             if append_state:
@@ -615,7 +615,7 @@ class CheatGame:
             'message': f"{player.name} has left the game.",
             'num_players': len(self.players)
         })
-
+        self.log(GameAction(type="player_exit", player_id=player.id, timestamp=datetime.now(), data=None))
         self.logger.info(f"Player {player.name} left, replacing with bot")
 
         # Create a bot with the same characteristics
@@ -636,7 +636,8 @@ class CheatGame:
         self.players[player.id] = bot
 
         self.logger.info(f"Created bot {bot_name} with {len(bot.hand)} cards")
-
+        self.log(GameAction(type="player_replacement", player_id=bot.id, timestamp=datetime.now(),
+                            data=dict(bot_name=bot.name)))
         # Broadcast bot introduction
         await self.broadcast_to_all({
             "type": "bot_message",
@@ -665,7 +666,6 @@ class CheatGame:
         # Wait for at least one confirmation
         timeout = 30
         start_time = asyncio.get_event_loop().time()
-        last_broadcast_second = -1
 
         human_players = [p for p in self.players if p.type == "human"]
 
@@ -673,9 +673,9 @@ class CheatGame:
             elapsed = asyncio.get_event_loop().time() - start_time
             remaining = timeout - elapsed
 
-            # Broadcast countdown every second for the last 10 seconds
+            # Broadcast countdown every second
             current_second = int(remaining)
-            if current_second != last_broadcast_second and current_second >= 0:
+            if current_second >= 0:
                 await self.broadcast_to_all({
                     "type": "countdown",
                     "seconds_remaining": current_second,
@@ -683,7 +683,6 @@ class CheatGame:
                     "total_humans": len(human_players),
                     "waiting_for_players": [player.id for player in self.players if player.type == "human" and player.id not in self._new_round_confirmations]
                 })
-                last_broadcast_second = current_second
 
             # Timeout reached
             if elapsed > timeout:
@@ -691,6 +690,7 @@ class CheatGame:
                     # No one confirmed - end game
                     if self.game_mode != 'single':
                         self.logger.info("Timeout with no confirmations, ending game")
+                        self.log(GameAction(type="game_over", player_id=None, timestamp=datetime.now(), data=None))
                         self.game_over = True
                         return
                     else:

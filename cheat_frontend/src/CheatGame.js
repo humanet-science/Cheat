@@ -133,10 +133,11 @@ export default function CheatGame({
 					setTotalHumans(0);
 					setWinner(null);
 					removeAllConnectionTimers();
-					if (msg.current_player === msg.your_id) {
+					setSpeakingPlayers(new Set());
+					if (msg.current_player === msg.your_info.id) {
 						setHasActed(false);
 					}
-					setIsMyTurn(msg.current_player === msg.your_id);
+					setIsMyTurn(msg.current_player === msg.your_info.id);
 				}
 
 				if (["state", "state_update", "card_played", "bluff_called", "discard", "round_over", "bot_message"].includes(msg.type)) {
@@ -144,6 +145,9 @@ export default function CheatGame({
 				}
 
 				if (msg.type === "human_message") {
+					console.log(speakingPlayers);
+					console.log(actionQueue);
+					console.log(processingRef);
 					addStatusMessage(msg.sender_id, msg.message);
 				}
 
@@ -155,7 +159,10 @@ export default function CheatGame({
 
 					// Add a connection info to the missing players for those players waiting to join
 					if (!msg.waiting_for_players.includes(state.your_info.id)) {
-						removeConnectionTimer(state.your_info.id);
+						// Clear all connection timers first
+						removeAllConnectionTimers();
+
+						// Add timers only for players still waiting
 						for (const playerId of msg.waiting_for_players) {
 							addStatusMessage(playerId, `Waiting for connection (${msg.seconds_remaining}s)`, false, true);
 						}
@@ -234,7 +241,7 @@ export default function CheatGame({
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg?.player_id && msg?.your_info.id && msg.player_id === msg.your_info.id));
+			setIsMyTurn(Boolean(msg.player_id === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
 			const newCards = Array(msg.card_count)
@@ -271,7 +278,7 @@ export default function CheatGame({
 
 		} else if (msg.type === "bluff_called") {
 
-			setIsMyTurn(Boolean(msg?.current_player && msg?.your_id && msg.current_player === msg.your_id));
+			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id && msg.was_lying));
 
 			// Show revealed cards
 			if (msg.was_lying) {
@@ -325,7 +332,7 @@ export default function CheatGame({
 				soundManager.play('discard');
 
 				// Add to status messages instead of separate discardAnimation
-				const message = playerId === state.your_info.id ? `You discard ${ranksStr}s` : `Discarding ${ranksStr}s`;
+				const message = playerId === msg.your_info.id ? `You discard ${ranksStr}s` : `Discarding ${ranksStr}s`;
 				addStatusMessage(playerId, message);
 
 				// Add all ranks to discard list
@@ -378,24 +385,23 @@ export default function CheatGame({
 		setIsNewRound(declaredRank === null || declaredRank === "");
 
 		if (!isMyTurn || selectedCards.length === 0 || selectedCards.length > 3) {
-			// setShowRankInput(false);
 			return;
 		}
 
 		// Only require declared rank for new rounds
 		if (isNewRound && !declaredRank) {
-			// setShowRankInput(false);
 			return;
 		}
 
-		const normalizedRank = declaredRank.toUpperCase();
 		// Check rank before sending
+		const normalizedRank = declaredRank.toUpperCase();
 		if (!VALID_RANKS.includes(normalizedRank)) {
 			setRankError(true);          // trigger UI feedback
 			setTimeout(() => setRankError(false), 500); // reset after wiggle
 			return;
 		}
 
+		// Broadcast the play to the backend
 		socket.send(JSON.stringify({
 			type: "play", declared_rank: declaredRank, cards: selectedCards,
 		}));
@@ -453,7 +459,7 @@ export default function CheatGame({
 
 			setOpponents(newOpponents);
 		}
-	}, [state?.players, state?.your_id]);
+	}, [state?.players, state?.your_info.id]);
 
 	// Load sounds
 	useEffect(() => {
@@ -562,16 +568,20 @@ export default function CheatGame({
 	};
 
 	const removeAllConnectionTimers = () => {
-		setStatusMessages(prev => prev.filter(msg => !msg.is_connection_timer));
-		setSpeakingPlayers(prev => {
-			const newSet = new Set(prev);
-			// Remove all players that only have connection timers
-			statusMessages.forEach(msg => {
-				if (msg.is_connection_timer) {
+		setStatusMessages(prev => {
+			const timers = prev.filter(msg => msg.is_connection_timer);
+
+			// Remove those players from speaking set
+			setSpeakingPlayers(speakingPrev => {
+				const newSet = new Set(speakingPrev);
+				timers.forEach(msg => {
 					newSet.delete(msg.playerId);
-				}
+				});
+				return newSet;
 			});
-			return newSet;
+
+			// Return filtered messages
+			return prev.filter(msg => !msg.is_connection_timer);
 		});
 	};
 
@@ -604,7 +614,6 @@ export default function CheatGame({
 			type: "human_message", message: message, sender_id: state.your_info.id
 		}));
 	};
-
 
 	return (
 

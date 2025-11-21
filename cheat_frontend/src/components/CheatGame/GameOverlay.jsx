@@ -131,6 +131,7 @@ export function GameOverOverlay({gameOver, winner, state, ws, setGameOver, setWi
 				<button
 					onClick={() => {
 						ws.send(JSON.stringify({type: "new_round"}));
+						ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
 						setGameOver(false);
 						setWinner(null);
 						setSelectedCards([]);     // clear any lingering selections
