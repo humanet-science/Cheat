@@ -46,7 +46,7 @@ def setup_logging():
     }
 
 
-def setup_game_logger(game_id: str, out_dir: str):
+def setup_game_logger(game_id: str, out_dir: str = None):
     """Create a separate logger for each game"""
 
     logger = logging.getLogger(f'GAME.{game_id}')
@@ -54,14 +54,15 @@ def setup_game_logger(game_id: str, out_dir: str):
     logger.propagate = False
 
     # File handler for detailed logs
-    log_file = os.path.join(out_dir, 'game.log')
-    file_handler = logging.FileHandler(log_file)
-    file_formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+    if out_dir is not None:
+        log_file = os.path.join(out_dir, 'game.log')
+        file_handler = logging.FileHandler(log_file)
+        file_formatter = logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
 
     # Console handler with short game ID (light grey, more indented)
     console_handler = colorlog.StreamHandler()
@@ -83,7 +84,7 @@ def setup_game_logger(game_id: str, out_dir: str):
     return logger
 
 
-def setup_player_logger(game_id: str, out_dir: str):
+def setup_player_logger(game_id: str, out_dir: str = None):
     """Create a separate logger for player actions in a specific game"""
 
     logger = logging.getLogger(f'PLAYER.{game_id}')
@@ -91,14 +92,15 @@ def setup_player_logger(game_id: str, out_dir: str):
     logger.propagate = False
 
     # File handler for detailed logs (same file as game logs)
-    log_file = os.path.join(out_dir, 'game.log')
-    file_handler = logging.FileHandler(log_file)
-    file_formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] [PLAYER] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+    if out_dir is not None:
+        log_file = os.path.join(out_dir, 'game.log')
+        file_handler = logging.FileHandler(log_file)
+        file_formatter = logging.Formatter(
+            '%(asctime)s [%(levelname)s] [PLAYER] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
 
     # Console handler with short game ID (white/lighter, even more indented)
     console_handler = colorlog.StreamHandler()

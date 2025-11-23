@@ -34,8 +34,8 @@ class CheatGame:
                  experimental_mode: bool,
                  *,
                  game_mode: Literal["single", "multiplayer"],
-                 message_queue: asyncio.Queue,
-                 out_dir: str,
+                 message_queue: asyncio.Queue = None,
+                 out_dir: str = None,
                  round: int = 1,
                  game_id: str = None):
 
@@ -96,11 +96,14 @@ class CheatGame:
 
         # Create a folder for the game results
         _date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_path = os.path.expanduser(
-            os.path.join(out_dir, f"game_{_date_time}")
-        )
-        self.out_path = out_path
-        os.makedirs(self.out_path, exist_ok=True)
+        if out_dir is not None:
+            out_path = os.path.expanduser(
+                os.path.join(out_dir, f"game_{_date_time}")
+            )
+            self.out_path = out_path
+            os.makedirs(self.out_path, exist_ok=True)
+        else:
+            self.out_path = None
 
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
@@ -287,7 +290,8 @@ class CheatGame:
     def log(self, action: GameAction, **kwargs):
         """ Logs a new action to the database """
         self.history.append(action)
-        self.write_data(**kwargs)
+        if self.out_path is not None:
+            self.write_data(**kwargs)
 
     def get_info(self) -> dict:
         """ Produce a dictionary that can be broadcast to the frontend """
@@ -499,7 +503,7 @@ class CheatGame:
 
         return was_lying
 
-    async def play_round(self):
+    async def play_round(self, *, sleep_pause: float = 1.0):
         """ Main game loop function."""
 
         # Send out the game state at the start of a new round
@@ -601,7 +605,7 @@ class CheatGame:
 
             # Add a small delay to account for the animations in the frontend: this way the backend is not always
             # too many steps ahead of the frontend
-            await asyncio.sleep(1)
+            await asyncio.sleep(sleep_pause)
 
 
     async def replace_player_with_bot(self, player):
