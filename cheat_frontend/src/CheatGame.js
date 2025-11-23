@@ -145,9 +145,6 @@ export default function CheatGame({
 				}
 
 				if (msg.type === "human_message") {
-					console.log(speakingPlayers);
-					console.log(actionQueue);
-					console.log(processingRef);
 					addStatusMessage(msg.sender_id, msg.message);
 				}
 
