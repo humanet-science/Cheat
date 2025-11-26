@@ -3,6 +3,7 @@ import React, {useEffect, useState} from 'react';
 import {Logo} from './utils/Logo';
 import {AVATARS} from "./utils/constants";
 import LoadingWindow from "./components/GameLoading";
+import Tutorial from "./components/Tutorial";
 
 const WelcomePage = ({onGameStart}) => {
 
@@ -28,6 +29,9 @@ const WelcomePage = ({onGameStart}) => {
 
 	// Socket
 	const [socket, setSocket] = useState(null);
+
+	// Tutorial
+	const [showTutorial, setShowTutorial] = useState(false);
 
 	const handleCancelWaiting = () => {
 		setIsWaiting(false);
@@ -181,12 +185,16 @@ const WelcomePage = ({onGameStart}) => {
 					New Game
 				</button>
 				<button
-					onClick={() => alert('Tutorial coming soon!')}
+					onClick={() => setShowTutorial(true)}
 					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
 				>
 					Tutorial
 				</button>
 			</div>
+
+			{showTutorial && (
+				<Tutorial onClose={() => setShowTutorial(false)} />
+			)}
 
 
 			{/* Welcome Box, slides in when New Game is clicked */}

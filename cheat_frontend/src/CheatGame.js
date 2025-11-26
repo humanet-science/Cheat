@@ -25,7 +25,8 @@ import {Logo} from './utils/Logo';
 import {VALID_RANKS} from "./utils/constants";
 
 export default function CheatGame({
-																		socket, gameConfig, currentRound, onUpdateRound, onExitGame
+																		socket, gameConfig, currentRound, onUpdateRound, onExitGame,
+																		highlightMenu = false
 																	}) {
 
 	// Game state and previous state
@@ -140,7 +141,7 @@ export default function CheatGame({
 					setIsMyTurn(msg.current_player === msg.your_info.id);
 				}
 
-				if (["state", "state_update", "card_played", "bluff_called", "discard", "round_over", "bot_message"].includes(msg.type)) {
+				if (["state", "state_update", "cards_played", "bluff_called", "discard", "round_over", "bot_message"].includes(msg.type)) {
 					addToQueue(msg);
 				}
 
@@ -194,7 +195,7 @@ export default function CheatGame({
 		const msg = processNext();
 
 		// Pause if the relevant player is currently speaking
-		if (["card_played", "bluff_called", "bot_message", "discard"].includes(msg.type)) {
+		if (["cards_played", "bluff_called", "bot_message", "discard"].includes(msg.type)) {
 			if (msg && (msg.current_player || msg.sender_id || msg.caller)) {
 				const playerId = msg.sender_id || msg.caller || msg.current_player;
 				if (playerId && speakingPlayers.has(playerId)) {
@@ -233,7 +234,7 @@ export default function CheatGame({
 			// Small delay to let state update
 			await new Promise(r => setTimeout(r, 100));
 
-		} else if (msg.type === "card_played") {
+		} else if (msg.type === "cards_played") {
 
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
@@ -400,7 +401,8 @@ export default function CheatGame({
 
 		// Broadcast the play to the backend
 		socket.send(JSON.stringify({
-			type: "play", declared_rank: declaredRank, cards: selectedCards,
+			type: "cards_played", declared_rank: declaredRank, cards: selectedCards, current_player: state.your_info.id,
+			your_info: state.your_info, player_id: state.your_info.id, card_count: selectedCards.length
 		}));
 
 		// Optimistically update your hand immediately
@@ -502,7 +504,7 @@ export default function CheatGame({
 	};
 
 	const callBluff = () => {
-		socket.send(JSON.stringify({type: "call"}));
+		socket.send(JSON.stringify({type: "bluff_called"}));
 		setHasActed(true);
 	};
 
@@ -513,11 +515,13 @@ export default function CheatGame({
 			// Add player to speaking set
 			setSpeakingPlayers(prev => new Set(prev).add(playerId));
 
-			// Not using playerPositions here because need fixed absolute positions at top of bounding box?
-			const rect = playerElement.getBoundingClientRect();
+			// Not using playerPositions here because need fixed absolute positions at top of bounding box
 			const position = {
-				x: rect.left + rect.width / 2, y: rect.top
-			};
+      x: playerElement.offsetLeft,
+      y: playerPositionsRef.current[playerId].angle === 90
+        ? playerElement.offsetTop - 80 // push up for bottom player
+        : playerElement.offsetTop
+    };
 
 			if (is_connection_timer) {
 				// For connection timers, update existing message or create new one
@@ -629,6 +633,7 @@ export default function CheatGame({
 					}
 					onExitGame();
 				}}
+				highlightMenu={highlightMenu}
 			/>
 
 			{/* Game is over */}
