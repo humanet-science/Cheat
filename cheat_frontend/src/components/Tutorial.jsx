@@ -628,7 +628,7 @@ export default function Tutorial({onClose}) {
 			{/* Game Preview */}
 			<div className="relative" style={{height: '75vh'}}>
 				{mockSocket && currentRound && (<div
-					className={`absolute inset-0 border-2 shadow-2xl rounded-3xl transition-all duration-1000 ${showGame ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+					className={`absolute inset-0 border-2 shadow-2xl overflow-hidden rounded-3xl transition-all duration-1000 ${showGame ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
 					style={{
 						transform: showGame ? 'scale(0.7) translateY(-15%)' : 'scale(0.65) translateY(-15%)',
 						width: '100%',
