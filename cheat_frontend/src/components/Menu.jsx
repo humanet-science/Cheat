@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Rules, ExitConfirm} from "./Rules";
 
-export default function GameMenu({onQuit}) {
+export default function GameMenu({onQuit, highlightMenu}) {
 	const [showMenu, setShowMenu] = useState(false);
 	const [showRules, setShowRules] = useState(false);
 	const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -9,6 +9,14 @@ export default function GameMenu({onQuit}) {
 
 		{/* Menu Button with Animated Hamburger */}
 		<div className="fixed top-4 left-4 z-50">
+			{highlightMenu && (
+				<>
+					{/* Pulsing border ring */}
+					<div className="absolute inset-0 animate-pulse rounded-lg ring-4 ring-blue-400 pointer-events-none"></div>
+					{/* Expanding ping effect */}
+					<div className="absolute inset-0 animate-ping rounded-lg bg-blue-400 opacity-50 pointer-events-none"></div>
+				</>
+			)}
 			<button
 				onClick={() => setShowMenu(!showMenu)}
 				className="relative w-12 h-12 flex items-center justify-center group"

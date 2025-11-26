@@ -438,7 +438,7 @@ class CheatGame:
 
         # Broadcast the play
         await self.broadcast_to_all({
-            "type": "card_played",
+            "type": "cards_played",
             "cards": [str(c) for c in cards],
             "declared_rank": declared_rank,
             "card_count": len(cards),
@@ -555,7 +555,7 @@ class CheatGame:
                     continue
 
                 # Card has been played
-                if data["type"] == "play":
+                if data["type"] == "cards_played":
 
                     # Humans could forget to call the last player's card and miss that they had been lying
                     await self.check_for_winner(self.players[(current_player.id - 1) % self.num_players])
@@ -568,7 +568,7 @@ class CheatGame:
                     await self.play(current_player, declared_rank, cards)
 
                 # Calling a bluff
-                elif data["type"] == "call":
+                elif data["type"] == "bluff_called":
                     await self.call(current_player)
 
             elif current_player.type == 'bot':

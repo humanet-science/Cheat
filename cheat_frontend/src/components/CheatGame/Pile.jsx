@@ -1,7 +1,6 @@
 import React from "react";
 
 export function CenterPile({isMyTurn, state, hasActed, pileCards, lastPlayedCount, callBluff}) {
-
 	return (<div className="fixed left-1/2 top-1/2 z-20" style={{transform: "translate(-50%, -50%)"}}>
 
 		{/* Cards on pile*/}
@@ -17,7 +16,7 @@ export function CenterPile({isMyTurn, state, hasActed, pileCards, lastPlayedCoun
 		})}
 
 		{/* Call Bluff Button */}
-		{isMyTurn && state.pile_size > 0 && state.current_rank && !hasActed && (
+		{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
 			<div className="absolute top-full left-1/2 pop-in" style={{transform: 'translateX(-50%)'}}>
 				<button
 					onClick={callBluff}
