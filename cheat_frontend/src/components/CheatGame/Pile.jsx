@@ -1,6 +1,6 @@
 import React from "react";
 
-export function CenterPile({isMyTurn, state, hasActed, pileCards, lastPlayedCount, callBluff}) {
+export function CenterPile({isMyTurn, hasActed, pileCards, lastPlayedCount}) {
 	return (<div className="fixed left-1/2 top-1/2 z-20" style={{transform: "translate(-50%, -50%)"}}>
 
 		{/* Cards on pile*/}
@@ -14,17 +14,5 @@ export function CenterPile({isMyTurn, state, hasActed, pileCards, lastPlayedCoun
 				}}
 			/>);
 		})}
-
-		{/* Call Bluff Button */}
-		{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
-			<div className="absolute top-full left-1/2 pop-in" style={{transform: 'translateX(-50%)'}}>
-				<button
-					onClick={callBluff}
-					className="w-full drop-shadow-[0_0px_40px_rgba(0,0,0,1)] bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6
-                            rounded-lg transition-colors"
-				>
-					Call!
-				</button>
-			</div>)}
 	</div>)
 }
