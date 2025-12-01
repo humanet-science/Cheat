@@ -44,6 +44,8 @@ export default function PlayerHand({
 																		 setMessageInput,
 																		 playerPositions,
 																		 yourId,
+																		 pileCards,
+																		 callBluff
 																	 }) {
 	return (<div style={{
 		position: 'fixed',
@@ -55,12 +57,10 @@ export default function PlayerHand({
 							 id={`player-${yourId}`}
 	>
 		<div className="flex justify-center">
-			<div className="rounded-xl p-4">
+			<div>
 				<div className="text-center mb-3">
 					<div className="text-lg font-semibold">
-						{isMyTurn && (<span className="ml-3 text-yellow-400">Your Turn</span>)}
-						{selectedCards.length > 0 && (<span
-							className="ml-3 text-gray-500 font-medium text-sm">Selected: {selectedCards.join(", ")}</span>)}
+						<span className="ml-3 text-yellow-400">{isMyTurn ? 'Your Turn' : ''}</span>
 					</div>
 				</div>
 
@@ -100,8 +100,7 @@ export default function PlayerHand({
 				</div>
 
 				{/* Play Controls / Message Input with Morphing Effect */}
-				<div className={`
-												relative flex items-center justify-center gap-4 
+				<div className={`relative flex items-center justify-center gap-4
 												transition-all duration-500 ease-in-out
 												${isMyTurn && !hasActed ? 'h-12 scale-100' : 'h-12 scale-95'}
 										`}>
@@ -109,14 +108,69 @@ export default function PlayerHand({
 					<div className={`
 														absolute inset-0 rounded-2xl
 														transition-all duration-500 ease-in-out
-														${isMyTurn && !hasActed ? 'scale-100' : 'scale-105'}
-												`}></div>
+														${isMyTurn && !hasActed ? 'scale-100' : 'scale-100'}
+												`}>
 
-					{/* Content */}
-					<div className="relative z-10 flex items-center gap-4 transition-all duration-300">
-						{isMyTurn && !hasActed ? (// Play Controls
-							<div className="flex items-center gap-4 animate-fadeIn">
-								{showRankInput && (<input
+					</div>
+
+					{/* Communication and Play controls */}
+					<div className="min-w-fit relative z-10 flex items-center gap-4 transition-all duration-500">
+
+						{/* Message input */}
+						{!experimentalMode ? (<div className="flex items-center gap-3 animate-fadeIn relative">
+							<input
+								type="text"
+								placeholder="Send a message..."
+								value={messageInput}
+								onChange={(e) => setMessageInput(e.target.value)}
+								onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+								className={`px-4 py-1 rounded-xl backdrop-blur-lg bg-white bg-opacity-30 text-gray-950 text-center font-medium text-lg
+																				transition-all duration-500 focus:outline-none focus:bg-opacity-80 ${messageInput ? 'bg-opacity-80' : 'bg-opacity-30'}`}
+							/>
+							{messageInput && (<button
+								onClick={() => sendMessage()}
+								disabled={!messageInput.trim()}
+								className={`absolute right-1 px-1 py-1 rounded-full font-bold text-white transition-all bg-blue-500 hover:bg-blue-400 duration-300 transform scale-[0.8] shadow-lg'}`}
+							>
+								<img
+									src="/icons/arrow_up.svg"
+									alt="Arrow up"
+									className="w-4 h-4 m-1"
+									style={{
+										filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
+									}}
+								/>
+							</button>)}
+						</div>) : (<div className="flex flex-col gap-1 mt-10">
+							<div className="flex gap-2">
+								{allowedMessages.slice(0, 5).map((msg, index) => (<button
+									key={index}
+									onClick={() => sendMessage(msg)}
+									className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
+																				text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75 hover:scale-110 active:scale-95 whitespace-nowrap"
+								>
+									{msg}
+								</button>))}
+							</div>
+							<div className="flex gap-1">
+								{allowedMessages.slice(5,).map((msg, index) => (<button
+									key={index + 6}
+									onClick={() => sendMessage(msg)}
+									className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
+																				text-sm transition-all duration-200 hover:scale-110 active:scale-95 whitespace-nowrap"
+								>
+									{msg}
+								</button>))}
+							</div>
+						</div>)}
+
+						{/* Play controls */}
+						{isMyTurn && !hasActed && (
+							<div className="relative flex items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap">
+
+								{showRankInput ? (
+									<div>
+									<input
 									type="text"
 									placeholder="Rank (e.g. 7)"
 									value={declaredRank}
@@ -137,64 +191,50 @@ export default function PlayerHand({
 										}
 									}}
 									className={`
-																								px-4 py-2 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
-																								w-40 transition-all duration-300 transform
-																								${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-blue-400 hover:border-blue-300 hover:scale-105'}
+																								min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
+																								transition-all duration-300 transform focus:outline-none 
+																								${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400'}
 																						`}
-								/>)}
-								<button
+								/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
+									<button
+										onClick={play}
+										className={`
+																						absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8]
+																						${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 shadow-lg'}
+																				`}
+									>
+										<img
+											src="/icons/arrow_up.svg"
+											alt="Arrow up"
+											className="w-4 h-4 m-1"
+											style={{
+												filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
+											}}
+										/>
+									</button>)}
+								</div>) : (<button
 									onClick={play}
 									disabled={selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)}
 									className={`
-																						px-6 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
+																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
 																						${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
 																				`}
 								>
 									Play {selectedCards.length} Card{selectedCards.length !== 1 ? "s" : ""}
-								</button>
-							</div>) : !experimentalMode ? (// Message Input
-							<div className="flex items-center gap-3 animate-fadeIn">
-								<input
-									type="text"
-									placeholder="Send a message..."
-									value={messageInput}
-									onChange={(e) => setMessageInput(e.target.value)}
-									onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-									className="px-4 py-1 rounded-xl backdrop-blur-lg bg-white bg-opacity-30 text-gray-950 text-center font-medium text-lg w-64
-																				transition-all duration-300 hover:scale-105 focus:scale-105"
-								/>
+								</button>)}
+
+							</div>)}
+
+
+						{/* Call Bluff button */}
+						{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
+							<div className="pop-in flex items-center gap-4">
 								<button
-									onClick={() => sendMessage()}
-									disabled={!messageInput.trim()}
-									className={`
-																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
-																						${!messageInput.trim() ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
-																				`}
+									onClick={callBluff}
+									className="bg-red-600 hover:bg-red-700 transition-all duration-300 transform hover:scale-105 active:scale-95 text-white font-bold py-2 px-4 rounded-xl"
 								>
-									Send
+									Call!
 								</button>
-							</div>) : (// Experimental mode: Predefined message bubbles
-							<div className="flex flex-col gap-1 mt-10">
-								<div className="flex gap-2">
-									{allowedMessages.slice(0, 5).map((msg, index) => (<button
-										key={index}
-										onClick={() => sendMessage(msg)}
-										className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
-																				text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75 hover:scale-110 active:scale-95 whitespace-nowrap"
-									>
-										{msg}
-									</button>))}
-								</div>
-								<div className="flex gap-1">
-									{allowedMessages.slice(5,).map((msg, index) => (<button
-										key={index + 6}
-										onClick={() => sendMessage(msg)}
-										className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
-																				text-sm transition-all duration-200 hover:scale-110 active:scale-95 whitespace-nowrap"
-									>
-										{msg}
-									</button>))}
-								</div>
 							</div>)}
 					</div>
 				</div>

@@ -487,9 +487,10 @@ export default function CheatGame({
 					element.dataset.animated = 'true';
 
 					// Remove after animation
+					const duration = msg.is_play_announcement ? 6000 : 3000;
 					setTimeout(() => {
 						setStatusMessages(prev => prev.filter(m => m.id !== msg.id));
-					}, 3000);
+					}, duration);
 				}
 			}
 		});
@@ -547,6 +548,7 @@ export default function CheatGame({
 				setStatusMessages(prev => [...prev, newMessage]);
 
 				// Remove after animation
+				const duration = is_play_announcement ? 6000 : 3000;
 				setTimeout(() => {
 					setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
 					setSpeakingPlayers(prev => {
@@ -554,7 +556,7 @@ export default function CheatGame({
 						newSet.delete(playerId);
 						return newSet;
 					});
-				}, 3000);
+				}, duration);
 			}
 		}
 	};
@@ -680,11 +682,9 @@ export default function CheatGame({
 
 				<CenterPile
 					isMyTurn={isMyTurn}
-					state={state}
 					hasActed={hasActed}
 					pileCards={pileCards}
 					lastPlayedCount={lastPlayedCount}
-					callBluff={callBluff}
 				/>
 
 				<CardRevealOverlay
@@ -713,6 +713,8 @@ export default function CheatGame({
 					setMessageInput={setMessageInput}
 					playerPositions={playerPositionsRef.current}
 					yourId={selfId}
+					pileCards={pileCards}
+					callBluff={callBluff}
 				/>
 
 				<CardFlyAnimation animatingCards={animatingCards}/>

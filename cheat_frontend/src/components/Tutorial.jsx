@@ -277,7 +277,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 7,
 	title: "Discarding four of a kind",
-	description: "Four of a kind are discarded – except the Aces! You can only get rid of them by lying.",
+	description: "Four of a kind are discarded – except the Aces! You can only get rid of those by lying.",
 	messages: [{
 		type: "state",
 		your_info: {
@@ -333,7 +333,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 9,
 	title: "Help",
-	description: "The rules, and more information on the lab, are available here, where you can also exit the game. Have fun!",
+	description: "The rules, and more information on our lab, are available in the menu, from where you can also exit the game. Have fun!",
 	messages: [{}]
 }];
 

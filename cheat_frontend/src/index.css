@@ -67,15 +67,15 @@
 
 @keyframes popIn {
   0% {
-    transform: translateX(-50%) scale(0.4);
+    transform: scale(0.4);
     opacity: 0;
   }
   70% {
-    transform: translateX(-50%) scale(1.3);
+    transform: scale(1.3);
     opacity: 1;
   }
   100% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -321,47 +321,48 @@
 
 @keyframes floatUpWithWiggle {
   0% {
-    transform: translate(-50%, -20%) scale(1) rotate(-8deg);
+    transform: translate(-50%, -20%) scale(1) rotate(-4deg);
     opacity: 0;
   }
   5% {
-    transform: translate(-50%, -100%) scale(1.1) rotate(8deg);
+    transform: translate(-50%, -100%) scale(1.1) rotate(4deg);
     opacity: 1;
   }
   10% {
-    transform: translate(-50%, -102%) scale(1.15) rotate(-6deg);
+    transform: translate(-50%, -102%) scale(1.15) rotate(-3deg);
   }
   15% {
-    transform: translate(-50%, -104%) scale(1.2) rotate(6deg);
+    transform: translate(-50%, -104%) scale(1.2) rotate(3deg);
   }
   20% {
-    transform: translate(-50%, -106%) scale(1.15) rotate(-4deg);
+    transform: translate(-50%, -106%) scale(1.15) rotate(-2deg);
   }
   25% {
-    transform: translate(-50%, -108%) scale(1.1) rotate(4deg);
+    transform: translate(-50%, -108%) scale(1.12) rotate(2deg);
   }
   30% {
-    transform: translate(-50%, -110%) scale(1.05) rotate(-2deg);
+    transform: translate(-50%, -110%) scale(1.11) rotate(-1.5deg);
   }
   40% {
-    transform: translate(-50%, -115%) scale(1) rotate(0deg);
-    opacity: 1;
+    transform: translate(-50%, -117%) scale(1.09) rotate(1.2deg);
   }
   60% {
-    transform: translate(-50%, -120%) scale(1);
+    transform: translate(-50%, -123%) scale(1.05) rotate(-0.5deg);
+      opacity: 1;
   }
-  90 %{
-      opacity: 0.8;
+  90% {
+      transform: translate(-50%, -129%) scale(1.05) rotate(0.3deg);
+      opacity: 1;
   }
   100% {
-    transform: translate(-50%, -120%) scale(1);
+    transform: translate(-50%, -132%) scale(1.03);
     opacity: 0;
   }
 }
 
 .message_float {
-    animation: floatUp_Bubble 2.5s ease-out forwards
+    animation: floatUp_Bubble 1.5s ease-out forwards
 }
 .play-announcement {
-  animation: floatUpWithWiggle 2.5s ease-out forwards;
+  animation: floatUpWithWiggle 6s ease-out forwards;
 }
