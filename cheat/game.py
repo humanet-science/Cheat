@@ -26,7 +26,30 @@ class GameAction:
     timestamp: datetime
     data: Any  # Flexible data storage
 
-
+    def __str__(self):
+        """ Converts an action into a descriptive string for LLM integration. """
+        if self.type == 'play':
+            return f"Player {self.player_id} plays {len(self.data['cards_played'])} {'cards' if len(self.data['cards_played']) > 1 else 'card'}, declaring {self.data['declared_rank']}."
+        elif self.type == 'call':
+            if self.data['was_lying']:
+                return f"Player {self.player_id} successfully calls the last play; Player {self.data['accused_id']} had played {self.data['revealed_cards']}."
+            else:
+                return f"Player {self.player_id} unsuccessfully calls the last play; Player {self.data['accused_id']} was telling the truth."
+        elif self.type == 'pick_up':
+            return f"Player {self.player_id} picks up the pile."
+        elif self.type == 'discard':
+            return f"Player {self.player_id} discards {', '.join(self.data)}."
+        elif self.type == 'win':
+            return f"Player {self.player_id} wins the round!"
+        elif self.type in ['bot_message', 'human_message']:
+            return f"Player {self.player_id} broadcasts: '{self.data}'"
+        elif self.type == 'player_exit':
+            return f"Player {self.player_id} has left the game."
+        elif self.type == 'player_replacement':
+            return f"Player {self.player_id} has been replaced by a bot."
+        elif self.type == 'game_over':
+            return f"Game is over."
+        return f"Action type: {self.type}, player: {self.player_id}; data: {self.data}"
 class CheatGame:
 
     def __init__(self,
@@ -121,6 +144,7 @@ class CheatGame:
         random.shuffle(self.deck)
         for p in self.players:
             p.hand = []
+            p.action_idx = []
         self.deal_cards()
         self.pile = []
         self.discarded_ranks = []
@@ -170,6 +194,8 @@ class CheatGame:
         # TODO: error should be caught and should not crash the game!
         for c in cards_played:
             if c not in player.hand:
+                print(player.hand)
+                print(cards_played)
                 raise InvalidMove("Trying to play a card not in hand.")
 
         # remove cards and add to pile
@@ -189,7 +215,7 @@ class CheatGame:
         lying = not all(str_to_Card(c).rank == declared_rank for c in cards_played)
         self.log(
             GameAction(type="call", player_id=caller_idx, timestamp=datetime.now(),
-                       data=dict(was_lying=lying, accused_id=last_player)
+                       data=dict(was_lying=lying, accused_id=last_player, revealed_cards=[str(c) for c in cards_played])
                        )
         )
 
@@ -288,8 +314,11 @@ class CheatGame:
             traceback.print_exc()
 
     def log(self, action: GameAction, **kwargs):
-        """ Logs a new action to the database """
+        """ Logs a new action to the database. The index of the action is appended to the players list of actions, so
+         that each player's actions can be easily retrieved from the game history."""
         self.history.append(action)
+        if action.player_id is not None and (action.type == 'play' or (action.type == 'call' and action.data['was_lying'])):
+            self.players[action.player_id].action_idx.append(len(self.history)-1)
         if self.out_path is not None:
             self.write_data(**kwargs)
 
@@ -571,7 +600,7 @@ class CheatGame:
                 elif data["type"] == "bluff_called":
                     await self.call(current_player)
 
-            elif current_player.type == 'bot':
+            elif current_player.type in ['bot', 'LLM']:
 
                 # Discard any fours
                 await self.check_for_fours()

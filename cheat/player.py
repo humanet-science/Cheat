@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fastapi import WebSocket
 from typing import List
 from cheat.card import Card, RANK_ORDER
@@ -17,6 +17,7 @@ class Player:
     hand: List[Card] = None
     type: str = "human"
     connected: bool = True
+    action_idx: list = field(default_factory=list)
 
     def __post_init__(self):
         if self.hand is None:
