@@ -1,0 +1,45 @@
+# Check passes
+pass_cases:
+  - current_rank: "K"
+    hand: []
+    move: ("call", )
+
+  - current_rank: "K"
+    hand: ['A♥', 'K♦', 'Q♠', '8♣']
+    move: ("play", ['K♦'], None)
+
+# Check failures
+failures:
+  - current_rank: "Q"
+    hand: ['A♥', 'K♦', 'Q♠', '8♣']
+    move: ("play", ['K♦'], 3)
+    match_str: cannot declare a different rank
+
+  - hand: ['A♥', 'K♦', 'Q♠', '8♣']
+    move: ("play", ['K♦'], "A")
+    match_str: cannot declare Aces
+
+  - current_rank: "Q"
+    hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
+    move: ("play", ['10♦'], None)
+    match_str: can only play cards you currently hold
+
+  - hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
+    current_rank: ~
+    move: ("call", )
+    match_str: must select between one and three cards to play
+
+  - hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
+    current_rank: ~
+    move: ("play", [ 'A♥', 'K♦', 'Q♠', '8♣' ], "J")
+    match_str: select between one and three cards
+
+  - hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
+    current_rank: ~
+    move: ("play", [], "J")
+    match_str: select between one and three cards
+
+  - hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
+    current_rank: ~
+    move: ("play", [ 'A♥', 'K♦', 'Q♠', '8♣' ], None)
+    match_str: must play and declare a rank

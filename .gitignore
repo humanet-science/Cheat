@@ -4,4 +4,4 @@
 node_modules/
 .idea
 *.lock
-game_data/
+game_data

@@ -1,0 +1,32 @@
+no_verbosity:
+  - name: 5_player_game
+    n_rounds: 1
+    bot_config:
+      - type: RandomBot
+        name: His Botness
+        avatar: 🦊
+        p_call: 0.2
+        p_lie: 0.1
+        verbosity: 0.0
+      - type: RandomBot
+        name: B0Ttled Up
+        avatar: 🍾
+        p_call: 0.3
+        p_lie: 0.2
+        verbosity: 0.0
+      - type: RandomBot
+        name: Beep Boop
+        p_call: 0.4
+        p_lie: 0.3
+        avatar: 🤖
+        verbosity: 0.0
+      - type: RandomBot
+        p_call: 0.5
+        p_lie: 0.1
+        name: ChattyBot
+        avatar: 🐭
+        verbosity: 0.0
+    game_config:
+      game_mode: single
+      experimental_mode: False
+
