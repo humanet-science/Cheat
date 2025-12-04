@@ -1,27 +1,31 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from fastapi import WebSocket
-from typing import List
+from typing import List, Callable
 from cheat.card import Card, RANK_ORDER
+from cheat.action import GameAction
 
 # Get the logger
 import logging
-player_log = logging.getLogger('GAME')
 
 """ Generic Player class that applies to humans, bots, and LLMs equally """
 @dataclass
 class Player:
-    id: int | None
+    id: int | None = None
     ws: WebSocket = None
-    name: str = ""
-    avatar: str = ""
+    name: str | None = ""
+    avatar: str | None = ""
     hand: List[Card] = None
     type: str = "human"
     connected: bool = True
-    action_idx: list = field(default_factory=list)
+    input_function: Callable = None
+    logger: logging.Logger = None
 
     def __post_init__(self):
         if self.hand is None:
             self.hand = []
+
+    def __dict__(self):
+        pass # Implemented by each type
 
     def get_info(self) -> dict:
         """ State dictionary that can be broadcast to frontend"""
@@ -39,11 +43,11 @@ class Player:
         """ Sort the hand by rank """
         self.hand = sorted(self.hand, key=lambda c: RANK_ORDER[c.rank])
 
-    async def make_move(self, game) -> dict:
+    async def make_move(self, game) -> GameAction:
         # To be implemented by subclasses
         raise NotImplementedError
 
-    async def choose_action(self, game):
+    async def choose_action(self, game) -> GameAction:
         # To be implemented by subclasses
         raise NotImplementedError
 
@@ -58,12 +62,15 @@ class Player:
             try:
                 await self.ws.send_json(message)
             except Exception as e:
-                player_log.error(f"Error sending to player {self.id}: {e}")
+                self.logger.error(f"Error sending to player {self.id}: {e}")
 
 class HumanPlayer(Player):
     def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None):
         super().__init__(id=id, name=name, avatar=avatar, type="human", ws=ws)
 
-    async def make_move(self, game):
+    def __dict__(self):
+        return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type)
+
+    async def make_move(self, game) -> GameAction:
         # Human players make moves via WebSocket
         pass

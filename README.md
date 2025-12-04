@@ -30,3 +30,20 @@ cd cheat_frontend
 yarn start
 ```
 in another. The game should open automatically in a browser window.
+
+## Adding LLMs
+To play with LLMs, you must have an API key stored as an environment variable. To do this, run the following command
+```console
+export <NAME_OF_API_KEY>="your_api_key_here"
+```
+on macOS/Linux, or
+```shell
+setx <NAME_OF_API_KEY> "your_api_key_here"
+```
+on Windows. Replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>` with the following client name:
+
+| Client        | Name of API key  |
+|---------------|------------------|
+| OpenAI        | OPENAI_API_KEY   |
+| DeepSeek      | DEEPSEEK_API_KEY |
+| Google Gemini | GEMINI_API_KEY   |

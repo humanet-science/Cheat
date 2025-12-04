@@ -2,18 +2,27 @@ import random
 from cheat.card import RANKS, Card
 from cheat.player import Player
 from cheat.bots.bot_messages import message_types
+from cheat.action import GameAction
 
 class RandomBot(Player):
     """ Random bot that inherits from the parent Player class"""
 
-    def __init__(self, id: int | None, name: str, avatar: str, p_call: float = 0.3, p_lie: float = 0.3,
+    def __init__(self, id: int | None = None,
+                 name: str | None = None,
+                 avatar: str | None = None,
+                 p_call: float = 0.3,
+                 p_lie: float = 0.3,
                  verbosity: float = 0.3):
         super().__init__(id=id, name=name, avatar=avatar, type="bot")
         self.p_call = p_call
         self.p_lie = p_lie
         self.verbosity = verbosity
 
-    def make_move(self, game) -> tuple[str, str, list[Card]]:
+    def __dict__(self):
+        return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type, p_lie=self.p_lie, p_call=self.p_call,
+                    verbosity=self.verbosity)
+
+    async def make_move(self, game) -> GameAction:
         """ Play some cards, either true ones or false
 
         :param game: the current `CheatGame` instance
@@ -32,25 +41,26 @@ class RandomBot(Player):
         # Play some true cards
         if true_cards and random.random() > self.p_lie:
             chosen = random.sample(true_cards, random.randint(1, len(true_cards)))
-            return ("play", declared_rank, chosen)
 
         # Lie: play random cards, but not from those that have been discarded (must still declare current rank)
         else:
             chosen = random.sample(self.hand, random.randint(1, min(3, len(self.hand))))
-            return ("play", declared_rank, chosen)
 
-    def choose_action(self, game) -> tuple:
+        return GameAction(type="play", player_id=self.id,
+                              data=dict(declared_rank=declared_rank, cards_played=chosen))
+
+    async def choose_action(self, game) -> GameAction:
 
         # Must call if the last player played all their cards, otherwise they would automatically win
         # Otherwise, can still call with probability p_call
         if (len(game.history) > 0 and game.current_rank is not None) and (
                 random.random() < self.p_call or len(game.players[game.last_play()[0]].hand) == 0
         ):
-            return ("call",)
+            return GameAction(type='call', player_id=self.id)
 
         # Play
         else:
-            return self.make_move(game)
+            return await self.make_move(game)
 
     def broadcast_message(self, game, type: str = None, *_, **__):
         """ Broadcast an opinion based on the state of play"""

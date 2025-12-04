@@ -1,4 +1,7 @@
+colorlog
 hypercorn
 fastapi
+pandas
 pyyaml
-colorlog
+pytest
+pytest-asyncio

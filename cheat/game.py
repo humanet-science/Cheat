@@ -3,60 +3,29 @@ import traceback
 import random
 import os
 import json
-from cheat.player import Player
-from cheat.bots import RandomBot
-from cheat.card import Card, RANKS, SUITS, str_to_Card
-from cheat.logging_config import setup_game_logger, setup_player_logger
-from dataclasses import dataclass
 from typing import List, Any
 from datetime import datetime
 import uuid
 import asyncio
 from typing import Literal
 
+from cheat.player import Player
+from cheat.bots import RandomBot
+from cheat.card import Card, RANKS, SUITS, str_to_Card
+from cheat.logging_config import setup_game_logger, setup_player_logger
+from cheat.action import GameAction
+
 class InvalidMove(Exception):
     pass
 
 
-# General Action class that logs an action
-@dataclass
-class GameAction:
-    type: str  # "play", "call", "discard", "status_message"
-    player_id: int | None
-    timestamp: datetime
-    data: Any  # Flexible data storage
-
-    def __str__(self):
-        """ Converts an action into a descriptive string for LLM integration. """
-        if self.type == 'play':
-            return f"Player {self.player_id} plays {len(self.data['cards_played'])} {'cards' if len(self.data['cards_played']) > 1 else 'card'}, declaring {self.data['declared_rank']}."
-        elif self.type == 'call':
-            if self.data['was_lying']:
-                return f"Player {self.player_id} successfully calls the last play; Player {self.data['accused_id']} had played {self.data['revealed_cards']}."
-            else:
-                return f"Player {self.player_id} unsuccessfully calls the last play; Player {self.data['accused_id']} was telling the truth."
-        elif self.type == 'pick_up':
-            return f"Player {self.player_id} picks up the pile."
-        elif self.type == 'discard':
-            return f"Player {self.player_id} discards {', '.join(self.data)}."
-        elif self.type == 'win':
-            return f"Player {self.player_id} wins the round!"
-        elif self.type in ['bot_message', 'human_message']:
-            return f"Player {self.player_id} broadcasts: '{self.data}'"
-        elif self.type == 'player_exit':
-            return f"Player {self.player_id} has left the game."
-        elif self.type == 'player_replacement':
-            return f"Player {self.player_id} has been replaced by a bot."
-        elif self.type == 'game_over':
-            return f"Game is over."
-        return f"Action type: {self.type}, player: {self.player_id}; data: {self.data}"
 class CheatGame:
 
     def __init__(self,
                  players: List[Player],
-                 experimental_mode: bool,
+                 experimental_mode: bool = False,
                  *,
-                 game_mode: Literal["single", "multiplayer"],
+                 game_mode: Literal["single", "multiplayer"] = "single",
                  message_queue: asyncio.Queue = None,
                  out_dir: str = None,
                  round: int = 1,
@@ -131,6 +100,12 @@ class CheatGame:
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
         self.player_logger = setup_player_logger(self.game_id, self.out_path)
+        self.log(GameAction(type="new_round", player_id=None, timestamp=datetime.now(), data=dict(round=self.round, player_hands=dict((p.id, [str(c) for c in p.hand]) for p in self.players))))
+        self.write_action(
+            GameAction(type="player_info", player_id=None, timestamp=datetime.now(), data=dict(player_info=[p.__dict__() for p in self.players]))
+        )
+        for p in self.players:
+            p.logger = self.player_logger
 
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
@@ -144,15 +119,16 @@ class CheatGame:
         random.shuffle(self.deck)
         for p in self.players:
             p.hand = []
-            p.action_idx = []
         self.deal_cards()
         self.pile = []
         self.discarded_ranks = []
-        self.turn = random.randint(0, len(self.players)-1)
+        self.turn = random.randint(0, len(self.players)-1) # TODO: also shuffle the order of play?
         self.current_rank = None
         self.round_over = False
         self.winner = None
         self.round += 1
+        self.log(GameAction(type="new_round", player_id=None, timestamp=datetime.now(), data=dict(round=self.round, player_hands=dict((p.id, [str(c) for c in p.hand]) for p in self.players))))
+
 
     def deal_cards(self):
         """ Deal out the cards to the players"""
@@ -194,8 +170,6 @@ class CheatGame:
         # TODO: error should be caught and should not crash the game!
         for c in cards_played:
             if c not in player.hand:
-                print(player.hand)
-                print(cards_played)
                 raise InvalidMove("Trying to play a card not in hand.")
 
         # remove cards and add to pile
@@ -288,39 +262,34 @@ class CheatGame:
                 break
         return self.round_over
 
-    def write_data(self, *, file_name: str = "game_history"):
-        """ Write the history to a json file. This function can be called periodically for backup purposes.
-        If for any reason writing fails, an exception is printed but the game is not stopped. """
-        if not self.history:
-            return
-
-        try:
-            file_path = os.path.join(self.out_path, f"{file_name}.jsonl")
-            with open(file_path, 'a') as f:
-                for action in self.history:
-                    record = {
-                        'game_id': self.game_id,
-                        'round': self.round,
-                        'type': action.type,
-                        'player_id': action.player_id,
-                        'timestamp': action.timestamp.isoformat(),
-                        'data': action.data if action.type != 'play' else dict(
-                            declared_rank=action.data['declared_rank'],
-                            cards_played=[str(c) for c in action.data['cards_played']])
-                    }
-                    f.write(json.dumps(record) + '\n')
-        except Exception as e:
-            self.logger.error(f"Error saving game data: {e}")
-            traceback.print_exc()
-
     def log(self, action: GameAction, **kwargs):
         """ Logs a new action to the database. The index of the action is appended to the players list of actions, so
-         that each player's actions can be easily retrieved from the game history."""
+         that each player's actions can be easily retrieved from the game history. The action is also written to the database"""
         self.history.append(action)
-        if action.player_id is not None and (action.type == 'play' or (action.type == 'call' and action.data['was_lying'])):
-            self.players[action.player_id].action_idx.append(len(self.history)-1)
+        self.write_action(action, **kwargs)
+
+    def write_action(self, action: GameAction, *, file_name: str = 'game_history'):
+        """Write a single action to the data file, if available. If an error occurs during writing,
+         the error is logged but the game is not stopped."""
         if self.out_path is not None:
-            self.write_data(**kwargs)
+            try:
+                file_path = os.path.join(self.out_path, f"{file_name}.jsonl")
+                # Write the  action
+                record = {
+                    'game_id': self.game_id,
+                    'round': self.round,  # This is always the current round
+                    'type': action.type,
+                    'player_id': action.player_id,
+                    'timestamp': action.timestamp.isoformat(),
+                    'data': action.data if action.type != 'play' else dict(
+                        declared_rank=action.data['declared_rank'],
+                        cards_played=[str(c) for c in action.data['cards_played']])}
+                with open(file_path, 'a') as f:
+                    f.write(json.dumps(record) + '\n')
+
+            except Exception as e:
+                self.logger.error(f"Error saving game data: {e}")
+                traceback.print_exc()
 
     def get_info(self) -> dict:
         """ Produce a dictionary that can be broadcast to the frontend """
@@ -606,21 +575,22 @@ class CheatGame:
                 await self.check_for_fours()
 
                 # Pick an action
-                action = current_player.choose_action(self)
+                action = await current_player.choose_action(self)
 
                 # Play card
-                if action[0] == "play":
+                if action.type == "play":
 
                     # Check for win
                     round_is_over = await self.check_for_winner(current_player)
                     if round_is_over:
                         break
 
-                    _, declared_rank, cards = action
+                    declared_rank = action.data.get("declared_rank")
+                    cards = action.data.get("cards_played")
                     await self.play(current_player, declared_rank, cards)
 
                 # Call previous play
-                elif action[0] == "call":
+                elif action.type == "call":
 
                     was_lying = await self.call(current_player)
 
@@ -629,8 +599,20 @@ class CheatGame:
                         round_is_over = await self.check_for_winner(current_player)
                         if round_is_over:
                             break
-                        _, declared_rank, cards = current_player.make_move(self)
+                        action = await current_player.make_move(self)
+                        if action.type == "failure":
+                            self.log(action)
+                            await self.replace_player_with_bot(current_player)
+                            continue
+                        declared_rank = action.data.get('declared_rank')
+                        cards = action.data.get('cards_played')
                         await self.play(current_player, declared_rank, cards)
+
+                # Failure: disconnect player
+                elif action.type == "failure":
+                    self.log(action)
+                    await self.replace_player_with_bot(current_player)
+                    continue
 
             # Add a small delay to account for the animations in the frontend: this way the backend is not always
             # too many steps ahead of the frontend
@@ -685,7 +667,7 @@ class CheatGame:
     async def replace_disconnected_players_with_bots(self):
         # Replace any humans who didn't confirm with bots (if they're disconnected)
         for player in self.players:
-            if player.type == "human" and not player.connected:
+            if player.type in ["human", "LLM"] and not player.connected:
                 await self.replace_player_with_bot(player)
 
     async def wait_for_new_round(self):
