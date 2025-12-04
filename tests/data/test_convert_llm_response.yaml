@@ -1,0 +1,145 @@
+# Ideal cases
+test_cases:
+  - current_rank: "K"
+    input: "call"
+    expected: ("call",)
+    name: call
+
+  - input: "CALL"
+    expected: ("call",)
+    name: call_uppercase
+
+  - current_rank: "K"
+    input: "Play [2♥]"
+    expected: ("play", "K", ['2♥'])
+    name: play_list
+
+  - current_rank: "K"
+    input: "play [2♥]"
+    expected: ("play", "K", ['2♥'])
+    name: play_lowercase
+
+  - current_rank: "10"
+    input: "Play [2♥]; Declare 10"
+    expected: ("play", "10", ['2♥'])
+    name: play_declare_current_rank
+
+  - current_rank: "J"
+    input: "Play [2♥]; Declare J."
+    expected: ("play", "J", ['2♥'])
+    name: play_with_full_stop
+
+  - input: "Play [2♥, 5♥]; Declare Q"
+    expected: ("play", "Q", ['2♥', '5♥'])
+    name: play_list
+
+  - input: "Play [2♥, 5♥]; declare Q"
+    expected: ("play", "Q", ['2♥', '5♥'])
+    name: play_list_lower_declare
+
+  - input: "play [2♥, 5♥]; declare Q."
+    expected: ("play", "Q", ['2♥', '5♥'])
+    name: play_all_lowercase
+
+edge_cases:
+  - input: "I call"
+    expected: ("call",)
+    name: I_call
+
+  # Single card not in a list
+  - current_rank: "K"
+    input: "play 2♥"
+    expected: ("play", "K", ['2♥'])
+    name: lower_case_no_list
+
+  # Multiple cards not in a list
+  - current_rank: "K"
+    input: "play 2♥ 4♦"
+    expected: ("play", "K", ['2♥', '4♦'])
+    name: lower_case_all_no_list
+
+  # Cards in list but not seperated by comma
+  - current_rank: "K"
+    input: "Play [2♥ 4♦]; declare J"
+    expected: ("play", "J", ['2♥', '4♦'])
+    name: lower_case_no_comma
+
+  # Declaration given as a string
+  - input: "Play [2♥] and declare Ten"
+    expected: ("play", "10", ['2♥'])
+    name: word_declaration
+
+  # Declaration given as a string
+  - input: "Play [2♥] and declare Tens"
+    expected: ("play", "10", ['2♥'])
+    name: word_declaration_plural
+
+  # Declaration given as a string
+  - input: "Play [2♥] and declare Jack"
+    expected: ("play", "J", ['2♥'])
+    name: jack_declaration
+
+  # Declaration given as a string
+  - input: "Play [2♥] and declare Queen"
+    expected: ("play", "Q", ['2♥'])
+    name: queen_declaration
+
+  # Declaration given as a string
+  - input: "Play [2♥] and declare Jack"
+    expected: ("play", "J", ['2♥'])
+    name: king_declaration
+
+  # No list and declaration given as a string
+  - input: "Play 2♥ and declare Queen"
+    expected: ("play", "Q", ['2♥'])
+    name: queen_declaration_no_list
+
+  # No list and declaration given as a string
+  - input: "Play 2♥, 4♦ and declare jack"
+    expected: ("play", "J", ['2♥', '4♦'])
+    name: jack_deceleration_all_no_list
+
+  # No list and declaration given as a string
+  - input: "Play K♥, A♦ and declare sevens"
+    expected: ("play", "7", ['K♥', 'A♦'])
+    name: sevens_deceleration_all_no_list
+
+  # Declaration given in words
+  - input: "Play K of hearts, Ace of diamonds and declare sevens"
+    expected: ("play", "7", ['K♥', 'A♦'])
+    name: all_verbal
+
+  # Mixed-type declaration
+  - input: "Play K of hearts, A♦, declare 7"
+    expected: ("play", "7", ['K♥', 'A♦'])
+    name: mixed_verbal
+
+  # Mixed-type declaration
+  - input: "Play 10 of hearts, Seven♦, declaring 7"
+    expected: ("play", "7", ['10♥', '7♦'])
+    name: declaring_mixed_type
+
+  # Full sentence
+  - input: "I am going to play a nine of clubs, 10 of spades 9♥, declaring tens"
+    expected: ("play", "10", ['9♣', '10♠', '9♥'])
+    name: full_sentence
+
+  - input: "Play an Ace of hearts"
+    expected: ("play", None, ['A♥'])
+
+  - input: "Play [2♥]"
+    expected: ("play", None, ['2♥'])
+
+  # Declaration overrides current rank (but should be caught by move checking function
+  - input: "Play [2♥] declaring 3"
+    current_rank: '2'
+    expected: ("play", '3', ['2♥'])
+    name: override_current_rank
+
+  - input: "Bla bla bla"
+    expected: (None, None, [])
+    name: nonsense
+
+  - input: "Play something with no cards or declaration"
+    expected: ("play", None, [])
+    name: play_rest_empty
