@@ -31,14 +31,14 @@ def generate_client_input(kind, *, system_prompt, game_summary, additional_promp
         res = [{"role": "system", "content": system_prompt},
                {"role": "user", "content": game_summary}]
         if additional_prompts:
-            res.append({"role": "system", "content": f"Remember: {additional_prompts}"})
+            res.append({"role": "system", "content": additional_prompts})
         return dict(messages=res)
 
     elif kind == 'open_ai':
         res = [{"role": "developer", "content": system_prompt},
                {"role": "user", "content": game_summary}]
         if additional_prompts:
-            res.append({"role": "developer", "content": {additional_prompts}})
+            res.append({"role": "developer", "content": additional_prompts})
         return dict(input=res)
 
     elif kind == 'gemini':
@@ -203,24 +203,28 @@ class LLM_Player(Player):
     def __dict__(self):
         return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type, kind=self.kind, system_prompt=self.system_prompt)
 
-    def game_summary(self, game) -> str:
+    def game_summary(self, game) -> tuple[str, str]:
         """ Return a summary of the game that can be passed to the LLM"""
 
         game_summary = 'Here is the game history so far:\n'
-        game_summary += '\n'.join([f"- {str(action)}" for action in game.history])
+        game_summary += '\n'.join([f"- {action.__str__(speaker_id=self.id)}" for action in game.history])
+
+        play_prompt = ""
         if game.turn == self.id:
-            game_summary += f"\n- It's your turn. The hand sizes of the other players: {'; '.join([f'Player {player.id}: {len(player.hand)} card(s)' for player in game.players if player.id != self.id])}, "
-            game_summary += f"and your hand is {[str(c) for c in self.hand]}."
+            play_prompt += f"\n- It's your turn. The hand sizes of the other players: {'; '.join([f'Player {player.id}: {len(player.hand)} card(s)' for player in game.players if player.id != self.id])}, "
+            play_prompt += f"and your hand is {[str(c) for c in self.hand]}."
         if game.current_rank is not None:
-            game_summary += f" The current declared rank is {game.current_rank}."
-        game_summary += '\n What is your move?'
+            play_prompt += f" The current declared rank is {game.current_rank}."
+        play_prompt += '\n What is your move?'
 
-        return game_summary
+        return game_summary, play_prompt
 
-    def move_from_LLM_response(self, game, *, additional_prompts: str = None) -> GameAction:
+    def move_from_LLM_response(self, game, *, additional_prompts: str = "") -> GameAction:
         """Passes the input prompt to the LLM and extracts the move."""
-        game_summary = self.game_summary(game)
-        input_data = generate_client_input(self.kind, game_summary=game_summary, system_prompt=self.system_prompt, additional_prompts=additional_prompts)
+        game_summary, play_prompt = self.game_summary(game)
+        if additional_prompts:
+            play_prompt += f'\nRemember: {additional_prompts}.'
+        input_data = generate_client_input(self.kind, game_summary=game_summary, system_prompt=self.system_prompt, additional_prompts=play_prompt)
         response = input_to_client(kind=self.kind, client=self.client, **input_data, **self.model_kwargs)
 
         # Log the response

@@ -53,7 +53,7 @@ class RandomBot(Player):
 
         # Must call if the last player played all their cards, otherwise they would automatically win
         # Otherwise, can still call with probability p_call
-        if (len(game.history) > 0 and game.current_rank is not None) and (
+        if game.pile and (
                 random.random() < self.p_call or len(game.players[game.last_play()[0]].hand) == 0
         ):
             return GameAction(type='call', player_id=self.id)

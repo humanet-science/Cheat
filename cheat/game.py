@@ -256,10 +256,16 @@ class CheatGame:
 
     async def check_for_winner(self, player: Player = None) -> bool:
         """ Check if a player has won"""
-        for p in self.players if player is None else [player]:
-            if self.check_winner(p):
-                await self.broadcast_to_all({"type": "round_over", "winner": p.name})
-                break
+
+        # Unique situation: all players left holding Aces
+        if all([all([c.rank == 'A' for c in p.hand]) for p in self.players]):
+            await self.broadcast_to_all({"type": "round_over", "winner": "None"})
+            self.round_over = True
+        else:
+            for p in self.players if player is None else [player]:
+                if self.check_winner(p):
+                    await self.broadcast_to_all({"type": "round_over", "winner": p.name})
+                    break
         return self.round_over
 
     def log(self, action: GameAction, **kwargs):

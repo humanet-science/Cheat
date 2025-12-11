@@ -3,5 +3,7 @@ hypercorn
 fastapi
 pandas
 pyyaml
+openai
+google-genai
 pytest
 pytest-asyncio
