@@ -360,9 +360,29 @@
   }
 }
 
+@keyframes slideToSmallBubble {
+  0% {
+    /*transform: translate(var(--tw-translate-x, 0), var(--tw-translate-y, 0))*/
+    /*           scale(0.98);*/
+    opacity: 0;
+  }
+  100% {
+    /*transform: translate(var(--tw-translate-x, 0), var(--tw-translate-y, 0))*/
+    /*           scale(1);*/
+    opacity: 1;
+  }
+}
+
 .message_float {
     animation: floatUp_Bubble 1.5s ease-out forwards
 }
 .play-announcement {
-  animation: floatUpWithWiggle 6s ease-out forwards;
+  animation: floatUpWithWiggle 4s ease-out forwards;
 }
+
+.play-announcement-small {
+  animation: slideToSmallBubble 0.5s ease-out forwards;
+}
+
+.bg-opacity-low { --tw-bg-opacity: 0.2; }
+.bg-opacity-high { --tw-bg-opacity: 0.4; }
