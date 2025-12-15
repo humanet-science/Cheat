@@ -5,3 +5,4 @@ node_modules/
 .idea
 *.lock
 game_data
+__pycache__
