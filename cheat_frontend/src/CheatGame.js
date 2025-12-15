@@ -89,6 +89,7 @@ export default function CheatGame({
 
 	// Player status messages
 	const [statusMessages, setStatusMessages] = useState([]);
+	const [playAnnouncements, setPlayAnnouncements] = useState([]);
 	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 	const [messageInput, setMessageInput] = useState("");
 
@@ -276,6 +277,7 @@ export default function CheatGame({
 
 		} else if (msg.type === "bluff_called") {
 
+			setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
 			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id && msg.was_lying));
 
 			// Show revealed cards
@@ -313,6 +315,8 @@ export default function CheatGame({
 				setPilePickupAnimation(null);
 			}
 
+
+			setPlayAnnouncements([]);
 			setRevealedCards(null);
 			setLastPlayedCount(0);
 
@@ -478,7 +482,7 @@ export default function CheatGame({
 		}
 	}, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
-// Floating message bubbles
+	// Floating message bubbles
 	useEffect(() => {
 		statusMessages.forEach(msg => {
 			if (!msg.is_connection_timer) {  // Don't auto-animate connection timers
@@ -486,10 +490,13 @@ export default function CheatGame({
 				if (element && !element.dataset.animated) {
 					element.dataset.animated = 'true';
 
-					// Remove after animation
-					const duration = msg.is_play_announcement ? 6000 : 3000;
+					// Remove after animation, or move to constant play announcements array
+					const duration = msg.is_play_announcement ? 4000 : 3000;
 					setTimeout(() => {
 						setStatusMessages(prev => prev.filter(m => m.id !== msg.id));
+						if (msg.is_play_announcement) {
+							setPlayAnnouncements(prev => [...prev, {...msg}]);
+						}
 					}, duration);
 				}
 			}
@@ -654,6 +661,7 @@ export default function CheatGame({
 				setIsNewRound={setIsNewRound}
 				setIsMyTurn={setIsMyTurn}
 				setDiscards={setDiscards}
+				setPlayAnnouncements={setPlayAnnouncements}
 				onQuit={() => {
 					if (socket) {
 						socket.send(JSON.stringify({type: "quit", player_id: state.your_info.id}));
@@ -666,7 +674,9 @@ export default function CheatGame({
 			/>
 
 			{/* Status Message bubbles floating up from each player */}
-			<StatusMessage statusMessages={statusMessages}/>
+			<StatusMessage
+				statusMessages={statusMessages}
+			/>
 
 			{/* Section containing players and cards*/}
 			<div className="flex-1 flex items-center justify-center relative">
@@ -674,6 +684,7 @@ export default function CheatGame({
 				{/* Opponents arranged in semi-circle around pile */}
 				<OpponentIcons
 					opponents={opponents}
+					playAnnouncements={playAnnouncements}
 					playerPositions={playerPositionsRef.current}
 					handlePlayerClick={handlePlayerClick}
 					state={state}
