@@ -47,3 +47,8 @@ on Windows. Replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>` w
 | OpenAI        | OPENAI_API_KEY   |
 | DeepSeek      | DEEPSEEK_API_KEY |
 | Google Gemini | GEMINI_API_KEY   |
+
+> [!WARNING]
+> The API key should ideally be specific to your virtual environment. Make sure to NEVER reveal the API secret, e.g. by 
+> pushing the virtual environment to a Github repo, or by publishing it online. Make sure that your virtual environment folder
+> is not included in your git VCS so that it won't be accidentally pushed.

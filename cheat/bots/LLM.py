@@ -9,19 +9,30 @@ from cheat.action import GameAction
 
 SUPPORTED_CLIENTS = ["open_ai", "gemini", "deepseek"]
 
+class MissingAPIKeyError(Exception):
+    """Exception raised when an API key is missing."""
+    pass
+
+
 def get_client(kind: Literal["open_ai", "gemini", "deepseek"]):
     """ Set up the client connection for various kinds of LLM. """
     if kind == 'gemini':
+        if 'GEMINI_API_KEY' not in os.environ.keys():
+            raise MissingAPIKeyError("Missing API key for OpenAI! Add 'GEMINI_API_KEY' to your os.environ keys!")
         from google import genai
         return genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     if kind == 'open_ai':
+        if 'OPENAI_API_KEY' not in os.environ.keys():
+            raise MissingAPIKeyError("Missing API key for OpenAI! Add 'OPENAI_API_KEY' to your os.environ keys!")
         from openai import OpenAI
-        return OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        return OpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
     if kind == 'deepseek':
         from openai import OpenAI
-        return OpenAI(api_key=os.environ.get('DEEPSEEK_API_KEY'), base_url="https://api.deepseek.com")
+        if 'DEEPSEEK_API_KEY' not in os.environ.keys():
+            raise MissingAPIKeyError("Missing API key for Deepseek! Add 'DEEPSEEK_API_KEY' to your os.environ keys!")
+        return OpenAI(api_key=os.environ['DEEPSEEK_API_KEY'], base_url="https://api.deepseek.com")
     else:
         raise ValueError(f"Unkown client {kind}! Choose from {','.join(SUPPORTED_CLIENTS)}.")
 

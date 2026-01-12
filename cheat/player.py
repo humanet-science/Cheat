@@ -39,6 +39,10 @@ class Player:
             "cardCount": len(self.hand)
         })
 
+    def write_info(self, path) -> None:
+        """ Write out the internal configuration (implemented by subclass)"""
+        pass
+
     def sort_hand(self):
         """ Sort the hand by rank """
         self.hand = sorted(self.hand, key=lambda c: RANK_ORDER[c.rank])
@@ -74,3 +78,24 @@ class HumanPlayer(Player):
     async def make_move(self, game) -> GameAction:
         # Human players make moves via WebSocket
         pass
+
+def get_player(config: dict) -> Player:
+    """Get a player from a configuration"""
+    type = config['type']
+    if type.lower() == 'smartbot':
+        from cheat.bots import SmartBot
+        return SmartBot(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None),
+                        verbosity=config.get('verbosity', None))
+    elif type.lower() == 'randombot':
+        from cheat.bots import RandomBot
+        return RandomBot(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None),
+                         p_call=config.get('p_call', None), p_lie=config.get('p_lie', None),
+                         verbosity=config.get('verbosity', None))
+    elif type.lower() == 'llm':
+        from cheat.bots import LLM_Player
+        return LLM_Player(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None), kind=config['kind'],
+                          system_prompt=config.get('system_prompt', None), model_kwargs=config.get('model_kwargs', {}))
+    elif type.lower() == 'human':
+        return HumanPlayer(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None))
+    else:
+        raise ValueError(f"Unrecognised player type {type}!")

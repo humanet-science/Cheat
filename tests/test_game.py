@@ -58,7 +58,9 @@ class TestBasicGameFunctionality:
                 game = setup_game(tmp_path, **test_case)
                 for i in range(test_case['n_rounds']):
                    await game.play_round(sleep_pause=0)
+                   assert game.winner is not None
                    game.new_round()
+
 
                 # Check the json file is the same length as the game history
                 json_file = Path(game.out_path) / "game_history.jsonl"

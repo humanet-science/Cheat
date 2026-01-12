@@ -10,7 +10,7 @@ import asyncio
 from typing import Literal
 
 from cheat.player import Player
-from cheat.bots import RandomBot
+from cheat.bots import RandomBot, SmartBot
 from cheat.card import Card, RANKS, SUITS, str_to_Card
 from cheat.logging_config import setup_game_logger, setup_player_logger
 from cheat.action import GameAction
@@ -28,18 +28,22 @@ class CheatGame:
                  game_mode: Literal["single", "multiplayer"] = "single",
                  message_queue: asyncio.Queue = None,
                  out_dir: str = None,
+                 note: str = None,
                  round: int = 1,
                  game_id: str = None):
 
         """ CheatGame that can be played for multiple rounds.
 
-        :param players:
-        :param experimental_mode:
-        :param game_mode:
-        :param message_queue:
-        :param out_dir:
-        :param round:
-        :param game_id:
+        :param players: list of cheat.Player objects. Each player can be of any type (e.g. human, bot, LLM)
+        :param experimental_mode: whether to use a special experimental mode, in which player messages are restricted
+        :param game_mode: in single mode, only one human player is playing. In multiplayer mode, multiple humans can
+            play
+        :param message_queue: game-specific message queue (asyncio.Queue object), collecting and distributing game
+            actions and messages
+        :param out_dir: directory to which to save the game data. If None, nothing is saved
+        :param note: note added to time-stamped out_dir name, if given
+        :param round: starting round number
+        :param game_id: unique game id. If None, a random UUID identifier is created
         """
 
         # Set up the players
@@ -92,10 +96,18 @@ class CheatGame:
             out_path = os.path.expanduser(
                 os.path.join(out_dir, f"game_{_date_time}")
             )
+            if note:
+                out_path += f"_{note}"
             self.out_path = out_path
             os.makedirs(self.out_path, exist_ok=True)
+
+            # Make a folder for the players
+            self.player_info_path = os.path.join(self.out_path, "players")
+            os.makedirs(self.player_info_path, exist_ok = True)
+
         else:
             self.out_path = None
+            self.player_info_path = None
 
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
@@ -106,6 +118,8 @@ class CheatGame:
         )
         for p in self.players:
             p.logger = self.player_logger
+            if self.player_info_path:
+                p.write_info(self.player_info_path)
 
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
@@ -273,6 +287,12 @@ class CheatGame:
          that each player's actions can be easily retrieved from the game history. The action is also written to the database"""
         self.history.append(action)
         self.write_action(action, **kwargs)
+
+        # Also write out updates to the internal state of any SmartBots
+        if self.player_info_path:
+            for p in self.players:
+                if isinstance(p, SmartBot):
+                    p.write_info(self.player_info_path)
 
     def write_action(self, action: GameAction, *, file_name: str = 'game_history'):
         """Write a single action to the data file, if available. If an error occurs during writing,

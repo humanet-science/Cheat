@@ -1,4 +1,5 @@
 import random
+import pickle
 from cheat.card import RANKS, Card
 from cheat.player import Player
 from cheat.bots.bot_messages import message_types
@@ -21,6 +22,11 @@ class RandomBot(Player):
     def __dict__(self):
         return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type, p_lie=self.p_lie, p_call=self.p_call,
                     verbosity=self.verbosity)
+
+    def write_info(self, path) -> None:
+        """ Writes out the configuration"""
+        with open(f"{path}/Player_{self.id if self.id is not None else self.name}.pickle", "wb") as file:
+            pickle.dump(self.__dict__(), file)
 
     async def make_move(self, game) -> GameAction:
         """ Play some cards, either true ones or false
