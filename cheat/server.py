@@ -9,9 +9,9 @@ from pathlib import Path
 import os
 from collections import deque
 
+import cheat.bots
 from cheat.game import CheatGame
-from cheat.bots import RandomBot
-from cheat.player import Player
+from cheat.player import Player, get_player, HumanPlayer
 from typing import Literal
 
 from cheat.logging_config import setup_logging
@@ -92,20 +92,10 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
     game_players = []
     game_players.extend(human_players)
 
-    # Fill up with bots
+    # Add non-human players from config
     for i in range(num_players - len(human_players)):
-        bot_config = game_config['bots'][i]
-        if bot_config['type'] == "RandomBot":
-            game_players.append(RandomBot(
-                id=None,
-                name=bot_config['name'],
-                avatar=bot_config['avatar'],
-                p_call=bot_config.get('p_call', 0.3),
-                p_lie=bot_config.get('p_lie', 0.3),
-                verbosity=bot_config.get('verbosity', 0.3)
-            ))
-        # TODO: add other bots
-        # TODO: generalise player adding logic
+        player_config = game_config['players'][i]
+        game_players.append(get_player(player_config))
 
     # Now randomly shuffle the players if more than one human present
     if len(human_players) > 1:
@@ -121,9 +111,20 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
         experimental_mode=game_config["game"].get("experimental_mode", False),
         game_mode=mode,
         message_queue = asyncio.Queue(), # Set up a new queue
-        out_dir=game_config["game"].get("out_dir")
+        out_dir=game_config["game"].get("out_dir"),
+        note=game_config["game"].get("note")
     )
 
+    # Set the system prompt for all LLM players, if not specified from the config
+    for i, player in enumerate(game.players):
+        # Format the LLM default prompt
+        if isinstance(player, cheat.bots.LLM_Player):
+            if player.system_prompt is None:
+                player.system_prompt = game_config['default_system_prompt'].format(
+                    N_players=game.num_players, player_id=player.id
+                )
+
+    # Store a link to the human players in the dictionary
     for player in human_players:
         player_to_game[id(player.ws)] = game.game_id
 
@@ -151,16 +152,31 @@ async def try_start_game_from_queue(num_players, mode):
     min_players = 1 if (num_players == 1 or mode == 'single') else 2 if num_players == 3 else 3
 
     if len(queue) >= min_players and len(active_games) < MAX_NUM_ACTIVE_GAMES:
-        # Create a new game with the people in the front of the queue
-        _players = [waiting_queues[num_players][mode].popleft() for _ in range(min_players)]
-        _game = new_game(num_players, human_players=_players, mode=mode)
 
-        # Add game to list of active games
-        active_games[_game.game_id] = _game
+        # Try to create a new game with the people in the front of the queue
+        try:
+            # Peek at the players first (don't pop yet in case an error occurs)
+            _players = []
+            for _ in range(min_players):
+                player = waiting_queues[num_players][mode][0]
+                _players.append(player)
 
-        # Start the game loop as a separate task (non-blocking)
-        asyncio.create_task(run_game(_game))
+            # Try to create the game (this might fail with API key error)
+            _game = new_game(num_players, human_players=_players, mode=mode)
 
+            # If successful, now pop the players
+            for _ in range(min_players):
+                waiting_queues[num_players][mode].popleft()
+
+            # Add game to list of active games
+            active_games[_game.game_id] = _game
+
+            # Start the game loop as a separate task (non-blocking)
+            asyncio.create_task(run_game(_game))
+
+        # If an API key is missing (e.g. for a mixed LLM-human game), kick waiting players out of the queue
+        except cheat.MissingAPIKeyError as e:
+            server_log.error(e)
 
 async def run_game(_game: CheatGame):
     """Run a single game to completion"""
@@ -240,14 +256,11 @@ async def websocket_endpoint(ws: WebSocket):
 
         # Create Player instance and append to relevant queue
         if data["type"] == "player_join":
-            player = Player(
+            player = HumanPlayer(
                 id=None,
                 ws=ws,
                 name=data["name"],
-                avatar=data["avatar"],
-                hand=[],
-                type="human",
-                connected=True
+                avatar=data["avatar"]
             )
             waiting_queues[data["num_players"]][data["game_mode"]].append(player)
 

@@ -1,4 +1,5 @@
 import random
+import pickle
 from cheat.card import RANKS, Card, str_to_Card
 from cheat.player import Player
 from cheat.bots.bot_messages import message_types
@@ -24,11 +25,20 @@ class SmartBot(Player):
         self.other_player_repr = {}
         self.last_action_idx = 0
 
-        # History of estimates -- just for diagnostics
+        # History of estimates, used for writing out
         self.other_player_repr_hist = {}
 
     def __dict__(self):
         return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type, verbosity=self.verbosity)
+
+    def write_info(self, path) -> None:
+        """ Write out the internal configuration"""
+
+        # TODO: Use json instead
+        with open(f"{path}/Player_{self.id if self.id is not None else self.name}.pickle", "wb") as file:
+            res = self.__dict__()
+            res['other_player_repr_hist'] = self.other_player_repr_hist
+            pickle.dump(res, file)
 
     def populate_player_repr(self, game) -> None:
         """ Populate the inner representation of other players' estimated dynamics and cards"""
@@ -132,7 +142,9 @@ class SmartBot(Player):
         # If the previous player is running low on cards, increase chance of calling by number of cards left on hand.
         # If the previous player has no cards left, p_call is 1 and the play is necessarily called
         if self.other_player_repr.get((self.id - 1) % game.num_players, {}).get("hand_length", 5) < 4:
-            p_call = min(1, p_call + (1/self.other_player_repr[(self.id - 1) % game.num_players]["hand_length"]+1))
+            p_call = min(1, p_call + (1/(self.other_player_repr[(self.id - 1) % game.num_players]["hand_length"]+1)))
+            if p_call == 1:
+                return GameAction(type='call', player_id=self.id)
 
         # Get the estimated lie probability of the previous player
         prev_player_info = self.other_player_repr.get((self.id - 1) % game.num_players, {})
