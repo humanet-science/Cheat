@@ -337,7 +337,7 @@ const TUTORIAL_SLIDES = [{
 	messages: [{}]
 }];
 
-export default function Tutorial({onClose}) {
+export default function Tutorial({onClose, isEmpirica = false}) {
 	const [currentSlide, setCurrentSlide] = useState(0);
 	const [mockSocket, setMockSocket] = useState(null);
 	const [currentRound, setCurrentRound] = useState(null);
@@ -598,7 +598,7 @@ export default function Tutorial({onClose}) {
 	const slide = TUTORIAL_SLIDES[currentSlide];
 
 	return (<div
-		className={`fixed inset-0  z-50 flex items-center justify-center p-4 transition-all transform-gpu duration-1000 ${isOpening || isOpen ? 'bg-opacity-40 backdrop-blur-lg bg-black' : ''}`}
+		className={`fixed inset-0  ${!isEmpirica ? 'z-50' : ''} flex items-center justify-center p-4 transition-all transform-gpu duration-1000 ${(isOpening || isOpen) && !isEmpirica ? 'bg-opacity-40 backdrop-blur-lg bg-black' : ''}`}
 	>
 
 		{/* Close button */}
@@ -622,7 +622,7 @@ export default function Tutorial({onClose}) {
 		</button>
 
 		<div
-			className={`rounded-2xl duration-500 ${isOpen ? 'shadow-2xl' : ''} ${isClosing ? 'opacity-0' : ''} bg-gradient-to-br from-green-900 to-blue-900 max-w-6xl w-full mx-4 overflow-hidden flex flex-col`}
+			className={`rounded-2xl duration-500 ${isOpen && !isEmpirica ? 'shadow-2xl' : ''} ${isClosing ? 'opacity-0' : ''} ${!isEmpirica ? 'bg-gradient-to-br from-green-900 to-blue-900' : ''} max-w-6xl w-full mx-4 overflow-hidden flex flex-col`}
 			style={{height: '95vh'}}>
 
 			{/* Game Preview */}

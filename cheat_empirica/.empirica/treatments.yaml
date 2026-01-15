@@ -1,0 +1,34 @@
+factors:
+  - name: playerCount
+    desc: determines the number of human players in a game
+    values:
+      - value: 3
+      - value: 4
+      - value: 5
+      - value: 6
+  - name: gameConfiguration
+    desc: Player configuration types; must correspond to filenames located in 'experiments'
+    values:
+      - value: 'HRRR' # One human, three random bots
+      - value: 'HSHS' # Human, smart bot, human, smart bot
+  - name: numRounds
+    desc: Number of rounds to play
+    values:
+      - value: 3
+      - value: 4
+      - value: 5
+treatments:
+  - name: Solo
+    desc: "One human vs three random bots"
+    factors:
+      playerCount: 1
+      numRounds: 4
+      gameConfiguration: 'HRRR'
+
+  - name: Two Players
+    desc: "Two humans vs two smart bots, placed alternately"
+    factors:
+      playerCount: 2
+      numRounds: 4
+      gameConfiguration: 'HSHS'
+

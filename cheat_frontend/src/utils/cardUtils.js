@@ -1,4 +1,4 @@
-import {PLAYER_GRADIENTS, CARD_RADIUS} from './constants';
+import {PLAYER_GRADIENTS} from './constants';
 
 /** Get pretty colours for each player
  *

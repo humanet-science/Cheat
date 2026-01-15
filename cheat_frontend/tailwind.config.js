@@ -3,6 +3,7 @@ module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
   ],
+  important: '#game-root',
   theme: {
 		extend: {
       zIndex: {
@@ -14,5 +15,9 @@ module.exports = {
       }
     }
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms')({
+      strategy: 'class', // Use class strategy instead of base
+    }),
+  ],
 }

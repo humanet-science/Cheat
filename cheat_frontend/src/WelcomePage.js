@@ -4,6 +4,7 @@ import {Logo} from './utils/Logo';
 import {AVATARS} from "./utils/constants";
 import LoadingWindow from "./components/GameLoading";
 import Tutorial from "./components/Tutorial";
+import {PlayerNameInput, AvatarSelection, TermsCheckbox} from "./components/WelcomeBox";
 
 const WelcomePage = ({onGameStart}) => {
 
@@ -148,7 +149,7 @@ const WelcomePage = ({onGameStart}) => {
 		return <LoadingWindow handleCancelWaiting={handleCancelWaiting}/>
 	}
 	return (<div
-		className="min-h-screen flex flex-col items-center justify-center p-4">
+		className="min-h-screen flex flex-col items-center justify-center p-4" id="game-root">
 		<div className="relative w-full max-w-md h-96 mx-auto z-10">
 
 			{/* Logo Container */}
@@ -192,9 +193,7 @@ const WelcomePage = ({onGameStart}) => {
 				</button>
 			</div>
 
-			{showTutorial && (
-				<Tutorial onClose={() => setShowTutorial(false)} />
-			)}
+			{showTutorial && (<Tutorial onClose={() => setShowTutorial(false)}/>)}
 
 
 			{/* Welcome Box, slides in when New Game is clicked */}
@@ -221,38 +220,14 @@ const WelcomePage = ({onGameStart}) => {
 					</button>
 
 					<form onSubmit={handleSubmit}>
+
 						{/* Player Name Input */}
-						<div className="mb-6 mt-3">
-							<input
-								type="text"
-								value={playerName}
-								onChange={(e) => setPlayerName(e.target.value)}
-								placeholder="Choose a player name ..."
-								className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-								maxLength={20}
-								required
-							/>
-						</div>
+						<PlayerNameInput playerName={playerName} setPlayerName={setPlayerName} />
 
 						{/* Avatar Selection */}
-						<div className="mb-6">
-							<label className="block text-gray-500 text-sm font-bold mb-4">
-								Choose your Avatar
-							</label>
-							<div
-								className="overflow-x-auto scrollbar-thin border border-gray-200 rounded-lg p-3 bg-gray-50">
-								<div className="flex gap-3" style={{minWidth: 'min-content'}}>
-									{AVATARS.map((avatar, index) => (<button
-										key={index}
-										type="button"
-										onClick={() => setSelectedAvatar(avatar)}
-										className={`flex-shrink-0 text-4xl p-3 rounded-xl transform-gpu transition-transform ${selectedAvatar === avatar ? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-300' : 'bg-gray-100 hover:bg-gray-200 hover:scale-110'}`}
-									>
-										{avatar}
-									</button>))}
-								</div>
-							</div>
-						</div>
+						<AvatarSelection
+							selectedAvatar={selectedAvatar}
+							setSelectedAvatar={setSelectedAvatar}/>
 
 						{/* Game mode selection */}
 						<div className="mb-6">
@@ -319,6 +294,7 @@ const WelcomePage = ({onGameStart}) => {
 								</button>))}
 							</div>
 						</div>
+
 						{/* Help Tooltip */}
 						{showNumPlayersHelp && (<div
 							className="mb-3 p-3 absolute left-[45%] top-1/2 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 pointer-events-none">
@@ -327,28 +303,9 @@ const WelcomePage = ({onGameStart}) => {
 						</div>)}
 
 						{/* Terms and Conditions Checkbox */}
-						<div className="mb-6">
-
-							<label className="flex items-start space-x-3">
-								<input
-									type="checkbox"
-									checked={acceptedTerms}
-									onChange={(e) => setAcceptedTerms(e.target.checked)}
-									className="mt-1 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-									required
-								/>
-								<span className="text-sm text-gray-700">
-                                            I consent that anonymised game play data will be collected for research purposes only. Click {' '}
-									<button
-										type="button"
-										onClick={() => alert(`Anonymised play data will be stored for research purposes.`)}
-										className="text-blue-600 hover:text-blue-800 underline focus:outline-none"
-									>
-                                                here
-                                            </button> for details.
-                                        </span>
-							</label>
-						</div>
+						<TermsCheckbox
+							acceptedTerms={acceptedTerms}
+							setAcceptedTerms={setAcceptedTerms}/>
 
 						{/* Join Button */}
 						<button

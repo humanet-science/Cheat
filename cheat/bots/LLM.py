@@ -199,11 +199,12 @@ def is_valid_move(move: GameAction, game, hand: list[Card]) -> tuple[bool, str]:
 class LLM_Player(Player):
     """ Random bot that inherits from the parent Player class"""
 
-    def __init__(self, id: int | None,
-                 name: str,
-                 avatar: str,
-                 system_prompt: str,
-                 kind: Literal["open_ai", "gemini", "deepseek"],
+    def __init__(self,
+                 id: int | None = None,
+                 name: str | None = None,
+                 avatar: str | None = None,
+                 system_prompt: str | None = None,
+                 kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
                  model_kwargs: dict = {}):
         super().__init__(id=id, name=name, avatar=avatar, type="LLM")
         self.client = get_client(kind)

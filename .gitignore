@@ -2,6 +2,7 @@
 .Cheat_venv
 .venv
 node_modules/
+build/
 .idea
 *.lock
 game_data
