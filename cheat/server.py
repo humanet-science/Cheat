@@ -1,20 +1,26 @@
 import asyncio
-from contextlib import asynccontextmanager
-import yaml
+import copy
+import os
+import paramspace
 import random
 import traceback
+import yaml
+
+# Package imports
+from collections import deque
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-import os
-from collections import deque
+from pydantic import BaseModel
+from typing import Any, Dict, Literal
 
+# Local imports
 import cheat.bots
 from cheat.game import CheatGame
-from cheat.player import Player, get_player, HumanPlayer
-from typing import Literal
-
 from cheat.logging_config import setup_logging
+from cheat.player import get_player, HumanPlayer
+from cheat.utils import game_from_config
 
 # Set up logging
 loggers = setup_logging()
@@ -22,14 +28,15 @@ server_log = loggers['server']
 ws_log = loggers['websocket']
 
 # Path to configuration file, located in root
-game_config_path = Path(__file__).parent.parent / "config.yaml"
+game_config_path = Path(__file__).parent.parent / "base_config.yaml"
 with open(game_config_path, "r") as f:
     game_config = yaml.safe_load(f)
 
 # Set the seed for reproducibility
-seed = game_config['game'].get('seed')
-random.seed(seed)
-server_log.info(f"Random seed set to: {seed}")
+seed = game_config.get('seed', None)
+if seed is not None:
+    random.seed(seed)
+    server_log.info(f"Random seed set to: {seed}")
 
 # Store the game manager task for potential cleanup
 game_manager_task = None
@@ -69,13 +76,18 @@ app.add_middleware(
 )
 
 # List of websockets waiting for each type of game
-waiting_queues = dict((k, dict(single=deque([]), multiplayer=deque([]))) for k in [1, 3, 4, 5, 6])
+waiting_queues: dict[str, dict[str, deque[Any]]] = dict((k, dict(single=deque([]), multiplayer=deque([]))) for k in [1, 3, 4, 5, 6])
 
 # Active games currently playing
-active_games = {} # {game_id: CheatGame instance}
+active_games: dict[str, CheatGame] = {} # {game_id: CheatGame instance}
+
+# Survey participants with a websocket waiting to be assigned to a game
+survey_participants: dict[str, HumanPlayer] = {} # {empirica_id: HumanPlayer instance}
+# Survey games waiting to be started
+survey_games: dict[str, CheatGame] = {} # {game_id: CheatGame instance}
 
 # Maximum number of parallel games server can handle
-MAX_NUM_ACTIVE_GAMES = 3
+MAX_NUM_ACTIVE_GAMES = game_config['max_num_active_games']
 
 # WebSocket-to-Game dictionary for routing messages
 player_to_game = {} # {websocket: game_id} for routing messages
@@ -95,7 +107,7 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
     # Add non-human players from config
     for i in range(num_players - len(human_players)):
         player_config = game_config['players'][i]
-        game_players.append(get_player(player_config))
+        game_players.append(get_player(**player_config))
 
     # Now randomly shuffle the players if more than one human present
     if len(human_players) > 1:
@@ -149,9 +161,9 @@ async def try_start_game_from_queue(num_players, mode):
     queue = waiting_queues[num_players][mode]
 
     # Minimum number of players in queue required to start the game
-    min_players = 1 if (num_players == 1 or mode == 'single') else 2 if num_players == 3 else 3
+    min_players = 1 if (num_players == 1 or mode == 'single') else game_config['min_human_players'][num_players]
 
-    if len(queue) >= min_players and len(active_games) < MAX_NUM_ACTIVE_GAMES:
+    if len(queue) >= min_players:
 
         # Try to create a new game with the people in the front of the queue
         try:
@@ -235,15 +247,23 @@ async def game_manager():
 
     """Continuously check queues and start games when possible"""
     while True:
-        if len(active_games) < MAX_NUM_ACTIVE_GAMES:
-            for key in waiting_queues.keys():
-                for mode in waiting_queues[key].keys():
-                    if len(waiting_queues[key][mode]) > 0:
-                        await try_start_game_from_queue(key, mode)
+
+        # Survey games are prioritised, if they are ready
+        for game_id in list(survey_games.keys()):
+            if all([p.connected for p in survey_games[game_id].players]):
+                if len(active_games) < MAX_NUM_ACTIVE_GAMES:
+                    game = survey_games.pop(game_id)
+                    active_games[game_id] = game
+                    asyncio.create_task(run_game(game))
+
+        # Run additional (non-survey) games with waiting players if possible
+        for key in waiting_queues.keys():
+            for mode in waiting_queues[key].keys():
+                if len(waiting_queues[key][mode]) > 0 and len(active_games) < MAX_NUM_ACTIVE_GAMES:
+                    await try_start_game_from_queue(key, mode)
 
         # Check every second
         await asyncio.sleep(1)
-
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -272,6 +292,27 @@ async def websocket_endpoint(ws: WebSocket):
             )
 
             await ws.send_json({"type": "queue_joined", "message": "Waiting for other players..."})
+
+        # Survey participant has completed introduction and is waiting to be assigned to a game.
+        # We store the player alongside their websocket and assign them to a game once it is created
+        elif data["type"] == "empirica_join":
+            print(data)
+            survey_participants[data["empirica_id"]] = HumanPlayer(
+                id=None,
+                ws=ws,
+                empirica_id=data["empirica_id"],
+                name=data["name"],
+                avatar=data["avatar"]
+            )
+
+            ws_log.info(
+                f"Player {data['name']} joined survey queue. "
+                f"WebSocket id: {id(ws)}. "
+                f"Number of active games: {len(active_games)}"
+            )
+
+            await ws.send_json({"type": "player_registered",
+                                "message": f"Id {data['empirica_id']} has been added to the participant queue"})
 
         # Keep connection alive and listen for messages
         while True:
@@ -370,6 +411,52 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Remove from player_to_game mapping
                 del player_to_game[id(ws)]
+
+## ---------------------------------------------------------------------------------------------------------------------
+## Empirica endpoint: create a game from a config
+## ---------------------------------------------------------------------------------------------------------------------
+
+class GameConfigRequest(BaseModel):
+    cfg: Dict # overlay with Empirica IDs, experimental_mode, etc.
+
+@app.post("/api/games/from_config")
+async def create_game_from_config(req: GameConfigRequest):
+
+    # Load the requested game config
+    cfg_key = req.cfg.get('cfg_key')
+    experiments_dir = Path(__file__).parent.parent / "experiments"
+    config_path = experiments_dir / f"{cfg_key}.yaml"
+    with open(config_path, "r") as f:
+        _cfg = yaml.safe_load(f)
+
+    # Update the base configuration with the configuration
+    _cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), _cfg)
+
+    # Replace human player configs with actual HumanPlayer instances from survey_participants
+    human_player_idx = 0
+    empirica_player_ids = req.cfg.get('players', [])
+
+    for idx in range(len(_cfg['players'])):
+        if _cfg['players'][idx]['type'] == 'human':
+            empirica_id = empirica_player_ids[human_player_idx]
+            # Replace the config dict with the actual HumanPlayer instance
+            _cfg['players'][idx] = survey_participants.pop(empirica_id)
+            human_player_idx += 1
+
+    # Create a new game from the config and add to waiting survey games.
+    # This game functions as a placeholder game with 'empty' human players, which can be filled
+    # with survey participants as they arrive
+    game = game_from_config(_cfg, show_logs=_cfg.get('show_logs', False))
+
+    # Assign game ids to each player
+    for idx, player in enumerate(game.players):
+        player.id = idx
+
+    # Add game to survey games
+    survey_games[game.game_id] = game
+
+## ---------------------------------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import argparse

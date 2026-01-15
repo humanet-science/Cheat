@@ -1,5 +1,4 @@
 import React, {useEffect, useState} from "react";
-import {Logo} from "../utils/Logo";
 
 const LoadingWindow = ({handleCancelWaiting}) => {
 	const [cardAnimationPhase, setCardAnimationPhase] = useState('top-pause');

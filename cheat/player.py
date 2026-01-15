@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from fastapi import WebSocket
 from typing import List, Callable
+
 from cheat.card import Card, RANK_ORDER
 from cheat.action import GameAction
 
@@ -69,8 +70,9 @@ class Player:
                 self.logger.error(f"Error sending to player {self.id}: {e}")
 
 class HumanPlayer(Player):
-    def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None):
-        super().__init__(id=id, name=name, avatar=avatar, type="human", ws=ws)
+    def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None, empirica_id: int | None = None):
+        super().__init__(id=id, name=name, avatar=avatar, type="human", ws=ws, connected=ws is not None)
+        self.empirica_id = empirica_id
 
     def __dict__(self):
         return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type)
@@ -79,23 +81,36 @@ class HumanPlayer(Player):
         # Human players make moves via WebSocket
         pass
 
-def get_player(config: dict) -> Player:
-    """Get a player from a configuration"""
-    type = config['type']
-    if type.lower() == 'smartbot':
+def get_player(*, type: str, **kwargs) -> Player:
+    """ Return a game player type from a configuration.
+
+    :param type: player type
+    :param kwargs: passed to the specified Player tye
+    :return: a Player instance
+    :raises: ValueError if the player type is not recognised
+    """
+
+    PERMITTED_PLAYER_TYPES = ['human', 'smartbot', 'randombot', 'llm']
+
+    # Get the player type and raise a ValueError if unrecognised
+    if type.lower() not in PERMITTED_PLAYER_TYPES:
+        raise ValueError(f"Unrecognised player type {type}! Must be one of {', '.join(PERMITTED_PLAYER_TYPES)}.")
+
+    # HumanPlayer
+    if type.lower() == 'human':
+        return HumanPlayer(**kwargs)
+
+    # SmartBot
+    elif type.lower() == 'smartbot':
         from cheat.bots import SmartBot
-        return SmartBot(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None),
-                        verbosity=config.get('verbosity', None))
+        return SmartBot(**kwargs)
+
+    # RandomBot
     elif type.lower() == 'randombot':
         from cheat.bots import RandomBot
-        return RandomBot(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None),
-                         p_call=config.get('p_call', None), p_lie=config.get('p_lie', None),
-                         verbosity=config.get('verbosity', None))
+        return RandomBot(**kwargs)
+
+    # LLM
     elif type.lower() == 'llm':
         from cheat.bots import LLM_Player
-        return LLM_Player(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None), kind=config['kind'],
-                          system_prompt=config.get('system_prompt', None), model_kwargs=config.get('model_kwargs', {}))
-    elif type.lower() == 'human':
-        return HumanPlayer(id=config.get('id', None), name=config['name'], avatar=config.get('avatar', None))
-    else:
-        raise ValueError(f"Unrecognised player type {type}!")
+        return LLM_Player(**kwargs)

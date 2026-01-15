@@ -17,7 +17,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "postbuild": "cp build/static/css/main.*.css ../cheat_empirica/client/src/game.css"
   },
   "eslintConfig": {
     "extends": [
@@ -38,6 +39,9 @@
     ]
   },
   "devDependencies": {
+    "@tailwindcss/forms": "^0.5.11",
+    "postcss-prefix-selector": "^2.1.1",
+    "postcss-prefixer": "^3.0.0",
     "tailwindcss-bg-patterns": "^0.3.0"
   }
 }
