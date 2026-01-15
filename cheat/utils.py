@@ -29,6 +29,7 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
     game = CheatGame(
         players=game_players,
         message_queue=asyncio.Queue(),  # Set up a new queue: each game maintains its own queue
+        predefined_messages=config['experiment'].get('predefined_messages', []) if config['game'].get('experimental_mode', False) else [],
         **config['game']
     )
 

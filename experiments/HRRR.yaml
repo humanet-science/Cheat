@@ -1,7 +1,7 @@
 # Basic game settings, passed to CheatGame
 game:
-  experimental_mode: False
-  out_dir: ~/Cheat_game_data/ # Directory for game data
+  experimental_mode: True
+  out_dir: ~ # Directory for game data
   note: 'HRRR' # Additional note to add to the output directory
   game_id: ~
 

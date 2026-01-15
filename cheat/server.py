@@ -124,7 +124,8 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
         game_mode=mode,
         message_queue = asyncio.Queue(), # Set up a new queue
         out_dir=game_config["game"].get("out_dir"),
-        note=game_config["game"].get("note")
+        note=game_config["game"].get("note"),
+        predefined_messages=game_config["experiment"].get("predefined_messages", []) if game_config["game"].get("experimental_mode", False) else []
     )
 
     # Set the system prompt for all LLM players, if not specified from the config
@@ -296,14 +297,15 @@ async def websocket_endpoint(ws: WebSocket):
         # Survey participant has completed introduction and is waiting to be assigned to a game.
         # We store the player alongside their websocket and assign them to a game once it is created
         elif data["type"] == "empirica_join":
-            print(data)
-            survey_participants[data["empirica_id"]] = HumanPlayer(
+            player = HumanPlayer(
                 id=None,
                 ws=ws,
                 empirica_id=data["empirica_id"],
                 name=data["name"],
                 avatar=data["avatar"]
             )
+
+            survey_participants[data["empirica_id"]] = player
 
             ws_log.info(
                 f"Player {data['name']} joined survey queue. "
@@ -384,7 +386,7 @@ async def websocket_endpoint(ws: WebSocket):
                 for mode in waiting_queues[num_players]:
                     if player in waiting_queues[num_players][mode]:
                         waiting_queues[num_players][mode].remove(player)
-                        print(f"Removed {player.name} from queue")
+                        ws_log.info(f"Removed {player.name} from queue")
                         break
 
             # Mark as disconnected in active game if present
@@ -432,6 +434,12 @@ async def create_game_from_config(req: GameConfigRequest):
     # Update the base configuration with the configuration
     _cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), _cfg)
 
+    # Fix the number of rounds specified in the configuration
+    _cfg["game"]["n_rounds"] = req.cfg.get('n_rounds')
+
+    # Set the game id to match the Empirica id
+    _cfg["game"]["game_id"] = req.cfg.get('game_id')
+
     # Replace human player configs with actual HumanPlayer instances from survey_participants
     human_player_idx = 0
     empirica_player_ids = req.cfg.get('players', [])
@@ -454,6 +462,11 @@ async def create_game_from_config(req: GameConfigRequest):
 
     # Add game to survey games
     survey_games[game.game_id] = game
+
+    # Add players to routing dict
+    for player in game.players:
+        if player.type == 'human':
+            player_to_game[id(player.ws)] = game.game_id
 
 ## ---------------------------------------------------------------------------------------------------------------------
 ## ---------------------------------------------------------------------------------------------------------------------

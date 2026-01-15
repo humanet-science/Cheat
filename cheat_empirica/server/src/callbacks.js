@@ -23,6 +23,7 @@ Empirica.onGameStart(async ({ game }) => {
       body: JSON.stringify({
         cfg: {
           cfg_key: treatment.gameConfiguration,
+          n_rounds: treatment.numRounds,
           game_id: game.scope.id,
           players: playerIds
         }
@@ -44,7 +45,7 @@ Empirica.onGameStart(async ({ game }) => {
   const round = game.addRound({ name: "Cheat Game" });
   round.addStage({
     name: "Play",
-    duration: 3600  // 60 minutes - adjust as needed
+    duration: 30000000  // one year (i.e. infinite time)
   });
 
 });
