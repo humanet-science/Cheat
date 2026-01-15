@@ -29,8 +29,11 @@ class CheatGame:
                  message_queue: asyncio.Queue = None,
                  out_dir: str = None,
                  note: str = None,
+                 n_rounds: int = None,
                  round: int = 1,
-                 game_id: str = None):
+                 game_id: str = None,
+                 predefined_messages: list = None,
+                 ):
 
         """ CheatGame that can be played for multiple rounds.
 
@@ -42,6 +45,8 @@ class CheatGame:
             actions and messages
         :param out_dir: directory to which to save the game data. If None, nothing is saved
         :param note: note added to time-stamped out_dir name, if given
+        :param n_rounds: (optional) fixed number of rounds to play, e.g. in experimental setting. If this number
+            is reached, the game quits.
         :param round: starting round number
         :param game_id: unique game id. If None, a random UUID identifier is created
         """
@@ -62,6 +67,9 @@ class CheatGame:
 
         # Whether we are using an experimental setup
         self.experimental_mode = experimental_mode
+
+        # List of allowed messages players can send
+        self.predefined_messages = predefined_messages
 
         # Load and shuffle the deck, then deal out the cards
         self.deck = [Card(r, s) for r in RANKS for s in SUITS]
@@ -86,6 +94,10 @@ class CheatGame:
         # Check if round is over: this can be set at any time by a player if they have won
         self.round_over = False
         self.winner = None
+
+        # Maximum number of rounds to play (can be None, in which case we set num_rounds to -1 to still allow for
+        # comparisons)
+        self.num_rounds = n_rounds if n_rounds is not None else -1
 
         # Check if game is over: this terminates the game entirely
         self.game_over = False
@@ -120,7 +132,8 @@ class CheatGame:
             p.logger = self.player_logger
             if self.player_info_path:
                 p.write_info(self.player_info_path)
-
+        print(self.num_rounds)
+        print(self.round)
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
 
@@ -329,6 +342,7 @@ class CheatGame:
             "pile_size": len(self.pile),
             "human_ids": [player.id for player in self.players if player.type == 'human'],
             "experimental_mode": self.experimental_mode,
+            "predefined_messages": self.predefined_messages if self.experimental_mode else []
         }
 
     async def broadcast_to_all(self, message: dict, *, append_state: bool = True):
@@ -643,6 +657,13 @@ class CheatGame:
             # Add a small delay to account for the animations in the frontend: this way the backend is not always
             # too many steps ahead of the frontend
             await asyncio.sleep(sleep_pause)
+
+        # If the maximum number of rounds has been reached, end the game
+        print(self.round)
+        print(self.num_rounds)
+        if self.round + 1 > self.num_rounds:
+            print('Round over')
+            self.game_over = True
 
 
     async def replace_player_with_bot(self, player):
