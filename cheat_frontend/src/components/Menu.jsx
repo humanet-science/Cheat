@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Rules, ExitConfirm} from "./Rules";
 
-export default function GameMenu({onQuit, highlightMenu}) {
+export default function GameMenu({onQuit, highlightMenu, experimentalMode}) {
 	const [showMenu, setShowMenu] = useState(false);
 	const [showRules, setShowRules] = useState(false);
 	const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -9,14 +9,12 @@ export default function GameMenu({onQuit, highlightMenu}) {
 
 		{/* Menu Button with Animated Hamburger */}
 		<div className="fixed top-4 left-4 z-50">
-			{highlightMenu && (
-				<>
-					{/* Pulsing border ring */}
-					<div className="absolute inset-0 animate-pulse rounded-lg ring-4 ring-blue-400 pointer-events-none"></div>
-					{/* Expanding ping effect */}
-					<div className="absolute inset-0 animate-ping rounded-lg bg-blue-400 opacity-50 pointer-events-none"></div>
-				</>
-			)}
+			{highlightMenu && (<>
+				{/* Pulsing border ring */}
+				<div className="absolute inset-0 animate-pulse rounded-lg ring-4 ring-blue-400 pointer-events-none"></div>
+				{/* Expanding ping effect */}
+				<div className="absolute inset-0 animate-ping rounded-lg bg-blue-400 opacity-50 pointer-events-none"></div>
+			</>)}
 			<button
 				onClick={() => setShowMenu(!showMenu)}
 				className="relative w-12 h-12 flex items-center justify-center group"
@@ -57,15 +55,15 @@ export default function GameMenu({onQuit, highlightMenu}) {
 						Rules
 					</button>
 
-					{/* Exit button */}
-					<button
+					{/* Exit button, not displayed in the Empirica version */}
+					{!experimentalMode && (<button
 						onClick={() => {
 							setShowExitConfirm(true);
-    setShowMenu(false);
+							setShowMenu(false);
 						}}
 						className="block w-full text-left px-4 py-3 hover:bg-amber-200/30 text-gray-900 transition-all duration-200"
 					>Exit
-					</button>
+					</button>)}
 				</div>
 			</div>
 		</div>

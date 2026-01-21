@@ -26,7 +26,7 @@ import {VALID_RANKS} from "./utils/constants";
 
 export default function CheatGame({
 																		socket, gameConfig, currentRound, onUpdateRound, onExitGame,
-																		highlightMenu = false
+																		highlightMenu = false, empiricaPlayer = null
 																	}) {
 
 	// Game state and previous state
@@ -66,6 +66,9 @@ export default function CheatGame({
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
 	const [winner, setWinner] = useState(null);
+
+	// Track experiment over (experimental mode only)
+	const [experimentOver, setExperimentOver] = useState(false);
 
 	// Track seconds remaining until game resets
 	const [countdown, setCountdown] = useState(null);
@@ -172,6 +175,9 @@ export default function CheatGame({
 				}
 				if (msg.type === "quit_confirmed") {
 					removeConnectionTimer(state.your_info.id);
+					if (experimentalMode) {
+						setExperimentOver(true);
+					}
 					onExitGame();
 				}
 			};
@@ -520,16 +526,25 @@ export default function CheatGame({
 
 		const playerElement = document.getElementById(`player-${playerId}`);
 		if (playerElement) {
+
 			// Add player to speaking set
 			setSpeakingPlayers(prev => new Set(prev).add(playerId));
 
 			// Not using playerPositions here because need fixed absolute positions at top of bounding box
+			// const position = {
+			// 	x: playerElement.offsetLeft,
+			// 	y: playerPositionsRef.current[playerId].angle === 90
+			// 		? playerElement.offsetTop - 80 // push up for bottom player
+			// 		: playerElement.offsetTop
+			// };
+			const rect = playerElement.getBoundingClientRect();
 			const position = {
-      x: playerElement.offsetLeft,
-      y: playerPositionsRef.current[playerId].angle === 90
-        ? playerElement.offsetTop - 80 // push up for bottom player
-        : playerElement.offsetTop
-    };
+				x: rect.left + rect.width / 2, // Center horizontally
+				y: playerPositionsRef.current[playerId].angle === 90
+					? rect.top // Push up for bottom player
+					: rect.top
+			};
+
 
 			if (is_connection_timer) {
 				// For connection timers, update existing message or create new one
@@ -604,7 +619,7 @@ export default function CheatGame({
 				type: "human_message", message: messageToSend, sender_id: state.your_info.id
 			}));
 
-			addStatusMessage(state.your_info.id, messageToSend);
+			// addStatusMessage(state.your_info.id, messageToSend);
 
 			if (!customMessage) {
 				setMessageInput(""); // Only clear if it was from the input
@@ -643,6 +658,7 @@ export default function CheatGame({
 					onExitGame();
 				}}
 				highlightMenu={highlightMenu}
+				experimentalMode={experimentalMode}
 			/>
 
 			{/* Game is over */}
@@ -659,7 +675,6 @@ export default function CheatGame({
 				setPileCards={setPileCards}
 				setActionQueue={setActionQueue}
 				setIsNewRound={setIsNewRound}
-				setIsMyTurn={setIsMyTurn}
 				setDiscards={setDiscards}
 				setPlayAnnouncements={setPlayAnnouncements}
 				onQuit={() => {
@@ -671,6 +686,9 @@ export default function CheatGame({
 				countdown={countdown}
 				confirmedCount={confirmedCount}
 				totalHumans={totalHumans}
+				experimentalMode={experimentalMode}
+				empiricaPlayer={empiricaPlayer}
+				empiricaExperimentOver={experimentOver}
 			/>
 
 			{/* Status Message bubbles floating up from each player */}

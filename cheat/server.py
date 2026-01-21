@@ -234,6 +234,7 @@ async def run_game(_game: CheatGame):
         server_log.error(f"Error in game {_game.game_id}: {e}")
         traceback.print_exc()
     finally:
+
         # Cleanup
         if _game.game_id in active_games:
             active_games.pop(_game.game_id)
@@ -431,8 +432,12 @@ async def create_game_from_config(req: GameConfigRequest):
     with open(config_path, "r") as f:
         _cfg = yaml.safe_load(f)
 
-    # Update the base configuration with the configuration
+    # Update everything in the base configuration with the configuration except the player list -- this is
+    # overwritten by the new config
+    player_config = copy.deepcopy(_cfg['players'])
     _cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), _cfg)
+    _cfg['players'] = player_config
+    del player_config
 
     # Fix the number of rounds specified in the configuration
     _cfg["game"]["n_rounds"] = req.cfg.get('n_rounds')

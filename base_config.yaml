@@ -75,6 +75,7 @@ default_system_prompt: >
   Options: 'Call' (challenge previous play), 'Play [cards]' (follow current rank), or 'Play [cards]; Declare rank' 
   (start new rank when pile empty). Four-of-a-kind auto-discard. 
   Win by emptying hand. 
+  If previous player played their last card(s) must call.
   FORMAT REQUIREMENTS:
   - Respond ONLY with: 'Call', 'Play [card1, card2]', or 'Play [cards]; Declare rank' 
   - Use J/Q/K/A for face cards

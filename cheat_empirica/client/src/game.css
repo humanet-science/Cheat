@@ -1903,7 +1903,7 @@ img, video {
     }
 }
 
-.cheat .animate-wiggle {
+#game-root .animate-wiggle {
     animation: wiggle .4s ease-in-out both
 }
 
@@ -1962,7 +1962,7 @@ img, video {
     }
 }
 
-.cheat .pop-in {
+#game-root .pop-in {
     animation: popIn .3s ease-out forwards
 }
 
@@ -2092,43 +2092,43 @@ img, video {
     }
 }
 
-.cheat .perspective-1000 {
+#game-root .perspective-1000 {
     perspective: 1000px
 }
 
-.cheat .scrollbar-thin::-webkit-scrollbar {
+#game-root .scrollbar-thin::-webkit-scrollbar {
     height: 6px
 }
 
-.cheat .scrollbar-thin::-webkit-scrollbar-track {
+#game-root .scrollbar-thin::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 3px
 }
 
-.cheat .scrollbar-thin::-webkit-scrollbar-thumb {
+#game-root .scrollbar-thin::-webkit-scrollbar-thumb {
     background: #c1c1c1;
     border-radius: 3px
 }
 
-.cheat .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+#game-root .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8
 }
 
-.cheat .scrollbar-thin-v::-webkit-scrollbar {
+#game-root .scrollbar-thin-v::-webkit-scrollbar {
     width: 6px
 }
 
-.cheat .scrollbar-thin-v::-webkit-scrollbar-track {
+#game-root .scrollbar-thin-v::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 3px
 }
 
-.cheat .scrollbar-thin-v::-webkit-scrollbar-thumb {
+#game-root .scrollbar-thin-v::-webkit-scrollbar-thumb {
     background: #c1c1c1;
     border-radius: 3px
 }
 
-.cheat .scrollbar-thin-v::-webkit-scrollbar-thumb:hover {
+#game-root .scrollbar-thin-v::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8
 }
 
@@ -2143,7 +2143,7 @@ img, video {
     }
 }
 
-.cheat .animate-fade-in {
+#game-root .animate-fade-in {
     animation: fade-in .5s ease-out forwards
 }
 
@@ -2170,27 +2170,27 @@ img, video {
     }
 }
 
-.cheat .player-opponent {
+#game-root .player-opponent {
     transform: translate(-50%, -50%) !important;
     transition: all
 }
 
-.cheat .player-opponent:hover {
+#game-root .player-opponent:hover {
     transform: translate(-50%, -50%) scale(1.02) !important;
     z-index: 30 !important
 }
 
-.cheat .player-opponent:hover .opponent-card-1 {
+#game-root .player-opponent:hover .opponent-card-1 {
     transform: translate(-20%, -10%) rotate(-10deg) !important;
     transition: transform .4s cubic-bezier(.34, 1.56, .64, 1) .05s !important
 }
 
-.cheat .player-opponent:hover .opponent-card-2 {
+#game-root .player-opponent:hover .opponent-card-2 {
     transform: translate(15%, -10%) rotate(-3deg) scale(1.05) !important;
     transition: transform .4s cubic-bezier(.34, 1.56, .64, 1) .08s !important
 }
 
-.cheat .player-opponent:hover .opponent-card-3 {
+#game-root .player-opponent:hover .opponent-card-3 {
     transform: translate(40%, -8%) rotate(3deg) !important;
     transition: transform .4s cubic-bezier(.34, 1.56, .64, 1) .1s !important
 }
@@ -2245,23 +2245,23 @@ img, video {
     }
 }
 
-.cheat .message_float {
+#game-root .message_float {
     animation: floatUp_Bubble 1.5s ease-out forwards
 }
 
-.cheat .play-announcement {
+#game-root .play-announcement {
     animation: floatUpWithWiggle 4s ease-out forwards
 }
 
-.cheat .play-announcement-small {
+#game-root .play-announcement-small {
     animation: slideToSmallBubble .5s ease-out forwards
 }
 
-.cheat .bg-opacity-low {
+#game-root .bg-opacity-low {
     --tw-bg-opacity: 0.2
 }
 
-.cheat .bg-opacity-high {
+#game-root .bg-opacity-high {
     --tw-bg-opacity: 0.4
 }
 

@@ -45,7 +45,7 @@ export const HumanetLogo = ({}) => {
   rel="noopener noreferrer"
 			className="fixed bottom-4 right-4 flex items-center space-x-2 px-3 py-2 z-0 hover:scale-[1.05] transition-all duration-300 ease-out">
 		<img
-			src="/icons/LSE_logo.svg"
+			src="/icons/LSE_Logo.svg"
 			alt="Humanet Logo"
 			className="w-10 h-10 mr-2"
 		/>

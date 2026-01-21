@@ -1,0 +1,30 @@
+# Basic game settings, passed to CheatGame
+game:
+  experimental_mode: True
+  out_dir: ~ # Directory for game data
+  note: 'Test' # Additional note to add to the output directory
+  game_id: ~
+
+# Player settings
+players:
+  - type: human
+    avatar: 🧜‍♂️
+    name: Mike
+  - type: RandomBot
+    name: B0Ttled Up
+    avatar: 🍾
+    verbosity: 0.1
+    p_lie: 1.0
+    p_call: 0.0
+  - type: RandomBot
+    name: Beep Boop
+    avatar: 🤖
+    verbosity: 0.1
+    p_call: 0.0
+    p_lie: 1.0
+  - type: RandomBot
+    name: ChattyBot
+    avatar: 🐭
+    verbosity: 0.2
+    p_call: 1.0
+    p_lie: 1.0

@@ -132,8 +132,7 @@ class CheatGame:
             p.logger = self.player_logger
             if self.player_info_path:
                 p.write_info(self.player_info_path)
-        print(self.num_rounds)
-        print(self.round)
+
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
 
@@ -659,10 +658,7 @@ class CheatGame:
             await asyncio.sleep(sleep_pause)
 
         # If the maximum number of rounds has been reached, end the game
-        print(self.round)
-        print(self.num_rounds)
         if self.round + 1 > self.num_rounds:
-            print('Round over')
             self.game_over = True
 
 
@@ -726,7 +722,8 @@ class CheatGame:
 
         # Start a timer: 30 seconds to start a new round in multiplayer mode
         # Wait for at least one confirmation
-        timeout = 30
+        # TODO: adjust this for the experimental mode?
+        timeout = 30 if self.game_mode == "multiplayer" else 30000000
         start_time = asyncio.get_event_loop().time()
 
         human_players = [p for p in self.players if p.type == "human"]

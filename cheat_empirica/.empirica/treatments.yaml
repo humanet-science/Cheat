@@ -34,3 +34,10 @@ treatments:
       numRounds: 1
       gameConfiguration: 'HSHS'
 
+  - name: Test
+    desc: "Test"
+    factors:
+      playerCount: 1
+      numRounds: 2
+      gameConfiguration: 'Test'
+

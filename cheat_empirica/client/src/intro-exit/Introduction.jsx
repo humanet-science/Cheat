@@ -3,7 +3,6 @@ import Tutorial from "../../../../cheat_frontend/src/components/Tutorial";
 
 import {useState} from "react";
 import {usePlayer, useGame} from "@empirica/core/player/classic/react";
-import {AVATARS} from "../../../../cheat_frontend/src/utils/constants.js";
 import {
     PlayerNameInput, AvatarSelection, TermsCheckbox
 } from "../../../../cheat_frontend/src/components/WelcomeBox.jsx";
@@ -71,12 +70,12 @@ export function Introduction({next}) {
     }
 
     if (showReady) {
-        return (<div className="cheat" id="game-root">
+        return (<div id="game-root">
             <ReadyScreen onReady={handleJoinGame}/>
         </div>);
     }
 
-    return (<div className="cheat" id="game-root">
+    return (<div id="game-root">
         <Tutorial
             onClose={handleTutorialComplete}
             isEmpirica={true}
