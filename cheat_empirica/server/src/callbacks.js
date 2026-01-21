@@ -11,8 +11,6 @@ Empirica.onGameStart(async ({ game }) => {
   // Get the treatment
   const treatment = game.get("treatment");
 
-  console.log('here', game.get("treatment"), game.players, playerIds)
-
   // Send the backend a signal to initialise a game with the players
   try {
     const response = await fetch('http://localhost:5050/api/games/from_config', {

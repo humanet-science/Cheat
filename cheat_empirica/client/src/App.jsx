@@ -5,6 +5,7 @@ import React from "react";
 import {Game} from "./Game";
 import {ExitSurvey} from "./intro-exit/ExitSurvey";
 import {Introduction} from "./intro-exit/Introduction";
+import { Thanks } from "./intro-exit/Thanks";
 import {WebSocketProvider} from "./WebSocketContext";
 
 export default function App() {
@@ -27,7 +28,11 @@ export default function App() {
             <div className="h-screen relative bg-gradient-to-br from-green-900 to-blue-900">
                 <EmpiricaMenu position="bottom-left"/>
                 <div className="h-full overflow-auto">
-                    <EmpiricaContext introSteps={introSteps} exitSteps={exitSteps}>
+                    <EmpiricaContext
+                      introSteps={introSteps}
+                      exitSteps={exitSteps}
+                      finished={Thanks}
+                    >
                         <Game/>
                     </EmpiricaContext>
                 </div>

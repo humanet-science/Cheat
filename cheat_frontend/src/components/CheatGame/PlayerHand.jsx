@@ -141,22 +141,22 @@ export default function PlayerHand({
 									}}
 								/>
 							</button>)}
-						</div>) : (<div className="flex flex-col gap-1 mt-10">
+						</div>) : (<div className="flex flex-col gap-1">
 							<div className="flex gap-2">
-								{allowedMessages.slice(0, 5).map((msg, index) => (<button
+								{allowedMessages.slice(0, Math.ceil(allowedMessages.length / 2)).map((msg, index) => (<button
 									key={index}
 									onClick={() => sendMessage(msg)}
-									className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
+									className="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
 																				text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75 hover:scale-110 active:scale-95 whitespace-nowrap"
 								>
 									{msg}
 								</button>))}
 							</div>
-							<div className="flex gap-1">
-								{allowedMessages.slice(5,).map((msg, index) => (<button
+							<div className="flex gap-1 justify-center">
+								{allowedMessages.slice(Math.ceil(allowedMessages.length / 2),).map((msg, index) => (<button
 									key={index + 6}
 									onClick={() => sendMessage(msg)}
-									className="px-2 py-1 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
+									className="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
 																				text-sm transition-all duration-200 hover:scale-110 active:scale-95 whitespace-nowrap"
 								>
 									{msg}
@@ -180,7 +180,6 @@ export default function PlayerHand({
 									onKeyDown={(e) => {
 										if (e.key === 'Enter') {
 											e.preventDefault();
-											console.log("Selected Cards length", selectedCards.length);
 											// Only play if cards are actually selected AND rank is valid
 											if (selectedCards.length > 0) {
 												play();
