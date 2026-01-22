@@ -7,11 +7,26 @@ Create a virtual environment and install the required packages via
 ```commandline
 pip install -r requirements.txt
 ```
-You will also need to install React and yarn via homebrew:
+You will also need to install React and yarn:
+```commandline
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+\. "$HOME/.nvm/nvm.sh"
+nvm install 24
+sudo apt-get install -y nodejs
+npm install yarn
+```
+(this requires sudo privileges). Or, if you are using homebrew:
 ```commandline
 brew install node yarn
 ```
-Navigate to `Cheat/cheat_frontend` and run
+Check that everything was installed:
+```commandline
+node -v 
+npm -v
+```
+should print the version numbers.
+
+Next, navigate to `Cheat/cheat_frontend` and run
 ```commandline
 yarn install
 yarn add react-scripts
@@ -62,4 +77,7 @@ Then navigate to both the `cheat_empirica/server` and the `cheat_empirica/client
 ```console
 npm install
 ```
-Thereafter, you can start the empirica server from the `cheat_empirica` folder. TODO: automate this.
+Thereafter, you can start the empirica server from the `cheat_empirica` folder by running
+```commandline
+empirica
+```
