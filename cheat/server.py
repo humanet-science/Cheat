@@ -151,9 +151,10 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
 
     # Write metadata to folder
     # TODO: currently the same for all games, but some game-specific data (e.g. num_players) must be set from frontend
-    file_path = os.path.join(game.out_path, "game_config.yaml")
-    with open(file_path, "w") as f:
-        yaml.dump(game_config, f)
+    if game.out_path is not None:
+        file_path = os.path.join(game.out_path, "game_config.yaml")
+        with open(file_path, "w") as f:
+            yaml.dump(game_config, f)
 
     # Return the game
     return game
