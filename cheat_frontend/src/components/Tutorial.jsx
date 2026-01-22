@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import CheatGame from '../CheatGame';
 
 const TUTORIAL_SLIDES = [{
@@ -595,6 +595,32 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 		}
 	};
 
+	const gameContainerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // Measure the game container, not the window
+  useEffect(() => {
+    const container = gameContainerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setContainerSize({
+        width: rect.width,
+        height: rect.height
+      });
+    };
+
+    // Initial measurement
+		setTimeout(updateSize, 100);
+
+    // Watch for size changes
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [showGame]);
+
 	const slide = TUTORIAL_SLIDES[currentSlide];
 
 	return (<div
@@ -627,13 +653,15 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 
 			{/* Game Preview */}
 			<div className="relative" style={{height: '75vh'}}>
-				{mockSocket && currentRound && (<div
+				{mockSocket && currentRound && (
+					<div
 					className={`absolute inset-0 border-2 shadow-2xl overflow-hidden rounded-3xl transition-all duration-1000 ${showGame ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
 					style={{
 						transform: showGame ? 'scale(0.7) translateY(-15%)' : 'scale(0.65) translateY(-15%)',
 						width: '100%',
 						height: '100vh'
 					}}
+					ref={gameContainerRef}
 				>
 					<CheatGame
 						socket={mockSocket}
@@ -643,6 +671,9 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 						onExitGame={() => {
 						}}
 						highlightMenu={currentSlide === TUTORIAL_SLIDES.length - 1}
+						containerWidth={containerSize.width / 0.7}  // Pass container size
+						containerHeight={containerSize.height / 0.7}
+						tutorialScale={0.7}
 					/>
 				</div>)}
 			</div>
