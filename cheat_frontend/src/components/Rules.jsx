@@ -2,7 +2,7 @@ import React from "react";
 
 export function Rules({showRules, setShowRules}) {
 	if (!showRules) return null;
-	return (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60">
+	return (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
 		<div className="bg-white rounded-2xl p-6 max-w-lg mx-4 max-h-[80vh] relative pr-1 pt-10">
 
 			{/* Close Button */}

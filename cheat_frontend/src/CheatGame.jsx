@@ -24,9 +24,42 @@ import {Logo} from './utils/Logo';
 // Constants
 import {VALID_RANKS} from "./utils/constants";
 
+/**
+ * Main Cheat card game component
+ *
+ * Handles game state, player interactions, animations, and WebSocket communication.
+ * Can be used standalone or embedded in contexts like Tutorial or Empirica experiments.
+ *
+ * @param {WebSocket} socket - WebSocket connection for real-time game communication
+ * @param {Object} gameConfig - Game configuration object:
+ *   - numPlayers: total number of players in game
+ *   - experimentalMode: boolean for experimental features
+ *   - predefinedMessages: array of allowed chat messages
+ *   - selfId: current player's ID
+ * @param {Object} currentRound - Current round state from backend
+ * @param {Function} onUpdateRound - Callback to update round state
+ * @param {Function} onExitGame - Callback when player exits game
+ * @param {boolean} [highlightMenu=false] - Whether to highlight menu (used in Tutorial)
+ * @param {Object|null} [empiricaPlayer=null] - Empirica player object for experiment context.
+ *   If provided, game will handle Empirica-specific behaviors (e.g., stage transitions)
+ * @param {number|null} [containerWidth=null] - Override container width for player positioning.
+ *   Used in Tutorial where game is scaled/transformed. If null, uses window width.
+ * @param {number|null} [containerHeight=null] - Override container height for player positioning.
+ *   Used in Tutorial where game is scaled/transformed. If null, uses window height.
+ * @param {number|null} [tutorialScale=null] - Scale factor for Tutorial context (e.g., 0.7).
+ *   Passed to StatusMessage component to properly scale and position floating messages.
+ */
 export default function CheatGame({
-																		socket, gameConfig, currentRound, onUpdateRound, onExitGame,
-																		highlightMenu = false, empiricaPlayer = null
+																		socket,
+																		gameConfig,
+																		currentRound,
+																		onUpdateRound,
+																		onExitGame,
+																		highlightMenu = false,
+																		empiricaPlayer = null,
+																		containerWidth = null,
+																		containerHeight = null,
+																		tutorialScale= null
 																	}) {
 
 	// Game state and previous state
@@ -100,7 +133,11 @@ export default function CheatGame({
 	// We also need a const playerPositions array to trigger re-renders when the screen changes
 	const playerPositionsRef = useRef({});
 	const [playerPositions, setPlayerPositions] = useState({});
-	const {width, height} = useScreenSize();
+
+	// Use containerWidth/containerHeight if provided, otherwise fall back to window
+	const { width: windowWidth, height: windowHeight } = useScreenSize();
+  const width = containerWidth ?? windowWidth;
+  const height = containerHeight ?? windowHeight;
 
 	// Adjust player positions to the width and height of the screen
 	useEffect(() => {
@@ -321,7 +358,6 @@ export default function CheatGame({
 				setPilePickupAnimation(null);
 			}
 
-
 			setPlayAnnouncements([]);
 			setRevealedCards(null);
 			setLastPlayedCount(0);
@@ -531,12 +567,6 @@ export default function CheatGame({
 			setSpeakingPlayers(prev => new Set(prev).add(playerId));
 
 			// Not using playerPositions here because need fixed absolute positions at top of bounding box
-			// const position = {
-			// 	x: playerElement.offsetLeft,
-			// 	y: playerPositionsRef.current[playerId].angle === 90
-			// 		? playerElement.offsetTop - 80 // push up for bottom player
-			// 		: playerElement.offsetTop
-			// };
 			const rect = playerElement.getBoundingClientRect();
 			const position = {
 				x: rect.left + rect.width / 2, // Center horizontally
@@ -544,7 +574,6 @@ export default function CheatGame({
 					? rect.top // Push up for bottom player
 					: rect.top
 			};
-
 
 			if (is_connection_timer) {
 				// For connection timers, update existing message or create new one
@@ -694,6 +723,7 @@ export default function CheatGame({
 			{/* Status Message bubbles floating up from each player */}
 			<StatusMessage
 				statusMessages={statusMessages}
+				tutorialScale={tutorialScale}
 			/>
 
 			{/* Section containing players and cards*/}
