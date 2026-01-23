@@ -1,7 +1,6 @@
 // WelcomePage.js
 import React, {useEffect, useState} from 'react';
 import {Logo} from './utils/Logo';
-import {AVATARS} from "./utils/constants";
 import LoadingWindow from "./components/GameLoading";
 import Tutorial from "./components/Tutorial";
 import {PlayerNameInput, AvatarSelection, TermsCheckbox} from "./components/WelcomeBox";

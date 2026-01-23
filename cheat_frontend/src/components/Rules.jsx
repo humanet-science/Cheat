@@ -27,7 +27,7 @@ export function Rules({showRules, setShowRules}) {
 					<div>
 						<ul className="list-disc list-inside space-y-2">
 							<li>Players take turns playing 1-3 cards face down</li>
-							<li>You must declare a single rank for all cards (e.g., "Three 7s")</li>
+							<li>You must declare a single rank for all cards (e.g., "7" or "J")</li>
 							<li>You can lie about what cards you're actually playing, but you must always declare the same rank as what's on the pile.
 							</li>
 							<li>The next player can call if they suspect you're lying</li>

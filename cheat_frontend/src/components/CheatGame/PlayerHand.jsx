@@ -172,7 +172,7 @@ export default function PlayerHand({
 									<div>
 									<input
 									type="text"
-									placeholder="Rank (e.g. 7)"
+									placeholder="Declare rank (e.g. 7)"
 									value={declaredRank}
 									onChange={(e) => {
 										setDeclaredRank(e.target.value.toUpperCase())
