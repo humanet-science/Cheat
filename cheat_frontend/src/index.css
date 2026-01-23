@@ -385,3 +385,14 @@
 
 #game-root .bg-opacity-low { --tw-bg-opacity: 0.2; }
 #game-root .bg-opacity-high { --tw-bg-opacity: 0.4; }
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fillIn {
+  from { fill: transparent; }
+  to { fill: white; }
+}
