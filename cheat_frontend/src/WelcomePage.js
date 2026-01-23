@@ -162,7 +162,7 @@ const WelcomePage = ({onGameStart}) => {
 					<Logo
 						className="mx-auto"
 						style={{width: "80%", height: "auto"}}
-						animationDuration="1.5s"
+						animationDuration="4s"
 					/>
 				</div>
 

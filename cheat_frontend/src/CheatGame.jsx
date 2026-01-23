@@ -675,7 +675,7 @@ export default function CheatGame({
 
 			{/* Game logo */}
 			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-				<Logo className="opacity-20" style={{width: "20rem", height: "auto"}} animationDuration="0s"/>
+				<Logo className="opacity-20" style={{width: "20rem", height: "auto"}} animated={false}/>
 			</div>
 
 			{/* Game menu */}
