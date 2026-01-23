@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React from "react";
 
 export function OpponentIcons({
 																opponents, playerPositions, handlePlayerClick, state, playAnnouncements, getPlayerColor
@@ -74,7 +74,6 @@ export function OpponentIcons({
 			>
 				{playAnnouncements.filter(msg => msg.playerId === opp.id).map((msg, i, arr) => {
 
-					const maxI = arr.length - 1;
 					const offset = (arr.length-1 - i) * 35;
 					const offsetX = i !== arr.length - 1 ? 40 : 30;
 					const isHovered = hoveredPlayer === opp.id;

@@ -57,7 +57,7 @@ export function TermsCheckbox({ acceptedTerms, setAcceptedTerms }) {
           required
         />
         <span className="text-sm text-gray-700">
-          I consent that anonymised game play data will be collected for research purposes only. Click{' '}
+          I consent that anonymised game play data will be stored for research purposes. Click{' '}
           <button
             type="button"
             onClick={() => alert('Anonymised play data will be stored for research purposes.')}
