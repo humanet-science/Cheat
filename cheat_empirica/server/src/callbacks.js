@@ -5,7 +5,6 @@ Empirica.onGameStart(async ({ game }) => {
 
   // Start up function once the initial introduction steps have been completed. The treatment file is sent as a
   // game configuration to the backend, which creates a placeholder game and adds the survey participants
-  // Create a game in the backend using the configuration
   const playerIds = game.players.map(p => p.id);
 
   // Get the treatment
