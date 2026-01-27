@@ -367,7 +367,11 @@ export default function CheatGame({
 			const countText = msg.card_count === 1 ? "One" : msg.card_count === 2 ? "Two" : "Three";
 			addStatusMessage(msg.current_player, `${countText} ${rankText}${msg.card_count > 1 ? 's' : ''}!`, true);
 
-			await new Promise(r => setTimeout(r, 1000)); // Wait for animation
+			if (msg.your_info.id !== (msg.current_player + 1) % numPlayers) {
+				await new Promise(r => setTimeout(r, 1000)); // Wait for animation
+			} else {
+				await new Promise(r => setTimeout(r, 650));
+			}
 			setAnimatingCards(null);
 
 			// Add cards to pile with the SAME positions
@@ -376,13 +380,17 @@ export default function CheatGame({
 			setLastPlayedCount(msg.card_count);
 
 			// Wait for pile animation
-			await new Promise(r => setTimeout(r, 500));
+			if (msg.your_info.id !== (msg.current_player + 1) % numPlayers) {
+				await new Promise(r => setTimeout(r, 500));
+			}
 
 		} else if (msg.type === "bluff_called") {
 
-			// Add a play announcement
-			addStatusMessage(msg.current_player, 'Call!', true);
-			await new Promise(r => setTimeout(r, 3000));
+			// Add a play announcement unless player is self
+			if (msg.your_info.id !== msg.current_player) {
+				addStatusMessage(msg.current_player, 'Call!', true);
+				await new Promise(r => setTimeout(r, 3000));
+			}
 			setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
 
 			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id && msg.was_lying));
@@ -584,7 +592,7 @@ export default function CheatGame({
 		soundManager.loadSound('discard', '/sounds/discard.wav');
 		soundManager.loadSound('win', '/sounds/win.wav');
 		soundManager.loadSound('pick_up', '/sounds/pick_up.mp3', 0.2);
-		soundManager.loadSound('start_bell', '/sounds/start_bell.wav', 0.3);
+		soundManager.loadSound('start_bell', '/sounds/start_bell.wav', 0.7);
 	}, []);
 
 	// Play sound when Call Bluff! button pops up

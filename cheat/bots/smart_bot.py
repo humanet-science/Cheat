@@ -141,9 +141,9 @@ class SmartBot(Player):
 
         # If the previous player is running low on cards, increase chance of calling by number of cards left on hand.
         # If the previous player has no cards left, p_call is 1 and the play is necessarily called
-        if self.other_player_repr.get((self.id - 1) % game.num_players, {}).get("hand_length", 5) < 4:
-            p_call = min(1, p_call + (1/(self.other_player_repr[(self.id - 1) % game.num_players]["hand_length"]+1)))
-            if p_call == 1:
+        if len(game.players[(self.id - 1) % game.num_players].hand) < 4:
+            p_call = min(1, p_call + (1.0/float(len(game.players[(self.id - 1) % game.num_players].hand))))
+            if p_call == 1 and len(game.pile) > 0:
                 return GameAction(type='call', player_id=self.id)
 
         # Get the estimated lie probability of the previous player
@@ -155,7 +155,7 @@ class SmartBot(Player):
             p_lie = max(0, p_lie - next_player_info["p_call_est"])
 
         # Call
-        if game.pile and random.random() < p_call:
+        if len(game.pile) > 0 and random.random() < p_call:
             return GameAction(type='call', player_id=self.id)
 
         # Play
