@@ -320,7 +320,11 @@ export default function CheatGame({
 
 		} else if (msg.type === "bluff_called") {
 
+			// Add a play announcement
+			addStatusMessage(msg.current_player, 'Call!', true);
+			await new Promise(r => setTimeout(r, 3000));
 			setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
+
 			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id && msg.was_lying));
 
 			// Show revealed cards
@@ -536,7 +540,7 @@ export default function CheatGame({
 					const duration = msg.is_play_announcement ? 4000 : 3000;
 					setTimeout(() => {
 						setStatusMessages(prev => prev.filter(m => m.id !== msg.id));
-						if (msg.is_play_announcement) {
+						if (msg.is_play_announcement && msg.message !== 'Call!') {
 							setPlayAnnouncements(prev => [...prev, {...msg}]);
 						}
 					}, duration);
