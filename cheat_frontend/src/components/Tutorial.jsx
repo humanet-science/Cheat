@@ -815,6 +815,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
                         containerWidth={containerSize.width / 0.7}  // Pass container size
                         containerHeight={containerSize.height / 0.7}
                         tutorialScale={0.7}
+                        showDealAnimation={false}
                     />
                 </div>)}
             </div>

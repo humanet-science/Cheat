@@ -59,7 +59,8 @@ export default function CheatGame({
 																		empiricaPlayer = null,
 																		containerWidth = null,
 																		containerHeight = null,
-																		tutorialScale = null
+																		tutorialScale = null,
+																		showDealAnimation = true
 																	}) {
 
 	// Game state and previous state
@@ -114,7 +115,7 @@ export default function CheatGame({
 	const [pilePickupAnimation, setPilePickupAnimation] = useState(null);
 	const [isDealingCards, setIsDealingCards] = useState(true);
 	const [dealtCards, setDealtCards] = useState(0);
-	const [dealingFromCenter, setDealingFromCenter] = useState(true);
+	const [dealingFromCenter, setDealingFromCenter] = useState(showDealAnimation);
 	const [centerDealCards, setCenterDealCards] = useState([]);
 	const [showLetsGo, setShowLetsGo] = useState(false);
 
@@ -144,7 +145,7 @@ export default function CheatGame({
 	const width = containerWidth ?? windowWidth;
 	const height = containerHeight ?? windowHeight;
 
-// Dealing animation - cards fly from center to players one at a time, round-robin
+  // Dealing animation - cards fly from center to players one at a time, round-robin
 	useEffect(() => {
 		if (!state || !dealingFromCenter) return;
 
@@ -198,6 +199,15 @@ export default function CheatGame({
 		}, lastCardsStart + 3500); // Extra 3500ms for text to fade
 
 	}, [state?.players, selfId]);
+
+	// If skipping animation, set dealing to false immediately when state loads
+	useEffect(() => {
+		if (!showDealAnimation && state) {
+			setDealingFromCenter(false);
+			setIsDealingCards(false);
+			setDealtCards(state.your_info.hand.length); // Set to full hand length
+		}
+	}, [showDealAnimation, state]);
 
 	// Adjust player positions to the width and height of the screen
 	useEffect(() => {

@@ -12,7 +12,6 @@ export function CenterPile({isMyTurn, hasActed, pileCards, lastPlayedCount, deal
 				// Random offset from center to simulate hand movement
 				const startOffsetX = Math.random() * 40 - 20; // -20 to 20px
 				const startOffsetY = Math.random() * 40 - 20;
-				console.log('Dealing card:', card.delay, 'to', card.targetPlayer, target);
 				return (
 					<div
 						key={card.id}
