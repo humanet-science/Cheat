@@ -4,7 +4,7 @@ import CheatGame from '../CheatGame';
 const TUTORIAL_SLIDES = [{
     id: 1,
     title: "Welcome to Cheat!",
-    description: "The goal is simple: get rid of all your cards. You don’t always have to play what is needed – you can lie about what you’re playing!",
+    description: "The goal is simple: get rid of all your cards. Cards are played face down, so you can lie about what you’re playing!",
     messages: [{
         type: "state",
         your_info: {
@@ -98,7 +98,7 @@ const TUTORIAL_SLIDES = [{
 }, {
     id: 4,
     title: "Playing Cards",
-    description: "They decided to play! Their declaration will appear in a bubble above them, and eventually move to" + " a smaller history bubble next to their icon.",
+    description: "They decided to play! They decided to play! You can see how many cards they declared in the speech bubble.",
     messages: [{
         type: "state",
         your_info: {
@@ -234,7 +234,8 @@ const TUTORIAL_SLIDES = [{
 }, {
     id: 6,
     title: "Calling Bluff",
-    description: "It's your turn again. If you think the previous player was lying, you can call their play.",
+    description: "It's your turn again. You can select cards to play the same rank. " +
+      "Or, if you think the previous player is lying, you can call their play. Click the 'Call' button to see what happens then.",
     task: {
         type: 'bluff_called',
         description: "Click the 'Call' button to see what happens.",
