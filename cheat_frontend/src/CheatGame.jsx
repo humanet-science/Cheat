@@ -59,7 +59,7 @@ export default function CheatGame({
 																		empiricaPlayer = null,
 																		containerWidth = null,
 																		containerHeight = null,
-																		tutorialScale= null
+																		tutorialScale = null
 																	}) {
 
 	// Game state and previous state
@@ -112,6 +112,11 @@ export default function CheatGame({
 	const [animatingCards, setAnimatingCards] = useState(null); // {playerId, cards, targetPosition, starting x, starting y}
 	const [revealedCards, setRevealedCards] = useState(null); // {cards, wasLying}
 	const [pilePickupAnimation, setPilePickupAnimation] = useState(null);
+	const [isDealingCards, setIsDealingCards] = useState(true);
+	const [dealtCards, setDealtCards] = useState(0);
+	const [dealingFromCenter, setDealingFromCenter] = useState(true);
+	const [centerDealCards, setCenterDealCards] = useState([]);
+	const [showLetsGo, setShowLetsGo] = useState(false);
 
 	// Cards on the pile
 	const [pileCards, setPileCards] = useState([]);
@@ -135,9 +140,64 @@ export default function CheatGame({
 	const [playerPositions, setPlayerPositions] = useState({});
 
 	// Use containerWidth/containerHeight if provided, otherwise fall back to window
-	const { width: windowWidth, height: windowHeight } = useScreenSize();
-  const width = containerWidth ?? windowWidth;
-  const height = containerHeight ?? windowHeight;
+	const {width: windowWidth, height: windowHeight} = useScreenSize();
+	const width = containerWidth ?? windowWidth;
+	const height = containerHeight ?? windowHeight;
+
+// Dealing animation - cards fly from center to players one at a time, round-robin
+	useEffect(() => {
+		if (!state || !dealingFromCenter) return;
+
+		const cardsPerPlayer = state.your_info.hand.length;
+		const players = state.players.map(p => p.your_info.id);
+
+		// Create cards in dealing order: one to each player, then repeat
+		const allCards = [];
+		for (let round = 0; round < cardsPerPlayer; round++) {
+			for (let playerIdx = 0; playerIdx < players.length; playerIdx++) {
+				const cardDelay = allCards.length * 80;
+				allCards.push({
+					id: Math.random(), targetPlayer: players[playerIdx], cardNumber: round, // Which card in their hand (0-9)
+					delay: cardDelay, // Deal one every 80ms
+				});
+			}
+		}
+
+		setCenterDealCards(allCards);
+
+		// Update dealtCards as cards arrive at player's position
+		allCards.forEach((card) => {
+			if (card.targetPlayer === selfId) {
+				setTimeout(() => {
+					setDealtCards(prev => prev + 1);
+					soundManager.play('cardPlay'); // Play sound when card arrives
+				}, card.delay); // Delay + flight time
+			}
+		});
+
+		// Finish dealing animation
+		const totalDuration = allCards.length * 80 + 1000;
+		const lastCardsStart = (allCards.length - 5) * 80; // When last 5 cards start dealing
+
+		// Show "Let's Go!" during last 5 cards
+		setTimeout(() => {
+			setShowLetsGo(true);
+			soundManager.play('start_bell');
+		}, lastCardsStart);
+
+		// Finish dealing
+		setTimeout(() => {
+			setDealingFromCenter(false);
+			setCenterDealCards([]);
+		}, totalDuration);
+
+		// Hide "Let's Go!" and start game
+		setTimeout(() => {
+			setShowLetsGo(false);
+			setIsDealingCards(false);
+		}, lastCardsStart + 3500); // Extra 3500ms for text to fade
+
+	}, [state?.players, selfId]);
 
 	// Adjust player positions to the width and height of the screen
 	useEffect(() => {
@@ -233,7 +293,7 @@ export default function CheatGame({
 	// game play
 	const processActionQueue = async () => {
 
-		if (processingRef.current || animatingCards) return;
+		if (processingRef.current || animatingCards || dealingFromCenter || isDealingCards) return;
 
 		// Get the next action
 		const msg = processNext();
@@ -424,7 +484,7 @@ export default function CheatGame({
 		if (actionQueue.length > 0 && !processingRef.current) {
 			processActionQueue();
 		}
-	}, [actionQueue, animatingCards, speakingPlayers]);
+	}, [actionQueue, animatingCards, speakingPlayers, dealingFromCenter, isDealingCards]);
 
 	// Checks whether the rank needs to be declared; if not, the text box disappears.
 	// Also validates the rank, so that only valid ranks are sent to the backend.
@@ -451,8 +511,13 @@ export default function CheatGame({
 
 		// Broadcast the play to the backend
 		socket.send(JSON.stringify({
-			type: "cards_played", declared_rank: declaredRank, cards: selectedCards, current_player: state.your_info.id,
-			your_info: state.your_info, player_id: state.your_info.id, card_count: selectedCards.length
+			type: "cards_played",
+			declared_rank: declaredRank,
+			cards: selectedCards,
+			current_player: state.your_info.id,
+			your_info: state.your_info,
+			player_id: state.your_info.id,
+			card_count: selectedCards.length
 		}));
 
 		// Optimistically update your hand immediately
@@ -519,6 +584,7 @@ export default function CheatGame({
 		soundManager.loadSound('discard', '/sounds/discard.wav');
 		soundManager.loadSound('win', '/sounds/win.wav');
 		soundManager.loadSound('pick_up', '/sounds/pick_up.mp3', 0.2);
+		soundManager.loadSound('start_bell', '/sounds/start_bell.wav', 0.3);
 	}, []);
 
 	// Play sound when Call Bluff! button pops up
@@ -574,8 +640,7 @@ export default function CheatGame({
 			const rect = playerElement.getBoundingClientRect();
 			const position = {
 				x: rect.left + rect.width / 2, // Center horizontally
-				y: playerPositionsRef.current[playerId].angle === 90
-					? rect.top // Push up for bottom player
+				y: playerPositionsRef.current[playerId].angle === 90 ? rect.top // Push up for bottom player
 					: rect.top
 			};
 
@@ -748,6 +813,8 @@ export default function CheatGame({
 					hasActed={hasActed}
 					pileCards={pileCards}
 					lastPlayedCount={lastPlayedCount}
+					dealingCards={centerDealCards}
+					playerPositions={playerPositionsRef.current}
 				/>
 
 				<CardRevealOverlay
@@ -778,6 +845,8 @@ export default function CheatGame({
 					yourId={selfId}
 					pileCards={pileCards}
 					callBluff={callBluff}
+					isDealingCards={isDealingCards}
+					dealtCardsCount={dealtCards}
 				/>
 
 				<CardFlyAnimation animatingCards={animatingCards}/>
@@ -787,5 +856,17 @@ export default function CheatGame({
 				<DiscardAnimation discards={discards}/>
 
 			</div>
+
+
+			{showLetsGo && (<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+				<div
+					className="text-white text-6xl font-bold satisfy-regular animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl"
+					style={{
+						animation: 'fadeInOut 3.5s ease-in-out', textShadow: '0 0 20px rgba(255,255,255,0.5)'
+					}}
+				>
+					Let's Gooo!
+				</div>
+			</div>)}
 		</div>);
 }

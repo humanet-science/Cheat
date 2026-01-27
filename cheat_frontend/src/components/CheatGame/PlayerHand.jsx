@@ -45,7 +45,9 @@ export default function PlayerHand({
 																		 playerPositions,
 																		 yourId,
 																		 pileCards,
-																		 callBluff
+																		 callBluff,
+																		 isDealingCards,
+																		 dealtCardsCount
 																	 }) {
 	return (<div style={{
 		position: 'fixed',
@@ -73,8 +75,13 @@ export default function PlayerHand({
 							key={`${card}-${index}`}
 							onClick={() => toggleCard(card)}
 							disabled={!isMyTurn || hasActed || (selectedCards.length >= 3 && !selectedCards.includes(card))}
-							style={{marginLeft: index === 0 ? '0' : '-1.5rem'}}
-							className={`relative w-16 h-24 rounded-lg border-2 transition-all font-bold ${selectedCards.includes(card) ? "bg-yellow-400 border-yellow-500 transform -translate-y-4 shadow-xl" : "bg-white border-gray-400 shadow-md"} ${isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card)) ? "hover:shadow-lg hover:-translate-y-2 cursor-pointer" : !isMyTurn || hasActed ? "cursor-not-allowed" : "bg-gray-400 cursor-not-allowed"}`}
+							style={{
+								marginLeft: index === 0 ? '0' : '-1.5rem', // Add dealing animation
+								opacity: isDealingCards && index >= dealtCardsCount ? 0 : 1,
+								transform: isDealingCards && index >= dealtCardsCount ? 'translateY(20px) scale(0.8)' : selectedCards.includes(card) ? 'translateY(-1rem) scale(1)' : 'translateY(0) scale(1)',
+								transition: `all 0.3s ease-out ${isDealingCards ? `${index * 0.15}s` : '0s'}`
+							}}
+							className={`relative w-16 h-24 rounded-lg border-2 font-bold ${selectedCards.includes(card) ? "bg-yellow-400 border-yellow-500 shadow-xl" : "bg-white border-gray-400 shadow-md"} ${isMyTurn && !hasActed && (selectedCards.length < 3 || selectedCards.includes(card)) ? "hover:shadow-lg hover:-translate-y-2 cursor-pointer" : !isMyTurn || hasActed ? "cursor-not-allowed" : "bg-gray-400 cursor-not-allowed"}`}
 						>
 							{/* Top-left corner */}
 							<div
@@ -168,33 +175,32 @@ export default function PlayerHand({
 						{isMyTurn && !hasActed && (
 							<div className="relative flex items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap">
 
-								{showRankInput ? (
-									<div>
+								{showRankInput ? (<div>
 									<input
-									type="text"
-									placeholder="Declare rank (e.g. 7)"
-									value={declaredRank}
-									onChange={(e) => {
-										setDeclaredRank(e.target.value.toUpperCase())
-									}}
-									onKeyDown={(e) => {
-										if (e.key === 'Enter') {
-											e.preventDefault();
-											// Only play if cards are actually selected AND rank is valid
-											if (selectedCards.length > 0) {
-												play();
-											} else {
-												// Optional: Show some feedback that cards need to be selected
-												console.log("Cannot play - no cards selected");
+										type="text"
+										placeholder="Declare rank (e.g. 7)"
+										value={declaredRank}
+										onChange={(e) => {
+											setDeclaredRank(e.target.value.toUpperCase())
+										}}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter') {
+												e.preventDefault();
+												// Only play if cards are actually selected AND rank is valid
+												if (selectedCards.length > 0) {
+													play();
+												} else {
+													// Optional: Show some feedback that cards need to be selected
+													console.log("Cannot play - no cards selected");
+												}
 											}
-										}
-									}}
-									className={`
+										}}
+										className={`
 																								min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
 																								transition-all duration-300 transform focus:outline-none 
 																								${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400'}
 																						`}
-								/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
+									/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
 									<button
 										onClick={play}
 										className={`
