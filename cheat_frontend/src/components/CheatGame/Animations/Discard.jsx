@@ -9,8 +9,8 @@ import React from "react";
 export default function DiscardAnimation({discards}) {
 	if (discards.length === 0) return null;
 	return (<div className="fixed top-4 right-4 rounded-lg p-4 z-0 max-w-lg">
-		<div className="text-sm font-bold mb-3 opacity-75">Discarded Sets:</div>
-		<div className="flex flex-wrap gap-3">
+		<div className="text-sm font-bold mb-3 opacity-75 flex justify-end">Discarded Sets</div>
+		<div className="flex flex-wrap justify-end gap-3">
 			{discards.map((rank, setIndex) => (<div
 				key={setIndex}
 				className="relative"

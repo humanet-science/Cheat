@@ -3,7 +3,7 @@ import traceback
 import random
 import os
 import json
-from typing import List, Any
+from typing import List
 from datetime import datetime
 import uuid
 import asyncio
@@ -97,7 +97,7 @@ class CheatGame:
 
         # Maximum number of rounds to play (can be None, in which case we set num_rounds to -1 to still allow for
         # comparisons)
-        self.num_rounds = n_rounds if n_rounds is not None else -1
+        self.num_rounds = n_rounds
 
         # Check if game is over: this terminates the game entirely
         self.game_over = False
@@ -658,8 +658,9 @@ class CheatGame:
             await asyncio.sleep(sleep_pause)
 
         # If the maximum number of rounds has been reached, end the game
-        if self.round + 1 > self.num_rounds:
-            self.game_over = True
+        if self.num_rounds is not None:
+            if self.round + 1 > self.num_rounds:
+                self.game_over = True
 
 
     async def replace_player_with_bot(self, player):
