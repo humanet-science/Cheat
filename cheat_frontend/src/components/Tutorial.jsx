@@ -98,7 +98,7 @@ const TUTORIAL_SLIDES = [{
 }, {
     id: 4,
     title: "Playing Cards",
-    description: "They decided to play! They decided to play! You can see how many cards they declared in the speech bubble.",
+    description: "They decided to play! You can see how many cards they declared in the speech bubble.",
     messages: [{
         type: "state",
         your_info: {
