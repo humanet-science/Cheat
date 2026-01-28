@@ -235,7 +235,7 @@ const TUTORIAL_SLIDES = [{
     id: 6,
     title: "Calling Bluff",
     description: "It's your turn again. You can select cards to play the same rank. " +
-      "Or, if you think the previous player is lying, you can call their play. Click the 'Call' button to see what happens then.",
+      "Or, if you think the previous player is lying, you can call their play.",
     task: {
         type: 'bluff_called',
         description: "Click the 'Call' button to see what happens.",
