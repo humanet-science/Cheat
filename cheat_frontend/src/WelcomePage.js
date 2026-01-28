@@ -619,10 +619,10 @@ const WelcomePage = ({onGameStart}) => {
                                     <div className="flex-1 relative">
                                         <input
                                             type="text"
-                                            placeholder="Enter game key..."
+                                            placeholder="Enter game key ..."
                                             value={gameKey}
                                             onChange={handleGameKeyChange}
-                                            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 tracking-wider ${
+                                            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
                                                 joinError
                                                     ? 'border-red-500 focus:ring-red-500 focus:border-red-500 pr-10'
                                                     : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
