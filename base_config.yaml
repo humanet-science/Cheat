@@ -19,7 +19,7 @@ max_num_active_games: 5
 # Basic game settings, passed to CheatGame
 game:
   experimental_mode: False
-  out_dir: ~/Cheat_game_data/ # Directory for game data
+  out_dir: ~ # Directory for game data
   note: ~ # Additional note to add to the output directory
   game_id: ~
 

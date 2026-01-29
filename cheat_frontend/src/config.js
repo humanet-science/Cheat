@@ -5,11 +5,10 @@ const getWebSocketURL = () => {
         return 'ws://localhost:5050/ws';
     }
 
-    // Otherwise, use the current hostname (or hardcode your laptop's IP)
-    return `ws://${window.location.hostname}:5050/ws`;
-
-    // Or hardcode for testing:
-    // return 'ws://192.168.1.X:5050/ws';
+    // In production, use wss:// (secure WebSocket) and no port
+    // The protocol will match your page (ws for http, wss for https)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.hostname}/ws`;
 };
 
 export const WS_URL = getWebSocketURL();
