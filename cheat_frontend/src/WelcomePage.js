@@ -119,9 +119,10 @@ const WelcomePage = ({onGameStart}) => {
                 return 'ws://localhost:5050/ws';
             }
 
-            // If accessing via IP, connect to that IP
-            return `ws://${hostname}:5050/ws`;
-        };
+	    // For production, use secure WebSocket without port
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${protocol}//${hostname}/ws`;
+	};
         const ws = new WebSocket(getWebSocketURL());
         setSocket(ws);
 
