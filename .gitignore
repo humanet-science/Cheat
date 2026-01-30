@@ -7,4 +7,5 @@ build/
 *.lock
 game_data
 package-lock.json
+cheat_empirica/*.tar.zst
 **/__pycache__/
