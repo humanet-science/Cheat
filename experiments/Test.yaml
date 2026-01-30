@@ -28,3 +28,6 @@ players:
     verbosity: 0.2
     p_call: 1.0
     p_lie: 1.0
+
+experiment:
+  predefined_messages: ~

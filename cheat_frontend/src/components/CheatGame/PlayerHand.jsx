@@ -124,7 +124,7 @@ export default function PlayerHand({
 					<div className="min-w-fit relative z-10 flex items-center gap-4 transition-all duration-500">
 
 						{/* Message input */}
-						{!experimentalMode ? (<div className="flex items-center gap-3 animate-fadeIn relative">
+						{!allowedMessages ? (<div className="flex items-center gap-3 animate-fadeIn relative">
 							<input
 								type="text"
 								placeholder="Send a message..."

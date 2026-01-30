@@ -341,7 +341,7 @@ class CheatGame:
             "pile_size": len(self.pile),
             "human_ids": [player.id for player in self.players if player.type == 'human'],
             "experimental_mode": self.experimental_mode,
-            "predefined_messages": self.predefined_messages if self.experimental_mode else []
+            "predefined_messages": self.predefined_messages
         }
 
     async def broadcast_to_all(self, message: dict, *, append_state: bool = True):

@@ -21,3 +21,6 @@ players:
     name: Beep Boop
     avatar: 🤖
     verbosity: 0.1
+
+experiment:
+  predefined_messages: ~

@@ -130,7 +130,7 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
         message_queue = asyncio.Queue(), # Set up a new queue
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
-        predefined_messages=game_config["experiment"].get("predefined_messages", []) if game_config["game"].get("experimental_mode", False) else []
+        predefined_messages=game_config["experiment"].get("predefined_messages", None)
     )
 
     # Set the system prompt for all LLM players, if not specified from the config

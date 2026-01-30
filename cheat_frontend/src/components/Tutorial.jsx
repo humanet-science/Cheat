@@ -440,6 +440,7 @@ const TUTORIAL_SLIDES = [{
     id: 10,
     title: "Help",
     description: "The rules, and more information about our lab, are available in the menu, from where you can also exit the game. Have fun!",
+    empirica_description: "The rules, and more information about our lab, are available in the menu. Have fun!",
     messages: [{}]
 }];
 
@@ -770,7 +771,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
     >
 
         {/* Close button */}
-        <button
+        {(isEmpirica && currentSlide !== TUTORIAL_SLIDES.length - 1) ? <></> : <button
             onClick={handleClose}
             className={`absolute top-5 right-5 text-gray-500 hover:text-gray-700 transition-all duration-300 z-10 ${showText ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
@@ -787,7 +788,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
                     d="M6 18L18 6M6 6l12 12"
                 />
             </svg>
-        </button>
+        </button>}
 
         <div
             className={`rounded-2xl duration-500 ${isOpen && !isEmpirica ? 'shadow-2xl' : ''} ${isClosing ? 'opacity-0' : ''} ${!isEmpirica ? 'bg-gradient-to-br from-green-900 to-blue-900' : ''} max-w-6xl w-full mx-4 overflow-hidden flex flex-col`}
@@ -806,7 +807,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
                 >
                     <CheatGame
                         socket={mockSocket}
-                        gameConfig={{numPlayers: 5, experimentalMode: false, predefinedMessages: [], selfId: 0,}}
+                        gameConfig={{numPlayers: 5, experimentalMode: isEmpirica, predefinedMessages: null, selfId: 0,}}
                         currentRound={currentRound}
                         onUpdateRound={updateRoundState}
                         onExitGame={() => {
@@ -836,7 +837,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
                 >
                     <h2 className="text-gray-50 text-3xl font-bold mb-2">{slide.title}</h2>
                     <p className="text-gray-300 text-lg mb-6">
-                        {slide.description}
+                        {slide.empirica_description ? slide.empirica_description : slide.description}
                         {slide.task && (<span className="text-yellow-400"> {slide.task.description}</span>)}
                     </p>
                 </div>
