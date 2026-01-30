@@ -10,7 +10,8 @@ export function Thanks() {
           Thank you for participating!
         </h1>
         <p className="text-lg text-gray-600">
-          Your responses have been recorded. If you enjoyed the game, you continue playing for free at [URL].
+          Your responses have been recorded. If you enjoyed the game, you continue playing
+					for free at <a href="https://game.humanet.science" style={{"color": "#6DB4EE"}}>game.humanet.science</a>.
         </p>
       </div>
 			<div className="">
