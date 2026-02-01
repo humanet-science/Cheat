@@ -1,0 +1,91 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+  pull-requests: write
+  pages: write      # to deploy to Pages
+  id-token: write   # to verify the deployment originates from an appropriate source
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # caching pip dependencies
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Test with pytest
+        run: |
+          coverage run -m pytest tests/
+      - name: Generate Coverage Report
+        run: |  
+          coverage report -m -i && coverage json -o ./coverage/coverage-summary.json -i && coverage html -d ./coverage -i
+
+      # Create a coverage badge
+      - name: Create coverage badge
+        if: github.ref == 'refs/heads/main' && matrix.python-version == '3.12'
+        uses: jaywcjlove/coverage-badges-cli@main
+        with:
+          style: classic
+          source: ./coverage/coverage-summary.json
+          output: ./coverage/coverage-badge.svg
+          jsonPath: totals.percent_covered_display
+
+      - name: Upload artifact
+        if: github.ref == 'refs/heads/main' && matrix.python-version == '3.12'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './coverage'
+
+  # Deploy coverage result to GitHub Pages
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions: write-all
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Delete previous deployment
+        uses: strumwolf/delete-deployment-environment@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: github-pages
+          onlyRemoveDeployments: true
+
+      - name: Deploy coverage report
+        uses: actions/deploy-pages@v4
+        id: deployment
+

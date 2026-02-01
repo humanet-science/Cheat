@@ -1,11 +1,10 @@
 import random
 import pickle
-from cheat.card import RANKS, Card
-from cheat.player import Player
-from cheat.bots.bot_messages import message_types
+from cheat.card import RANKS
+from .generic_bot import BotPlayer
 from cheat.action import GameAction
 
-class RandomBot(Player):
+class RandomBot(BotPlayer):
     """ Random bot that inherits from the parent Player class"""
 
     def __init__(self, id: int | None = None,
@@ -14,7 +13,7 @@ class RandomBot(Player):
                  p_call: float = 0.3,
                  p_lie: float = 0.3,
                  verbosity: float = 0.3):
-        super().__init__(id=id, name=name, avatar=avatar, type="bot")
+        super().__init__(id=id, name=name, avatar=avatar)
         self.p_call = p_call
         self.p_lie = p_lie
         self.verbosity = verbosity
@@ -67,58 +66,3 @@ class RandomBot(Player):
         # Play
         else:
             return await self.make_move(game)
-
-    def broadcast_message(self, game, type: str = None, *_, **__):
-        """ Broadcast an opinion based on the state of play"""
-
-        # Stay silent based on verbosity
-        if random.random() > self.verbosity or len(game.history) == 0:
-            return None
-
-        # Return a specific type of message if requested
-        if type is not None:
-            if type == "thinking" and game.current_rank is None:
-                return random.choice(message_types["thinking_new_play"])
-            return random.choice(message_types[type])
-
-        # Get the last action that is a play or a call
-        last_play_idx = -1
-        while game.history[last_play_idx].type not in ["play", "call"]:
-            last_play_idx -= 1
-        last_play = game.history[last_play_idx]
-
-        # If the last play was a call, the two players involved can say something and the others can send a taunt
-        if last_play.type == "call":
-
-            # Am the accused
-            if last_play.data["accused_id"] == self.id:
-                # Got caught lying: only say something if you're not picking up just your own cards
-                if last_play.data["was_lying"]:
-                    # If you are just picking up your own cards
-                    if len(game.history[last_play_idx+1].data["pile"]) <=3:
-                        return random.choice(message_types["small_pile_picked_up"])
-                    # If you are picking up the pile
-                    return random.choice(message_types["pile_picked_up"])
-
-            # Am the accuser:
-            elif last_play.player_id == self.id:
-                # Caught someone else lying
-                if last_play.data["was_lying"]:
-                    return random.choice(message_types["suspicions_confirmed"])
-                # Failed to catch them and picked up the pile
-                else:
-                    return random.choice(message_types["surprise"] + message_types['pile_picked_up'])
-
-            # Not involved in the play: can taunt a lie
-            else:
-                if last_play.data["was_lying"]:
-                    return random.choice(message_types["taunt_blatant_lie"])
-
-        # Last play was a play by someone else (i.e. not self)
-        elif last_play.type == "play":
-            # If it is my turn next, don't say anything here because I will have a chance in a second
-            if (last_play.player_id + 1) % len(game.players) == self.id:
-                return None
-            return random.choice(message_types["suspicious"])
-
-        return None

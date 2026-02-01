@@ -18,12 +18,16 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
 
     # Game players from the config
     game_players=[]
-    for player_config in config['players']:
+    for idx, player_config in enumerate(config['players']):
         if isinstance(player_config, dict):
             game_players.append(get_player(**player_config))
         else:
             # Player_config is actually an initialised player
             game_players.append(player_config)
+
+        # Set the player id, if not already done
+        if game_players[-1].id is None:
+            game_players[-1].id = idx
 
     # Add players
     game = CheatGame(

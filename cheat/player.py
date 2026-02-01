@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from fastapi import WebSocket
 from typing import List, Callable
+import random
 
 from cheat.card import Card, RANK_ORDER
 from cheat.action import GameAction
@@ -80,6 +81,7 @@ class HumanPlayer(Player):
     async def make_move(self, game) -> GameAction:
         # Human players make moves via WebSocket
         pass
+
 
 def get_player(*, type: str, **kwargs) -> Player:
     """ Return a game player type from a configuration.

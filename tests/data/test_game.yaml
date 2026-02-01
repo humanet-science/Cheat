@@ -1,32 +1,90 @@
 no_verbosity:
-  - name: 5_player_game
-    n_rounds: 1
-    bot_config:
-      - type: RandomBot
-        name: His Botness
-        avatar: 🦊
-        p_call: 0.2
-        p_lie: 0.1
-        verbosity: 0.0
-      - type: RandomBot
-        name: B0Ttled Up
-        avatar: 🍾
-        p_call: 0.3
-        p_lie: 0.2
-        verbosity: 0.0
-      - type: RandomBot
-        name: Beep Boop
-        p_call: 0.4
-        p_lie: 0.3
-        avatar: 🤖
-        verbosity: 0.0
-      - type: RandomBot
-        p_call: 0.5
-        p_lie: 0.1
-        name: ChattyBot
-        avatar: 🐭
-        verbosity: 0.0
+  - n_rounds: 2
     game_config:
-      game_mode: single
-      experimental_mode: False
+      players:
+        - type: RandomBot
+          name: His Botness
+          avatar: 🦊
+          p_call: 0.2
+          p_lie: 0.1
+          verbosity: 0.0
+        - type: RandomBot
+          name: B0Ttled Up
+          avatar: 🍾
+          p_call: 0.3
+          p_lie: 0.2
+          verbosity: 0.0
+        - type: RandomBot
+          name: Beep Boop
+          p_call: 0.4
+          p_lie: 0.3
+          avatar: 🤖
+          verbosity: 0.0
+        - type: RandomBot
+          p_call: 0.5
+          p_lie: 0.1
+          name: ChattyBot
+          avatar: 🐭
+          verbosity: 0.0
+      game:
+        game_mode: single
+        experimental_mode: False
+
+small_verbosity:
+  - n_rounds: 1
+    game_config:
+      players:
+        - type: RandomBot
+          name: His Botness
+          avatar: 🦊
+          p_call: 0.2
+          p_lie: 0.1
+          verbosity: 0.1
+        - type: RandomBot
+          name: B0Ttled Up
+          avatar: 🍾
+          p_call: 0.3
+          p_lie: 0.2
+          verbosity: 0.1
+        - type: RandomBot
+          name: Beep Boop
+          p_call: 0.4
+          p_lie: 0.3
+          avatar: 🤖
+          verbosity: 0.0
+        - type: RandomBot
+          p_call: 0.5
+          p_lie: 0.1
+          name: ChattyBot
+          avatar: 🐭
+          verbosity: 0.1
+      game:
+        game_mode: single
+        experimental_mode: False
+
+all_smart:
+  - n_rounds: 2
+    game_config:
+      players:
+        - type: SmartBot
+          name: His Botness
+          avatar: 🦊
+          verbosity: 0.1
+        - type: SmartBot
+          name: B0Ttled Up
+          avatar: 🍾
+          verbosity: 0.0
+        - type: SmartBot
+          name: Beep Boop
+          avatar: 🤖
+          verbosity: 0.1
+        - type: SmartBot
+          name: ChattyBot
+          avatar: 🐭
+          verbosity: 0.0
+      game:
+        game_mode: single
+        experimental_mode: False
+
+
 

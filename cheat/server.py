@@ -167,8 +167,8 @@ async def try_start_game_from_queue(num_players, mode):
         try:
             # Peek at the players first (don't pop yet in case an error occurs)
             _players = []
-            for _ in range(min_players):
-                player = waiting_queues[num_players][mode][0]
+            for k in range(min_players):
+                player = waiting_queues[num_players][mode][k]
                 _players.append(player)
 
             # Try to create the game (this might fail with API key error)
@@ -543,6 +543,11 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Remove from player_to_game mapping
                 del player_to_game[id(ws)]
+
+            # If player is survey participant, remove from queue
+            if player.empirica_id is not None:
+                if player.empirica_id in survey_participants:
+                    survey_participants.pop(player.empirica_id)
 
 ## ---------------------------------------------------------------------------------------------------------------------
 ## Empirica endpoint: create a game from a config

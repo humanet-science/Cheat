@@ -1,11 +1,11 @@
 import random
 import pickle
-from cheat.card import RANKS, Card, str_to_Card
-from cheat.player import Player
-from cheat.bots.bot_messages import message_types
+from cheat.card import RANKS, str_to_Card
+from .generic_bot import BotPlayer
 from cheat.action import GameAction
 
-class SmartBot(Player):
+
+class SmartBot(BotPlayer):
     """ Smart bot that inherits from the parent Player class. The Smart bot works the following way:
         - Keeps track of other players' behavioural patterns and estimates their lie and call probability
         - Adjusts its probability of lying and calling to what it thinks the players to its left and right are doing
@@ -18,7 +18,7 @@ class SmartBot(Player):
                  name: str | None = None,
                  avatar: str | None = None,
                  verbosity: float = 0.3):
-        super().__init__(id=id, name=name, avatar=avatar, type="bot")
+        super().__init__(id=id, name=name, avatar=avatar)
         self.verbosity = verbosity
 
         # Dictionary containing information about other players — this is built dynamically
@@ -70,14 +70,18 @@ class SmartBot(Player):
                     self.other_player_repr[action.data["accused_id"]]["N_plays_called"] += 1
                     if action.data["was_lying"]:
                         self.other_player_repr[action.data["accused_id"]]["N_lies"] += 1
-                        self.other_player_repr[action.data["accused_id"]]["known_cards"].extend([str_to_Card(c) for c in action.data["revealed_cards"]])
+                        self.other_player_repr[action.data["accused_id"]]["known_cards"].extend(
+                            [str_to_Card(c) for c in action.data["revealed_cards"]]
+                        )
                     else:
                         if action.player_id != self.id:
-                            self.other_player_repr[action.player_id]["known_cards"].extend([str_to_Card(c) for c in action.data["revealed_cards"]])
+                            self.other_player_repr[action.player_id]["known_cards"].extend(
+                                [str_to_Card(c) for c in action.data["revealed_cards"]])
 
                 # Count the number of plays that could have been calls
                 elif action.type == "play":
-                    for item in game.history[self.last_action_idx+idx-1::-1]:
+                    for prev_idx in range(self.last_action_idx + idx - 1, -1, -1):
+                        item = game.history[prev_idx]
                         if item.type == "call":
                             break
                         elif item.type == "play":
@@ -142,7 +146,7 @@ class SmartBot(Player):
         # If the previous player is running low on cards, increase chance of calling by number of cards left on hand.
         # If the previous player has no cards left, p_call is 1 and the play is necessarily called
         if len(game.players[(self.id - 1) % game.num_players].hand) < 4:
-            p_call = min(1, p_call + (1.0/float(len(game.players[(self.id - 1) % game.num_players].hand))))
+            p_call = min(1, p_call + (0.5 / float(len(game.players[(self.id - 1) % game.num_players].hand) + 1)))
             if p_call == 1 and len(game.pile) > 0:
                 return GameAction(type='call', player_id=self.id)
 
@@ -171,6 +175,7 @@ class SmartBot(Player):
 
             # If holding cards of the chosen rank, prefer to play the truth
             true_cards = [c for c in self.hand if c.rank == declared_rank]
+
             if true_cards:
                 p_lie *= 0.5
 
@@ -197,67 +202,14 @@ class SmartBot(Player):
                     elif c.rank != declared_rank:
                         potential_other_cards.append(c)
                 if len(chosen) < n_cards_to_play:
-                    chosen.extend(random.sample(potential_other_cards, min(len(potential_other_cards), n_cards_to_play - len(chosen))))
+                    chosen.extend(random.sample(potential_other_cards,
+                                                min(len(potential_other_cards), n_cards_to_play - len(chosen))))
             else:
                 chosen = random.sample(true_cards, random.randint(1, len(true_cards)))
 
-            return GameAction(type="play", player_id=self.id, data=dict(declared_rank=declared_rank, cards_played=chosen))
+            return GameAction(type="play", player_id=self.id,
+                              data=dict(declared_rank=declared_rank, cards_played=chosen))
 
     async def choose_action(self, game) -> GameAction:
         """ Pass-through; required for interface compatibility with bot players"""
         return await self.make_move(game)
-
-    def broadcast_message(self, game, type: str = None, *_, **__):
-        """ Broadcast an opinion based on the state of play"""
-
-        # Stay silent based on verbosity
-        if random.random() > self.verbosity or len(game.history) == 0:
-            return None
-
-        # Return a specific type of message if requested
-        if type is not None:
-            if type == "thinking" and game.current_rank is None:
-                return random.choice(message_types["thinking_new_play"])
-            return random.choice(message_types[type])
-
-        # Get the last action that is a play or a call
-        last_play_idx = -1
-        while game.history[last_play_idx].type not in ["play", "call"]:
-            last_play_idx -= 1
-        last_play = game.history[last_play_idx]
-
-        # If the last play was a call, the two players involved can say something and the others can send a taunt
-        if last_play.type == "call":
-
-            # Am the accused
-            if last_play.data["accused_id"] == self.id:
-                # Got caught lying: only say something if you're not picking up just your own cards
-                if last_play.data["was_lying"]:
-                    # If you are just picking up your own cards
-                    if len(game.history[last_play_idx+1].data["pile"]) <=3:
-                        return random.choice(message_types["small_pile_picked_up"])
-                    # If you are picking up the pile
-                    return random.choice(message_types["pile_picked_up"])
-
-            # Am the accuser:
-            elif last_play.player_id == self.id:
-                # Caught someone else lying
-                if last_play.data["was_lying"]:
-                    return random.choice(message_types["suspicions_confirmed"])
-                # Failed to catch them and picked up the pile
-                else:
-                    return random.choice(message_types["surprise"] + message_types['pile_picked_up'])
-
-            # Not involved in the play: can taunt a lie
-            else:
-                if last_play.data["was_lying"]:
-                    return random.choice(message_types["taunt_blatant_lie"])
-
-        # Last play was a play by someone else (i.e. not self)
-        elif last_play.type == "play":
-            # If it is my turn next, don't say anything here because I will have a chance in a second
-            if (last_play.player_id + 1) % len(game.players) == self.id:
-                return None
-            return random.choice(message_types["suspicious"])
-
-        return None

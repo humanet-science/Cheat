@@ -75,7 +75,7 @@ class TestCheckLLMMoves:
 
     def test_all_cases(self, cheat_game):
         """Test all test cases from YAML"""
-        test_cases = load_test_cases("test_LLM_move_checker.yaml")
+        test_cases = load_test_cases("test_llm_move_checker.yaml")
 
         for k, v in test_cases.items():
             for test_case in v:
