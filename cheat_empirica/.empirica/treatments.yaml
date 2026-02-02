@@ -11,6 +11,7 @@ factors:
     values:
       - value: 'HRRR' # One human, three random bots
       - value: 'HSHS' # Human, smart bot, human, smart bot
+      - value: 'Test' # Everybody lying and calling for a fast-tracked game
   - name: numRounds
     desc: Number of rounds to play
     values:

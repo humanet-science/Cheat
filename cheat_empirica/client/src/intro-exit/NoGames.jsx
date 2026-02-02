@@ -1,16 +1,16 @@
 import React from "react";
 import {HumanetLogo} from "../../../../cheat_frontend/src/utils/Logo.jsx";
 
-export function Thanks() {
+export function noGames() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4" id="game-root">
       <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-lg">
         <h1 className="text-2xl font-bold text-gray-500 mb-4">
-          Thank you for participating!
+          🚧️ No experiments
         </h1>
         <p className="text-lg text-gray-600">
-          Your responses have been recorded. If you enjoyed the game, you continue playing
-					for free at <a href="https://game.humanet.science" style={{"color": "#6DB4EE"}}>game.humanet.science</a>.
+          There are currently no available experiments.
+					Please wait until an experiment becomes available or come back at a later date.
         </p>
       </div>
 			<div className="">

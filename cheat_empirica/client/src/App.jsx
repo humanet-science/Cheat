@@ -6,6 +6,7 @@ import {Game} from "./Game";
 import {ExitSurvey} from "./intro-exit/ExitSurvey";
 import {Introduction} from "./intro-exit/Introduction";
 import { Thanks } from "./intro-exit/Thanks";
+import {noGames} from "./intro-exit/NoGames.jsx";
 import {WebSocketProvider} from "./WebSocketContext";
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
                 <EmpiricaMenu position="bottom-left"/>
                 <div className="h-full overflow-auto">
                     <EmpiricaContext
+                      noGames={noGames}
                       introSteps={introSteps}
                       exitSteps={exitSteps}
                       finished={Thanks}

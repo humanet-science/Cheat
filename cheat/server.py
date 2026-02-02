@@ -623,7 +623,7 @@ class GameConfigRequest(BaseModel):
 @app.post("/api/games/from_config")
 async def create_game_from_config(req: GameConfigRequest):
     # Load the requested game config
-    cfg_key = req.cfg.get("cfg_key")
+    cfg_key = req.cfg["cfg_key"]
     experiments_dir = Path(__file__).parent.parent / "experiments"
     config_path = experiments_dir / f"{cfg_key}.yaml"
     with open(config_path) as f:
