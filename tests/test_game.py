@@ -1,25 +1,27 @@
-import sys
-import os
-import yaml
-import pytest
-from pathlib import Path
 import asyncio
-import logging
 import json
+import logging
+import os
+import sys
 from pathlib import Path
+
+import pytest
+import yaml
 
 # Add the project root to Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from cheat.utils import game_from_config
+
 
 def load_test_cases(filename):
     """Load test cases from YAML file"""
     test_file = Path(__file__).parent / "data" / filename
-    with open(test_file, 'r') as f:
+    with open(test_file) as f:
         data = yaml.safe_load(f)
 
     return data
+
 
 class TestBasicGameFunctionality:
     """Test games run correctly"""
@@ -31,17 +33,19 @@ class TestBasicGameFunctionality:
 
         for k, v in test_cases.items():
             for test_case in v:
-                test_case['game_config']['game']['out_dir'] = tmp_path
+                test_case["game_config"]["game"]["out_dir"] = tmp_path
 
-                game = game_from_config(test_case['game_config'])
+                game = game_from_config(test_case["game_config"])
 
-                for i in range(test_case['n_rounds']):
-                   await game.play_round(sleep_pause=0)
-                   assert game.winner is not None
-                   game.new_round()
+                for i in range(test_case["n_rounds"]):
+                    await game.play_round(sleep_pause=0)
+                    assert game.winner is not None
+                    game.new_round()
 
                 # Check the json file is the same length as the game history
                 json_file = Path(game.out_path) / "game_history.jsonl"
-                with open(json_file, "r") as f:
+                with open(json_file) as f:
                     game_history = [json.loads(line) for line in f if line.strip()]
-                assert len(game_history) == len(game.history) + 1 # Additional player info line written at start of new game
+                assert (
+                    len(game_history) == len(game.history) + 1
+                )  # Additional player info line written at start of new game

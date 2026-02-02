@@ -1,4 +1,4 @@
-Cheat
+Cheat!
 ---
 [![CI](https://github.com/humanet-science/Cheat/actions/workflows/pytest.yml/badge.svg)](https://github.com/ThGaskin/NeuralABM/actions/workflows/pytest.yml)
 [![coverage badge](https://humanet-science.github.io/Cheat/coverage-badge.svg)](https://humanet-science.github.io/Cheat/coverage-badge.svg)
@@ -7,10 +7,18 @@ Cheat
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
 
-Mixed Human-AI group game
+This repository implements the Cheat! bluffing game with a React frontend and Python backend.
+The frontend provides an interactive game interface, while the backend implements game logic,
+bot players (including LLM-based agents), and server management using FastAPI with WebSocket
+communication for real-time gameplay. The backend has been thoroughly unit-tested for
+Python versions ≥ 3.10.
+
 
 ## Installation
-Create a virtual environment and install the required packages via 
+> [!NOTE]
+> Requires Python ≥ 3.10
+
+Create a virtual environment and install the required packages via
 ```commandline
 pip install -r requirements.txt
 ```
@@ -22,13 +30,13 @@ nvm install 24
 sudo apt-get install -y nodejs
 npm install yarn
 ```
-(this requires sudo privileges). Or, if you are using homebrew:
+(this requires sudo privileges). Alternatively, if you are using homebrew on macOS:
 ```commandline
 brew install node yarn
 ```
 Check that everything was installed:
 ```commandline
-node -v 
+node -v
 npm -v
 ```
 should print the version numbers.
@@ -45,8 +53,8 @@ Then open two terminal windows, and run
 ```commandline
 python -m cheat.server --port 5050
 ```
-in one, 
-and 
+in one,
+and
 ```commandline
 cd cheat_frontend
 yarn start
@@ -71,13 +79,13 @@ on Windows. Replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>` w
 | Google Gemini | GEMINI_API_KEY   |
 
 > [!WARNING]
-> The API key should ideally be specific to your virtual environment. Make sure to NEVER reveal the API secret, e.g. by 
+> The API key should ideally be specific to your virtual environment. Make sure to NEVER reveal the API secret, e.g. by
 > pushing the virtual environment to a Github repo, or by publishing it online. Make sure that your virtual environment folder
 > is not included in your git VCS so that it won't be accidentally pushed.
 
 ## Empirica
-To install, run 
-```console 
+To install, run
+```console
 curl -fsS https://install.empirica.dev | sh
 ```
 Then navigate to both the `cheat_empirica/server` and the `cheat_empirica/client` folders, and in each run

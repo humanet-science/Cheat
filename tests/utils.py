@@ -1,12 +1,13 @@
 import asyncio
-
-from collections import deque
-from fastapi import WebSocketDisconnect
 import random
-from unittest.mock import MagicMock, AsyncMock
+from collections import deque
+from unittest.mock import AsyncMock, MagicMock
+
+from fastapi import WebSocketDisconnect
 
 from cheat.action import GameAction
 from cheat.card import RANKS, SUITS, Card
+
 
 class MockWebSocket:
     """Mock WebSocket that stays connected until explicitly closed."""
@@ -51,6 +52,7 @@ class MockWebSocket:
         """Mark websocket as closed."""
         self.closed = True
 
+
 class MockGame:
     """Mock game object for testing."""
 
@@ -66,7 +68,7 @@ class MockGame:
         self.deal_cards()
 
     def deal_cards(self):
-        """ Deal out the cards to the players"""
+        """Deal out the cards to the players"""
         while self.deck:
             for player in self.players:
                 if self.deck:
@@ -79,8 +81,8 @@ class MockGame:
             player_id=player_id,
             data={
                 "declared_rank": declared_rank,
-                "cards_played": [str(c) for c in cards]
-            }
+                "cards_played": [str(c) for c in cards],
+            },
         )
         self.history.append(action)
         return action
@@ -93,8 +95,8 @@ class MockGame:
             data={
                 "accused_id": accused_id,
                 "was_lying": was_lying,
-                "revealed_cards": [str(c) for c in revealed_cards]
-            }
+                "revealed_cards": [str(c) for c in revealed_cards],
+            },
         )
         self.history.append(action)
 
@@ -102,7 +104,7 @@ class MockGame:
         pile_action = GameAction(
             type="pile_picked_up",
             player_id=accused_id if was_lying else caller_id,
-            data={"pile": self.pile.copy()}
+            data={"pile": self.pile.copy()},
         )
         self.history.append(pile_action)
         return action

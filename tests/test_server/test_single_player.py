@@ -2,13 +2,19 @@
 Tests for single-player game scenarios, including joining and disconnecting/quiting the game.
 """
 
+import os
+
 # Add the project root to Python path
 import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
+
+import asyncio
 
 import pytest
-import asyncio
 
 import cheat.server as server
 from tests.utils import MockWebSocket
@@ -19,9 +25,7 @@ class TestSinglePlayerJoinFlow:
 
     @pytest.mark.asyncio
     async def test_player_joins_queue_via_websocket(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test player joining queue through WebSocket message."""
 
@@ -30,13 +34,15 @@ class TestSinglePlayerJoinFlow:
 
         try:
             # Queue the join message
-            ws.queue_message({
-                "type": "player_join",
-                "name": "TestPlayer",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "single"
-            })
+            ws.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "TestPlayer",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "single",
+                }
+            )
 
             # Start the websocket handler in background
             handler_task = asyncio.create_task(server.websocket_endpoint(ws))
@@ -51,7 +57,9 @@ class TestSinglePlayerJoinFlow:
 
             # Wait for game_manager to process the queue (it checks every 1 second)
             # Poll for game creation instead of fixed sleep
-            max_wait = 3.5  # Increased to ensure we catch at least 2 game_manager cycles
+            max_wait = (
+                3.5  # Increased to ensure we catch at least 2 game_manager cycles
+            )
             elapsed = 0.0
             check_interval = 0.2
 
@@ -60,8 +68,10 @@ class TestSinglePlayerJoinFlow:
                 await asyncio.sleep(check_interval)
                 elapsed += check_interval
                 if elapsed % 1.0 < check_interval:  # Log every second
-                    print(f"  {elapsed:.1f}s: active_games={len(server.active_games)}, "
-                          f"queue_size={len(server.waiting_queues[4]['single'])}")
+                    print(
+                        f"  {elapsed:.1f}s: active_games={len(server.active_games)}, "
+                        f"queue_size={len(server.waiting_queues[4]['single'])}"
+                    )
 
             # Check game was created
             assert len(server.active_games) >= 1
@@ -98,9 +108,7 @@ class TestPlayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_player_disconnects_during_single_player_game(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that server properly cleans up when the only human player disconnects."""
 
@@ -109,13 +117,15 @@ class TestPlayerDisconnection:
 
         try:
             # Step 1: Player joins queue
-            ws.queue_message({
-                "type": "player_join",
-                "name": "TestPlayer",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "single"
-            })
+            ws.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "TestPlayer",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "single",
+                }
+            )
 
             # Start the websocket handler - server handles the rest
             handler_task = asyncio.create_task(server.websocket_endpoint(ws))
@@ -153,7 +163,9 @@ class TestPlayerDisconnection:
             # This simulates what happens when a user closes their browser
             ws.close()
 
-            print("Player WebSocket closed, waiting for server to detect and cleanup...")
+            print(
+                "Player WebSocket closed, waiting for server to detect and cleanup..."
+            )
 
             # Step 4: Wait for server to automatically detect disconnect and cleanup
             # The websocket_endpoint should catch the disconnect and trigger cleanup
@@ -192,9 +204,7 @@ class TestPlayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_player_quits_explicitly_during_game(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that server handles explicit quit message from player."""
 
@@ -203,13 +213,15 @@ class TestPlayerDisconnection:
 
         try:
             # Step 1: Player joins queue
-            ws.queue_message({
-                "type": "player_join",
-                "name": "TestPlayer",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "single"
-            })
+            ws.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "TestPlayer",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "single",
+                }
+            )
 
             handler_task = asyncio.create_task(server.websocket_endpoint(ws))
             await asyncio.sleep(0.5)
@@ -266,9 +278,7 @@ class TestPlayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_no_state_leaks_after_multiple_disconnections(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that multiple join-disconnect cycles don't leak state.
 
@@ -284,13 +294,15 @@ class TestPlayerDisconnection:
                 print(f"\n--- Cycle {i + 1} ---")
 
                 # Join queue
-                ws.queue_message({
-                    "type": "player_join",
-                    "name": f"TestPlayer{i}",
-                    "avatar": "avatar1",
-                    "num_players": 4,
-                    "game_mode": "single"
-                })
+                ws.queue_message(
+                    {
+                        "type": "player_join",
+                        "name": f"TestPlayer{i}",
+                        "avatar": "avatar1",
+                        "num_players": 4,
+                        "game_mode": "single",
+                    }
+                )
 
                 handler_task = asyncio.create_task(server.websocket_endpoint(ws))
                 await asyncio.sleep(0.5)

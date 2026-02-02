@@ -3,17 +3,23 @@ Tests for game creation with key sharing scenarios.
 Tests what happens when players create games, share keys, and leave queues.
 """
 
-# Add the project root to Python path
-import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+# Add the project root to Python path
+import sys
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
+
+import asyncio
 
 import pytest
-import asyncio
-import cheat.server as server
 
+import cheat.server as server
 from tests.utils import MockWebSocket
+
 
 class TestGameCreation:
     """Test game creation and key sharing functionality."""
@@ -27,13 +33,15 @@ class TestGameCreation:
 
         try:
             # Player creates a game
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 2,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 2,
+                    "num_bots": 2,
+                }
+            )
 
             handler_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -83,13 +91,15 @@ class TestGameCreation:
 
         try:
             # Creator creates game
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 2,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 2,
+                    "num_bots": 2,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -99,12 +109,14 @@ class TestGameCreation:
             game_key = game_created_msgs[0]["key"]
 
             # Another player joins with the key
-            ws_joiner.queue_message({
-                "type": "player_join",
-                "name": "Joiner",
-                "avatar": "avatar2",
-                "game_key": game_key
-            })
+            ws_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
 
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
@@ -121,7 +133,9 @@ class TestGameCreation:
 
             # Game should have both players
             game = server.waiting_games[game_key]
-            connected_humans = [p for p in game.players if p.type == "human" and p.connected]
+            connected_humans = [
+                p for p in game.players if p.type == "human" and p.connected
+            ]
             assert len(connected_humans) == 2
 
             player_names = {p.name for p in connected_humans}
@@ -157,12 +171,14 @@ class TestGameCreation:
 
         try:
             # Try to join with invalid key
-            ws_joiner.queue_message({
-                "type": "player_join",
-                "name": "Joiner",
-                "avatar": "avatar2",
-                "game_key": "invalid_key_12345"
-            })
+            ws_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner",
+                    "avatar": "avatar2",
+                    "game_key": "invalid_key_12345",
+                }
+            )
 
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
@@ -185,9 +201,7 @@ class TestGameCreation:
 
     @pytest.mark.asyncio
     async def test_join_already_started_game(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that joining a game that has already started is rejected."""
 
@@ -200,13 +214,15 @@ class TestGameCreation:
 
         try:
             # Creator creates game for 2 humans
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 2,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 2,
+                    "num_bots": 2,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -214,12 +230,14 @@ class TestGameCreation:
             game_key = ws_creator.get_sent_messages_of_type("game_created")[0]["key"]
 
             # First joiner joins
-            ws_joiner1.queue_message({
-                "type": "player_join",
-                "name": "Joiner1",
-                "avatar": "avatar2",
-                "game_key": game_key
-            })
+            ws_joiner1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner1",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
 
             joiner1_task = asyncio.create_task(server.websocket_endpoint(ws_joiner1))
             await asyncio.sleep(0.5)
@@ -238,14 +256,18 @@ class TestGameCreation:
             assert game_key in server.active_games
 
             # Late joiner tries to join with the same key
-            ws_late_joiner.queue_message({
-                "type": "player_join",
-                "name": "LateJoiner",
-                "avatar": "avatar3",
-                "game_key": game_key
-            })
+            ws_late_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "LateJoiner",
+                    "avatar": "avatar3",
+                    "game_key": game_key,
+                }
+            )
 
-            late_joiner_task = asyncio.create_task(server.websocket_endpoint(ws_late_joiner))
+            late_joiner_task = asyncio.create_task(
+                server.websocket_endpoint(ws_late_joiner)
+            )
             await asyncio.sleep(0.5)
 
             # Should receive invalid_key message (game already in progress)
@@ -272,6 +294,7 @@ class TestGameCreation:
 
             await asyncio.sleep(0.5)
 
+
 class TestGameCreatorCancellation:
     """Test what happens when game creator cancels the game."""
 
@@ -284,13 +307,15 @@ class TestGameCreatorCancellation:
 
         try:
             # Creator creates game
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 2,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 2,
+                    "num_bots": 2,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -337,13 +362,15 @@ class TestGameCreatorCancellation:
 
         try:
             # Creator creates game
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 3,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 3,
+                    "num_bots": 2,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -351,12 +378,14 @@ class TestGameCreatorCancellation:
             game_key = ws_creator.get_sent_messages_of_type("game_created")[0]["key"]
 
             # Joiner joins
-            ws_joiner.queue_message({
-                "type": "player_join",
-                "name": "Joiner",
-                "avatar": "avatar2",
-                "game_key": game_key
-            })
+            ws_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
 
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
@@ -410,13 +439,15 @@ class TestNonCreatorLeaving:
 
         try:
             # Creator creates game
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 3,
-                "num_bots": 2
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 3,
+                    "num_bots": 2,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -424,19 +455,23 @@ class TestNonCreatorLeaving:
             game_key = ws_creator.get_sent_messages_of_type("game_created")[0]["key"]
 
             # Joiner joins
-            ws_joiner.queue_message({
-                "type": "player_join",
-                "name": "Joiner",
-                "avatar": "avatar2",
-                "game_key": game_key
-            })
+            ws_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
 
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
 
             # Verify both are waiting
             game = server.waiting_games[game_key]
-            connected_before = [p for p in game.players if p.type == "human" and p.connected]
+            connected_before = [
+                p for p in game.players if p.type == "human" and p.connected
+            ]
             assert len(connected_before) == 2
 
             # Joiner exits queue
@@ -447,7 +482,9 @@ class TestNonCreatorLeaving:
             assert game_key in server.waiting_games
 
             # Joiner should be disconnected but creator still connected
-            connected_after = [p for p in game.players if p.type == "human" and p.connected]
+            connected_after = [
+                p for p in game.players if p.type == "human" and p.connected
+            ]
             assert len(connected_after) == 1
             assert connected_after[0].name == "Creator"
 
@@ -492,13 +529,15 @@ class TestNonCreatorLeaving:
 
         try:
             # Creator creates game for 3 humans
-            ws_creator.queue_message({
-                "type": "create_game",
-                "name": "Creator",
-                "avatar": "avatar1",
-                "num_humans": 3,
-                "num_bots": 1
-            })
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 3,
+                    "num_bots": 1,
+                }
+            )
 
             creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
             await asyncio.sleep(0.5)
@@ -506,19 +545,23 @@ class TestNonCreatorLeaving:
             game_key = ws_creator.get_sent_messages_of_type("game_created")[0]["key"]
 
             # Two joiners join
-            ws_joiner1.queue_message({
-                "type": "player_join",
-                "name": "Joiner1",
-                "avatar": "avatar2",
-                "game_key": game_key
-            })
+            ws_joiner1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner1",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
 
-            ws_joiner2.queue_message({
-                "type": "player_join",
-                "name": "Joiner2",
-                "avatar": "avatar3",
-                "game_key": game_key
-            })
+            ws_joiner2.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner2",
+                    "avatar": "avatar3",
+                    "game_key": game_key,
+                }
+            )
 
             joiner1_task = asyncio.create_task(server.websocket_endpoint(ws_joiner1))
             await asyncio.sleep(0.3)
@@ -545,7 +588,9 @@ class TestNonCreatorLeaving:
             connected = [p for p in game.players if p.type == "human" and p.connected]
             assert len(connected) == 1
             assert connected[0].name == "Creator"
-            assert game_key in server.waiting_games, "Game should still exist with only creator"
+            assert (
+                game_key in server.waiting_games
+            ), "Game should still exist with only creator"
 
         finally:
             ws_creator.close()

@@ -49,7 +49,7 @@ jobs:
         run: |
           coverage run -m pytest tests/
       - name: Generate Coverage Report
-        run: |  
+        run: |
           coverage report -m -i && coverage json -o ./coverage/coverage-summary.json -i && coverage html -d ./coverage -i
 
       # Create a coverage badge
@@ -88,4 +88,3 @@ jobs:
       - name: Deploy coverage report
         uses: actions/deploy-pages@v4
         id: deployment
-

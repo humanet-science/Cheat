@@ -1,19 +1,32 @@
 import argparse
 import asyncio
+
 import tqdm
 
 from ..utils import setup_game
 
 
 async def main(p_lie, p_call, n_rounds=10):
-
     # Set up the game with a single random bot and three smart bots
-    game_one_random = setup_game({"players": [
-        {"type": "SmartBot", "id": 0, "name": "SmartBot_1", "verbosity": 0.0},
-        {"type": "SmartBot", "id": 1, "name": "SmartBot_2", "verbosity": 0.0},
-        {"type": "SmartBot", "id": 2, "name": "SmartBot_3", "verbosity": 0.0},
-        {"type": "RandomBot", "id": 3, "name": "RandomBot", "p_lie": p_lie, "p_call": p_call, "verbosity": 0.0},
-    ]}, out_dir='game_data', note=f'one_random_p_lie_{p_lie}_p_call_{p_call}')
+    game_one_random = setup_game(
+        {
+            "players": [
+                {"type": "SmartBot", "id": 0, "name": "SmartBot_1", "verbosity": 0.0},
+                {"type": "SmartBot", "id": 1, "name": "SmartBot_2", "verbosity": 0.0},
+                {"type": "SmartBot", "id": 2, "name": "SmartBot_3", "verbosity": 0.0},
+                {
+                    "type": "RandomBot",
+                    "id": 3,
+                    "name": "RandomBot",
+                    "p_lie": p_lie,
+                    "p_call": p_call,
+                    "verbosity": 0.0,
+                },
+            ]
+        },
+        out_dir="game_data",
+        note=f"one_random_p_lie_{p_lie}_p_call_{p_call}",
+    )
 
     # Play n_rounds
     for i in tqdm.trange(n_rounds):

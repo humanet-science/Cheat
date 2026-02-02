@@ -197,7 +197,7 @@ export default function PlayerHand({
 										}}
 										className={`
 																								min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
-																								transition-all duration-300 transform focus:outline-none 
+																								transition-all duration-300 transform focus:outline-none
 																								${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400'}
 																						`}
 									/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (

@@ -4,7 +4,7 @@ suspicions = [
     "Flip Flip Flip!",
     "That's some BS",
     "Yeah right",
-    "Lotta liars these days"
+    "Lotta liars these days",
 ]
 
 suspicions_confirmed = [
@@ -13,24 +13,17 @@ suspicions_confirmed = [
     "So obvious",
 ]
 
-surprise = [
-    "Oh, how surprising!",
-    "Not lying for once",
-    "New strategy eh?"
-]
+surprise = ["Oh, how surprising!", "Not lying for once", "New strategy eh?"]
 
 pile_picked_up = [
     "So many liars here",
     "Yikes",
     "Oh dear ...",
     "So many aces ...",
-    "Everyone out here lying"
+    "Everyone out here lying",
 ]
 
-small_pile_picked_up = [
-    "Worth a shot",
-    "Thought I'd give it a go"
-]
+small_pile_picked_up = ["Worth a shot", "Thought I'd give it a go"]
 
 taunt_blatant_lie = [
     "The nerve!",
@@ -38,7 +31,7 @@ taunt_blatant_lie = [
     "So cheeky",
     "Damn son",
     "Classic",
-    "I'm not surprised"
+    "I'm not surprised",
 ]
 
 thinking_new_play = [
@@ -46,10 +39,7 @@ thinking_new_play = [
     "Let's see ...",
 ]
 
-thinking = [
-    "Do I believe this?",
-    "Can this be trusted?"
-] + thinking_new_play
+thinking = ["Do I believe this?", "Can this be trusted?"] + thinking_new_play
 
 # Dictionary of message types
 message_types = {
@@ -60,5 +50,5 @@ message_types = {
     "pile_picked_up": pile_picked_up,
     "surprise": surprise,
     "taunt_blatant_lie": taunt_blatant_lie,
-    "small_pile_picked_up": small_pile_picked_up
+    "small_pile_picked_up": small_pile_picked_up,
 }

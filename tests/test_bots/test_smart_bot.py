@@ -3,16 +3,22 @@ Comprehensive tests for the SmartBot player.
 Tests tracking, strategy, decision-making, and messaging behaviour.
 """
 
+import os
+
 # Add the project root to Python path
 import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
 
 import pytest
 
 from cheat.bots import SmartBot
 from cheat.card import Card
 from tests.utils import MockGame
+
 
 class TestSmartBotInitialization:
     """Test SmartBot initialization and basic properties."""
@@ -53,7 +59,9 @@ class TestPlayerTracking:
 
         # Player 1 plays, Player 2 calls and catches them lying
         game.add_play_action(1, "K", [Card("K", "♠"), Card("Q", "♥")])
-        game.add_call_action(2, 1, was_lying=True, revealed_cards=[Card("K", "♠"), Card("Q", "♥")])
+        game.add_call_action(
+            2, 1, was_lying=True, revealed_cards=[Card("K", "♠"), Card("Q", "♥")]
+        )
 
         bot.populate_player_repr(game)
 
@@ -75,7 +83,9 @@ class TestPlayerTracking:
 
         # Player 1 plays honestly, Player 2 calls but was wrong
         game.add_play_action(1, "K", [Card("K", "♠"), Card("K", "♥")])
-        game.add_call_action(2, 1, was_lying=False, revealed_cards=[Card("K", "♠"), Card("K", "♥")])
+        game.add_call_action(
+            2, 1, was_lying=False, revealed_cards=[Card("K", "♠"), Card("K", "♥")]
+        )
 
         bot.populate_player_repr(game)
 
@@ -93,15 +103,15 @@ class TestPlayerTracking:
         game = MockGame(num_players=4)
 
         # Play two rounds
-        game.add_play_action(1, "K", [Card("K", "♠")]) # forced play
-        game.add_play_action(2, "K", [Card("Q", "♥")]) # unforced play
+        game.add_play_action(1, "K", [Card("K", "♠")])  # forced play
+        game.add_play_action(2, "K", [Card("Q", "♥")])  # unforced play
         game.add_call_action(3, 2, True, revealed_cards=[Card("Q", "♥")])
-        game.add_play_action(3, "10", [Card("10", "♥")]) # forced play
-        game.add_play_action(0, "10", [Card("9", "♥")]) # unforced play
-        game.add_play_action(1, "10", [Card("8", "♥")]) # unforced play
+        game.add_play_action(3, "10", [Card("10", "♥")])  # forced play
+        game.add_play_action(0, "10", [Card("9", "♥")])  # unforced play
+        game.add_play_action(1, "10", [Card("8", "♥")])  # unforced play
         game.add_call_action(2, 1, True, revealed_cards=[Card("8", "♥")])
-        game.add_play_action(2, "J", [Card("2", "♥")]) # forced play
-        game.add_play_action(3, "J", [Card("A", "♥")]) # unforced play
+        game.add_play_action(2, "J", [Card("2", "♥")])  # forced play
+        game.add_play_action(3, "J", [Card("A", "♥")])  # unforced play
 
         bot.populate_player_repr(game)
 
@@ -112,12 +122,12 @@ class TestPlayerTracking:
 
         assert bot.other_player_repr[2]["N_plays"] == 1
         assert bot.other_player_repr[2]["N_calls"] == 1
-        assert bot.other_player_repr[2]["p_call_est"] == 1/2
+        assert bot.other_player_repr[2]["p_call_est"] == 1 / 2
         assert bot.other_player_repr[2]["p_lie_est"] == 1
 
         assert bot.other_player_repr[3]["N_plays"] == 1
         assert bot.other_player_repr[3]["N_calls"] == 1
-        assert bot.other_player_repr[3]["p_call_est"] == 1/2
+        assert bot.other_player_repr[3]["p_call_est"] == 1 / 2
 
     def test_known_cards_cleared_each_round(self):
         """Test that known cards are cleared on each populate call."""
@@ -219,7 +229,9 @@ class TestDecisionMaking:
                     lies += 1
 
         # Should lie less often when next player is low on cards
-        assert lies < 30, f"Bot should lie less with low-card player nearby, got {lies}/50 lies"
+        assert (
+            lies < 30
+        ), f"Bot should lie less with low-card player nearby, got {lies}/50 lies"
 
     @pytest.mark.asyncio
     async def test_avoids_known_ranks_when_starting_new_round(self):
@@ -232,7 +244,9 @@ class TestDecisionMaking:
 
         # Simulate that bot learned Player 1 has Kings
         game.add_play_action(1, "Q", [Card("K", "♠"), Card("K", "♥")])
-        game.add_call_action(2, 1, was_lying=True, revealed_cards=[Card("K", "♠"), Card("K", "♥")])
+        game.add_call_action(
+            2, 1, was_lying=True, revealed_cards=[Card("K", "♠"), Card("K", "♥")]
+        )
         game.add_play_action(2, "10", [Card("A", "♠")])
         game.add_call_action(0, 2, was_lying=True, revealed_cards=[Card("A", "♠")])
 
@@ -244,7 +258,7 @@ class TestDecisionMaking:
 
         # Bot should never lead with Kings
         action = await bot.make_move(game)
-        assert action.type == 'play'
+        assert action.type == "play"
         assert action.data["declared_rank"] != "K"
 
     @pytest.mark.asyncio
@@ -276,9 +290,10 @@ class TestDecisionMaking:
                     truthful_plays += 1
 
         # Should play truthfully most of the time when holding the rank
-        print(truthful_plays/total_plays)
-        assert truthful_plays/total_plays  == pytest.approx(0.75, abs=0.02), \
-            f"Bot should prefer be truthful 75% of the time, played truthfully {truthful_plays}/{total_plays} times"
+        print(truthful_plays / total_plays)
+        assert truthful_plays / total_plays == pytest.approx(
+            0.75, abs=0.02
+        ), f"Bot should prefer be truthful 75% of the time, played truthfully {truthful_plays}/{total_plays} times"
 
     @pytest.mark.asyncio
     async def test_adjusts_to_aggressive_caller(self):
@@ -316,7 +331,9 @@ class TestDecisionMaking:
                     lies += 1
 
         # Should lie less when next player is aggressive
-        assert lies < 20, f"Bot should lie less with aggressive caller, lied {lies}/30 times"
+        assert (
+            lies < 20
+        ), f"Bot should lie less with aggressive caller, lied {lies}/30 times"
 
     @pytest.mark.asyncio
     async def test_plays_aces_when_lying(self):
@@ -347,8 +364,9 @@ class TestDecisionMaking:
                     aces_played += 1
 
         # Should prefer Aces when lying
-        assert aces_played / total_plays == 1, \
-            f"Bot should prefer playing Aces when lying, played Aces {aces_played}/{total_plays} times"
+        assert (
+            aces_played / total_plays == 1
+        ), f"Bot should prefer playing Aces when lying, played Aces {aces_played}/{total_plays} times"
 
     @pytest.mark.asyncio
     async def test_adjusts_cards_played_based_on_call_probability(self):
@@ -376,8 +394,9 @@ class TestDecisionMaking:
         avg_cards = sum(cards_counts) / len(cards_counts)
 
         # Should play fewer cards on average with high call probability
-        assert avg_cards < 2.0, \
-            f"Bot should play fewer cards with high call probability, avg={avg_cards}"
+        assert (
+            avg_cards < 2.0
+        ), f"Bot should play fewer cards with high call probability, avg={avg_cards}"
 
 
 class TestMessaging:
@@ -420,8 +439,9 @@ class TestMessaging:
         # Bot (id=0) plays and gets caught
         game.add_play_action(0, "K", [Card("Q", "♠"), Card("Q", "♥")])
         game.pile = [Card("J", "♣"), Card("J", "♦"), Card("10", "♠"), Card("10", "♥")]
-        game.add_call_action(1, 0, was_lying=True,
-                             revealed_cards=[Card("Q", "♠"), Card("Q", "♥")])
+        game.add_call_action(
+            1, 0, was_lying=True, revealed_cards=[Card("Q", "♠"), Card("Q", "♥")]
+        )
 
         msg = bot.broadcast_message(game)
 

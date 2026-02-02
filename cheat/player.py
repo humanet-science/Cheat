@@ -1,15 +1,17 @@
-from dataclasses import dataclass
-from fastapi import WebSocket
-from typing import List, Callable
-import random
-
-from cheat.card import Card, RANK_ORDER
-from cheat.action import GameAction
-
 # Get the logger
 import logging
+import random
+from dataclasses import dataclass
+from typing import Callable, List
+
+from fastapi import WebSocket
+
+from cheat.action import GameAction
+from cheat.card import RANK_ORDER, Card
 
 """ Generic Player class that applies to humans, bots, and LLMs equally """
+
+
 @dataclass
 class Player:
     id: int | None = None
@@ -27,26 +29,28 @@ class Player:
             self.hand = []
 
     def __dict__(self):
-        pass # Implemented by each type
+        pass  # Implemented by each type
 
     def get_info(self) -> dict:
-        """ State dictionary that can be broadcast to frontend"""
-        return dict(your_info={
-            "id": self.id,
-            "name": self.name,
-            "avatar": self.avatar,
-            "type": self.type,
-            "hand": [str(card) for card in self.hand],
-            "connected": self.connected,
-            "cardCount": len(self.hand)
-        })
+        """State dictionary that can be broadcast to frontend"""
+        return dict(
+            your_info={
+                "id": self.id,
+                "name": self.name,
+                "avatar": self.avatar,
+                "type": self.type,
+                "hand": [str(card) for card in self.hand],
+                "connected": self.connected,
+                "cardCount": len(self.hand),
+            }
+        )
 
     def write_info(self, path) -> None:
-        """ Write out the internal configuration (implemented by subclass)"""
+        """Write out the internal configuration (implemented by subclass)"""
         pass
 
     def sort_hand(self):
-        """ Sort the hand by rank """
+        """Sort the hand by rank"""
         self.hand = sorted(self.hand, key=lambda c: RANK_ORDER[c.rank])
 
     async def make_move(self, game) -> GameAction:
@@ -63,16 +67,31 @@ class Player:
         return None
 
     async def send_message(self, message):
-        """ Send a message to the player's websocket"""
-        if self.connected and self.ws and hasattr(self, 'ws'):
+        """Send a message to the player's websocket"""
+        if self.connected and self.ws and hasattr(self, "ws"):
             try:
                 await self.ws.send_json(message)
             except Exception as e:
                 self.logger.error(f"Error sending to player {self.id}: {e}")
 
+
 class HumanPlayer(Player):
-    def __init__(self, id: int | None, name: str, avatar: str, ws: WebSocket = None, empirica_id: int | None = None):
-        super().__init__(id=id, name=name, avatar=avatar, type="human", ws=ws, connected=ws is not None)
+    def __init__(
+        self,
+        id: int | None,
+        name: str,
+        avatar: str,
+        ws: WebSocket = None,
+        empirica_id: int | None = None,
+    ):
+        super().__init__(
+            id=id,
+            name=name,
+            avatar=avatar,
+            type="human",
+            ws=ws,
+            connected=ws is not None,
+        )
         self.empirica_id = empirica_id
 
     def __dict__(self):
@@ -84,7 +103,7 @@ class HumanPlayer(Player):
 
 
 def get_player(*, type: str, **kwargs) -> Player:
-    """ Return a game player type from a configuration.
+    """Return a game player type from a configuration.
 
     :param type: player type
     :param kwargs: passed to the specified Player tye
@@ -92,27 +111,32 @@ def get_player(*, type: str, **kwargs) -> Player:
     :raises: ValueError if the player type is not recognised
     """
 
-    PERMITTED_PLAYER_TYPES = ['human', 'smartbot', 'randombot', 'llm']
+    PERMITTED_PLAYER_TYPES = ["human", "smartbot", "randombot", "llm"]
 
     # Get the player type and raise a ValueError if unrecognised
     if type.lower() not in PERMITTED_PLAYER_TYPES:
-        raise ValueError(f"Unrecognised player type {type}! Must be one of {', '.join(PERMITTED_PLAYER_TYPES)}.")
+        raise ValueError(
+            f"Unrecognised player type {type}! Must be one of {', '.join(PERMITTED_PLAYER_TYPES)}."
+        )
 
     # HumanPlayer
-    if type.lower() == 'human':
+    if type.lower() == "human":
         return HumanPlayer(**kwargs)
 
     # SmartBot
-    elif type.lower() == 'smartbot':
+    elif type.lower() == "smartbot":
         from cheat.bots import SmartBot
+
         return SmartBot(**kwargs)
 
     # RandomBot
-    elif type.lower() == 'randombot':
+    elif type.lower() == "randombot":
         from cheat.bots import RandomBot
+
         return RandomBot(**kwargs)
 
     # LLM
-    elif type.lower() == 'llm':
+    elif type.lower() == "llm":
         from cheat.bots import LLM_Player
+
         return LLM_Player(**kwargs)

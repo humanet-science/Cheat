@@ -1,11 +1,16 @@
 import asyncio
-import pytest
-import sys
 import os
+import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+import pytest
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
 
 import cheat.server as server
+
 
 @pytest.fixture(scope="function")
 def clean_server_state():

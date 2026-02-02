@@ -2,10 +2,15 @@
 Comprehensive tests for the RandomBot player.
 """
 
+import os
+
 # Add the project root to Python path
 import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
 
 import pytest
 
@@ -13,12 +18,15 @@ from cheat.bots import RandomBot
 from cheat.card import Card
 from tests.utils import MockGame
 
+
 class TestRandomBotInitialization:
     """Test RandomBot initialization and basic properties."""
 
     def test_initialization(self):
         """Test bot initializes with correct defaults."""
-        bot = RandomBot(id=0, name="TestBot", avatar="avatar1", verbosity=0.5, p_call=0.5, p_lie=0.5)
+        bot = RandomBot(
+            id=0, name="TestBot", avatar="avatar1", verbosity=0.5, p_call=0.5, p_lie=0.5
+        )
 
         assert bot.id == 0
         assert bot.name == "TestBot"
@@ -30,7 +38,9 @@ class TestRandomBotInitialization:
 
     def test_dict_method(self):
         """Test __dict__ returns correct representation."""
-        bot = RandomBot(id=1, name="Bot1", avatar="av1", verbosity=0.3, p_lie=0.5, p_call=0.5)
+        bot = RandomBot(
+            id=1, name="Bot1", avatar="av1", verbosity=0.3, p_lie=0.5, p_call=0.5
+        )
 
         bot_dict = bot.__dict__()
 
@@ -39,6 +49,7 @@ class TestRandomBotInitialization:
         assert bot_dict["avatar"] == "av1"
         assert bot_dict["type"] == "bot"
         assert bot_dict["verbosity"] == 0.3
+
 
 class TestDecisionMaking:
     """Test RandomBot's decision-making logic."""
@@ -102,8 +113,9 @@ class TestMessaging:
         # Bot (id=0) plays and gets caught
         game.add_play_action(0, "K", [Card("Q", "♠"), Card("Q", "♥")])
         game.pile = [Card("J", "♣"), Card("J", "♦"), Card("10", "♠"), Card("10", "♥")]
-        game.add_call_action(1, 0, was_lying=True,
-                             revealed_cards=[Card("Q", "♠"), Card("Q", "♥")])
+        game.add_call_action(
+            1, 0, was_lying=True, revealed_cards=[Card("Q", "♠"), Card("Q", "♥")]
+        )
 
         msg = bot.broadcast_message(game)
 

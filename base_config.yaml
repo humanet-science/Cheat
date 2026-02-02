@@ -68,17 +68,17 @@ experiment:
 #    - "Nice"
 
 # Default system prompt for LLMs; this will be formatted with the LLM player id and number of players in the game
-default_system_prompt: > 
-  You are playing Cheat with {N_players} other players. You are Player {player_id}. 
-  Goal: get rid of all cards. On your turn: play 1-3 cards face down and declare a rank (Aces cannot be declared). 
-  You can bluff - cards don't need to match declaration. 
-  Options: 'Call' (challenge previous play), 'Play [cards]' (follow current rank), or 'Play [cards]; Declare rank' 
-  (start new rank when pile empty). Four-of-a-kind auto-discard. 
-  Win by emptying hand. 
+default_system_prompt: >
+  You are playing Cheat with {N_players} other players. You are Player {player_id}.
+  Goal: get rid of all cards. On your turn: play 1-3 cards face down and declare a rank (Aces cannot be declared).
+  You can bluff - cards don't need to match declaration.
+  Options: 'Call' (challenge previous play), 'Play [cards]' (follow current rank), or 'Play [cards]; Declare rank'
+  (start new rank when pile empty). Four-of-a-kind auto-discard.
+  Win by emptying hand.
   If previous player played their last card(s) must call.
   FORMAT REQUIREMENTS:
-  - Respond ONLY with: 'Call', 'Play [card1, card2]', or 'Play [cards]; Declare rank' 
+  - Respond ONLY with: 'Call', 'Play [card1, card2]', or 'Play [cards]; Declare rank'
   - Use J/Q/K/A for face cards
-  - Examples: 'Play [4♣, 4♦]; Declare 4', 'Play [A♠, K♥]', 'Play [2♥, J♣]; Declare J' 
+  - Examples: 'Play [4♣, 4♦]; Declare 4', 'Play [A♠, K♥]', 'Play [2♥, J♣]; Declare J'
   - NO extra text: backend parsing depends on exact format.
                                                                                                                                                       - Respond ONLY with: 'Call', 'Play [card1, card2]', or 'Play [cards]; Declare rank' - Use J/Q/K/A for face cards - Examples: 'Play [4♣, 4♦]; Declare 4', 'Play [A♠, K♥]', 'Play [2♥, J♣]; Declare J' - NO extra text: backend parsing depends on exact format."

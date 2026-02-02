@@ -1,45 +1,47 @@
 import asyncio
 import copy
 import os
-import paramspace
 import random
 import traceback
-import yaml
 
 # Package imports
 from collections import deque
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, Dict, Literal
+
+import paramspace
+import yaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
 from pydantic import BaseModel
-from typing import Any, Dict, Literal
 
 # Local imports
 import cheat.bots
 from cheat.game import CheatGame
 from cheat.logging_config import setup_logging
-from cheat.player import get_player, HumanPlayer
+from cheat.player import HumanPlayer, get_player
 from cheat.utils import game_from_config
 
 # Set up logging
 loggers = setup_logging()
-server_log = loggers['server']
-ws_log = loggers['websocket']
+server_log = loggers["server"]
+ws_log = loggers["websocket"]
 
 # Path to configuration file, located in root
 game_config_path = Path(__file__).parent.parent / "base_config.yaml"
-with open(game_config_path, "r") as f:
+with open(game_config_path) as f:
     game_config = yaml.safe_load(f)
 
 # Set the seed for reproducibility
-seed = game_config.get('seed', None)
+seed = game_config.get("seed", None)
 if seed is not None:
     random.seed(seed)
     server_log.info(f"Random seed set to: {seed}")
 
 # Store the game manager task for potential cleanup
 game_manager_task = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,29 +78,34 @@ app.add_middleware(
 )
 
 # List of websockets waiting for each type of game
-waiting_queues: dict[str, dict[str, deque[Any]]] = dict((k, dict(single=deque([]), multiplayer=deque([]))) for k in [1, 3, 4, 5, 6])
+waiting_queues: dict[str, dict[str, deque[Any]]] = {
+    k: dict(single=deque([]), multiplayer=deque([])) for k in [1, 3, 4, 5, 6]
+}
 
 # Games waiting to be started
-waiting_games: dict[str, CheatGame] = {} # {game_id: CheatGame instance}
+waiting_games: dict[str, CheatGame] = {}  # {game_id: CheatGame instance}
 
 # Dictionary of game creators. Only the people who open a room can cancel the game, and when they cancel the game
 # the room is closed and removed from the server to prevent 'zombie' games from accumulating
-game_creators: dict[str, str] = {} # {player_id: game_id}
+game_creators: dict[str, str] = {}  # {player_id: game_id}
 
 # Active games currently playing
-active_games: dict[str, CheatGame] = {} # {game_id: CheatGame instance}
+active_games: dict[str, CheatGame] = {}  # {game_id: CheatGame instance}
 
 # Survey participants with a websocket waiting to be assigned to a game
-survey_participants: dict[str, HumanPlayer] = {} # {empirica_id: HumanPlayer instance}
+survey_participants: dict[str, HumanPlayer] = {}  # {empirica_id: HumanPlayer instance}
 
 # Maximum number of parallel games server can handle
-MAX_NUM_ACTIVE_GAMES = game_config['max_num_active_games']
+MAX_NUM_ACTIVE_GAMES = game_config["max_num_active_games"]
 
 # WebSocket-to-Game dictionary for routing messages
-player_to_game: dict[int, str] = {} # {websocket: game_id} for routing messages
+player_to_game: dict[int, str] = {}  # {websocket: game_id} for routing messages
 
-def new_game(num_players: int, human_players: list, mode: Literal['single', 'multiplayer']) -> CheatGame:
-    """ Creates a new CheatGame instance. Returns a dictionary with the game_id as key and the game as value.
+
+def new_game(
+    num_players: int, human_players: list, mode: Literal["single", "multiplayer"]
+) -> CheatGame:
+    """Creates a new CheatGame instance. Returns a dictionary with the game_id as key and the game as value.
 
     :param num_players: total number of players
     :param human_players: list of human players. If the game_mode is 'single', the list only has one human player.
@@ -111,7 +118,7 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
 
     # Add non-human players from config
     for i in range(num_players - len(human_players)):
-        player_config = game_config['players'][i]
+        player_config = game_config["players"][i]
         game_players.append(get_player(**player_config))
 
     # Now randomly shuffle the players if more than one human present
@@ -127,10 +134,10 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
         players=game_players,
         experimental_mode=game_config["game"].get("experimental_mode", False),
         game_mode=mode,
-        message_queue = asyncio.Queue(), # Set up a new queue
+        message_queue=asyncio.Queue(),  # Set up a new queue
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
-        predefined_messages=game_config["experiment"].get("predefined_messages", None)
+        predefined_messages=game_config["experiment"].get("predefined_messages", None),
     )
 
     # Set the system prompt for all LLM players, if not specified from the config
@@ -138,7 +145,7 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
         # Format the LLM default prompt
         if isinstance(player, cheat.bots.LLM_Player):
             if player.system_prompt is None:
-                player.system_prompt = game_config['default_system_prompt'].format(
+                player.system_prompt = game_config["default_system_prompt"].format(
                     N_players=game.num_players, player_id=player.id
                 )
 
@@ -155,14 +162,18 @@ def new_game(num_players: int, human_players: list, mode: Literal['single', 'mul
     # Return the game
     return game
 
+
 async def try_start_game_from_queue(num_players, mode):
     queue = waiting_queues[num_players][mode]
 
     # Minimum number of players in queue required to start the game
-    min_players = 1 if (num_players == 1 or mode == 'single') else game_config['min_human_players'][num_players]
+    min_players = (
+        1
+        if (num_players == 1 or mode == "single")
+        else game_config["min_human_players"][num_players]
+    )
 
     if len(queue) >= min_players:
-
         # Try to create a new game with the people in the front of the queue
         try:
             # Peek at the players first (don't pop yet in case an error occurs)
@@ -188,16 +199,17 @@ async def try_start_game_from_queue(num_players, mode):
         except cheat.MissingAPIKeyError as e:
             server_log.error(e)
 
+
 async def run_game(_game: CheatGame):
     """Run a single game to completion"""
     try:
-        server_log.info(f'Starting new game with {len(_game.players)} players; game id: {_game.game_id}.')
+        server_log.info(
+            f"Starting new game with {len(_game.players)} players; game id: {_game.game_id}."
+        )
         while not _game.game_over:
-
-            await _game.broadcast_to_all({
-                "type": "new_round",
-                **_game.get_info()
-            }, append_state=True)
+            await _game.broadcast_to_all(
+                {"type": "new_round", **_game.get_info()}, append_state=True
+            )
 
             # Replace any disconnected humans with bots
             await _game.replace_disconnected_players_with_bots()
@@ -207,7 +219,9 @@ async def run_game(_game: CheatGame):
 
             # Wait for confirmation of new round from frontend
             if _game.round_over and not _game.game_over:
-                server_log.info(f"Round {_game.round} ended in game {_game.game_id}, waiting for continuation")
+                server_log.info(
+                    f"Round {_game.round} ended in game {_game.game_id}, waiting for continuation"
+                )
                 await _game.wait_for_new_round()
 
         # When game is over, remove from active games
@@ -216,7 +230,9 @@ async def run_game(_game: CheatGame):
         # Check player connection status
         for player in _game.players:
             if player.type == "human":
-                server_log.debug(f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}")
+                server_log.debug(
+                    f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}"
+                )
 
         # Notify all connected human players that the game is over
         for player in _game.players:
@@ -225,28 +241,30 @@ async def run_game(_game: CheatGame):
                     await player.ws.send_json({"type": "quit_confirmed"})
                     server_log.info(f"Sent quit_confirmed to {player.name}")
                 except Exception as e:
-                    server_log.error(f"Error sending quit_confirmed to {player.name}: {e}")
+                    server_log.error(
+                        f"Error sending quit_confirmed to {player.name}: {e}"
+                    )
 
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")
         traceback.print_exc()
     finally:
-
         # Cleanup
         if _game.game_id in active_games:
             active_games.pop(_game.game_id)
-            server_log.info(f"Number of active games remaining: {len(active_games.keys())}.")
+            server_log.info(
+                f"Number of active games remaining: {len(active_games.keys())}."
+            )
 
         # Remove player mappings
         for player in _game.players:
             if id(player.ws) in player_to_game:
                 player_to_game.pop(id(player.ws))
 
-async def game_manager():
 
+async def game_manager():
     """Continuously check queues and start games when possible"""
     while True:
-
         # Start waiting games, if they are ready
         for game_id in list(waiting_games.keys()):
             if all([p.connected for p in waiting_games[game_id].players]):
@@ -258,11 +276,15 @@ async def game_manager():
         # Run games once enough players are in the queue
         for key in waiting_queues.keys():
             for mode in waiting_queues[key].keys():
-                if len(waiting_queues[key][mode]) > 0 and len(active_games) < MAX_NUM_ACTIVE_GAMES:
+                if (
+                    len(waiting_queues[key][mode]) > 0
+                    and len(active_games) < MAX_NUM_ACTIVE_GAMES
+                ):
                     await try_start_game_from_queue(key, mode)
 
         # Check every second
         await asyncio.sleep(1)
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -280,25 +302,30 @@ async def websocket_endpoint(ws: WebSocket):
             player = HumanPlayer(
                 id=None,
                 ws=ws,
-                empirica_id=data.get("empirica_id"), # for Empirica experiments only
+                empirica_id=data.get("empirica_id"),  # for Empirica experiments only
                 name=data["name"],
-                avatar=data["avatar"]
+                avatar=data["avatar"],
             )
 
         # Player wants to create a new game: in this case, a new game with the requested configuration
         # is created, the creating player added, and the remaining player slots filled with bots or empty (placeholder)
         # humans until enough humans have requested to join this specific game for it to start.
         if data["type"] == "create_game":
-
             # Read the number of humans and bots in the request
             num_humans = data["num_humans"]
             num_bots = data["num_bots"]
 
             # Add placeholder humans and bots
-            human_players = [player] + [HumanPlayer(id=None, name='', avatar='') for _ in range(num_humans - 1)]
+            human_players = [player] + [
+                HumanPlayer(id=None, name="", avatar="") for _ in range(num_humans - 1)
+            ]
 
             # Create a new multiplayer game
-            game = new_game(num_players=num_humans + num_bots, human_players=human_players, mode='multiplayer')
+            game = new_game(
+                num_players=num_humans + num_bots,
+                human_players=human_players,
+                mode="multiplayer",
+            )
 
             # Add the game to waiting games
             player_to_game[id(ws)] = game.game_id
@@ -318,40 +345,42 @@ async def websocket_endpoint(ws: WebSocket):
         # and can be joined. If not game key has been supplied, simply add player to generic queue for
         # requested game type
         elif data["type"] == "player_join":
-
             # Player wants to join a specific game; if game key is wrong or game has already stated,
             # inform the frontend
-            if data.get('game_key') is not None:
-
+            if data.get("game_key") is not None:
                 ws_log.info(
                     f"Player {data['name']} requested to join game {data['game_key']}. "
                     f"Number of active games: {len(active_games)}"
                 )
 
                 # Game key is not valid
-                if data['game_key'] not in waiting_games and data['game_key'] not in active_games:
-                    ws_log.info(
-                        f"Game key {data['game_key']} invalid."
+                if (
+                    data["game_key"] not in waiting_games
+                    and data["game_key"] not in active_games
+                ):
+                    ws_log.info(f"Game key {data['game_key']} invalid.")
+                    await ws.send_json(
+                        {"type": "invalid_key", "message": "Key not valid"}
                     )
-                    await ws.send_json({"type": "invalid_key", "message": "Key not valid"})
 
                 # Game is already full
-                elif data['game_key'] not in waiting_games and data['game_key'] in active_games:
-                    ws_log.info(
-                        f"Game {data['game_key']} already in progress."
+                elif (
+                    data["game_key"] not in waiting_games
+                    and data["game_key"] in active_games
+                ):
+                    ws_log.info(f"Game {data['game_key']} already in progress.")
+                    await ws.send_json(
+                        {"type": "invalid_key", "message": "Game already in progress"}
                     )
-                    await ws.send_json({"type": "invalid_key", "message": "Game already in progress"})
 
                 # Add player to game. Since the generic game as already assigned ids to all the players,
                 # just add the websocket, name, and avatar of the human player
                 else:
-
                     # Get the game and add the player to an available human slot
-                    _game = waiting_games[data['game_key']]
+                    _game = waiting_games[data["game_key"]]
                     for idx in range(len(_game.players)):
                         p = _game.players[idx]
-                        if p.type == 'human' and not p.connected:
-
+                        if p.type == "human" and not p.connected:
                             # Get the assigned id and hand
                             player.id = _game.players[idx].id
                             player.hand = _game.players[idx].hand
@@ -363,10 +392,20 @@ async def websocket_endpoint(ws: WebSocket):
                                 f"Player {player.name} joined game {data['game_key']}."
                             )
                             await _game.broadcast_to_all(
-                                {"type": "queue_joined",
-                                 "num_connected": len([p for p in _game.players if p.type == 'human' and p.connected]),
-                                 "num_slots": len([p for p in _game.players if p.type == 'human'])
-                                 })
+                                {
+                                    "type": "queue_joined",
+                                    "num_connected": len(
+                                        [
+                                            p
+                                            for p in _game.players
+                                            if p.type == "human" and p.connected
+                                        ]
+                                    ),
+                                    "num_slots": len(
+                                        [p for p in _game.players if p.type == "human"]
+                                    ),
+                                }
+                            )
                             break
 
             # Player has not requested a specific game; is just added to relevant generic queue for their requested
@@ -381,16 +420,19 @@ async def websocket_endpoint(ws: WebSocket):
                     f"Number of active games: {len(active_games)}"
                 )
 
-                await ws.send_json({
-                    "type": "queue_joined",
-                    "num_connected": len(waiting_queues[data['num_players']][data['game_mode']]),
-                    "num_slots": data['num_players']
-                })
+                await ws.send_json(
+                    {
+                        "type": "queue_joined",
+                        "num_connected": len(
+                            waiting_queues[data["num_players"]][data["game_mode"]]
+                        ),
+                        "num_slots": data["num_players"],
+                    }
+                )
 
         # Survey participant has completed introduction and is waiting to be assigned to a game.
         # We store the player alongside their websocket and assign them to a game once it is created
         elif data["type"] == "empirica_join":
-
             survey_participants[data["empirica_id"]] = player
 
             ws_log.info(
@@ -399,8 +441,12 @@ async def websocket_endpoint(ws: WebSocket):
                 f"Number of active games: {len(active_games)}"
             )
 
-            await ws.send_json({"type": "player_registered",
-                                "message": f"Id {data['empirica_id']} has been added to the participant queue"})
+            await ws.send_json(
+                {
+                    "type": "player_registered",
+                    "message": f"Id {data['empirica_id']} has been added to the participant queue",
+                }
+            )
 
         # Keep connection alive and listen for messages
         while True:
@@ -412,11 +458,9 @@ async def websocket_endpoint(ws: WebSocket):
                 # and will no longer be valid.
                 # This does not occur if a non-creating player leaves the queue.
                 if message["type"] == "exit_queue":
-
                     # Game creator has left the waiting queue: exit game and notify all waiting players
                     # Also remove the game directory, if it was created
                     if id(player.ws) in game_creators.keys():
-
                         # Get the game and remove from all lists
                         _game_id = game_creators[id(player.ws)]
                         _game = waiting_games.pop(_game_id)
@@ -426,12 +470,11 @@ async def websocket_endpoint(ws: WebSocket):
                         # Delete the game's data directory, if created
                         if _game.out_path is not None:
                             import shutil
+
                             shutil.rmtree(_game.out_path)
 
                         # Inform frontend
-                        await _game.broadcast_to_all({
-                            "type": "game_cancelled"
-                        })
+                        await _game.broadcast_to_all({"type": "game_cancelled"})
                         ws_log.info(f"{player.name} cancelled game {_game_id}.")
 
                     # Non-creating player has left the waiting queue for a specific game
@@ -444,23 +487,38 @@ async def websocket_endpoint(ws: WebSocket):
 
                         player_to_game.pop(id(player.ws))
 
-                        await _game.broadcast_to_all({
-                            "type": "player_exited_queue",
-                            "num_connected": len([p for p in _game.players if p.connected and p.type == 'human']),
-                            "num_slots": len([p for p in _game.players if p.type == 'human'])
-                        })
-                        ws_log.info(f"{player.name} left the queue for game {_game.game_id}.")
+                        await _game.broadcast_to_all(
+                            {
+                                "type": "player_exited_queue",
+                                "num_connected": len(
+                                    [
+                                        p
+                                        for p in _game.players
+                                        if p.connected and p.type == "human"
+                                    ]
+                                ),
+                                "num_slots": len(
+                                    [p for p in _game.players if p.type == "human"]
+                                ),
+                            }
+                        )
+                        ws_log.info(
+                            f"{player.name} left the queue for game {_game.game_id}."
+                        )
 
                     # Player was not yet assigned a game
                     else:
-                        waiting_queues[data["num_players"]][data["game_mode"]].remove(player)
+                        waiting_queues[data["num_players"]][data["game_mode"]].remove(
+                            player
+                        )
                         ws_log.info(f"{player.name} exited queue.")
 
                 # Player has quit the game
                 elif message["type"] == "quit":
-
                     player.connected = False
-                    ws_log.info(f"Player {player.name} quit game {player_to_game[id(ws)]}")
+                    ws_log.info(
+                        f"Player {player.name} quit game {player_to_game[id(ws)]}"
+                    )
 
                     # Check if game should end
                     game_id = player_to_game[id(ws)]
@@ -495,7 +553,9 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # Unknown message
                 else:
-                    ws_log.error(f"Message received but player not in any active game: {message}")
+                    ws_log.error(
+                        f"Message received but player not in any active game: {message}"
+                    )
 
             except asyncio.TimeoutError:
                 continue
@@ -506,7 +566,6 @@ async def websocket_endpoint(ws: WebSocket):
         ws_log.error(f"WebSocket error: {e}")
         traceback.print_exc()
     finally:
-
         # Cleanup: mark player as disconnected and remove from mappings
         if player:
             player.connected = False
@@ -527,7 +586,9 @@ async def websocket_endpoint(ws: WebSocket):
                     for p in _game.players:
                         if p is player:
                             p.connected = False
-                            server_log.info(f"Marked {p.name} as disconnected in game {game_id}")
+                            server_log.info(
+                                f"Marked {p.name} as disconnected in game {game_id}"
+                            )
                             break
 
                     # If this is the last or only human player, just end the game
@@ -549,51 +610,53 @@ async def websocket_endpoint(ws: WebSocket):
                 if player.empirica_id in survey_participants:
                     survey_participants.pop(player.empirica_id)
 
+
 ## ---------------------------------------------------------------------------------------------------------------------
 ## Empirica endpoint: create a game from a config
 ## ---------------------------------------------------------------------------------------------------------------------
 
+
 class GameConfigRequest(BaseModel):
-    cfg: Dict # overlay with Empirica IDs, experimental_mode, etc.
+    cfg: Dict  # overlay with Empirica IDs, experimental_mode, etc.
+
 
 @app.post("/api/games/from_config")
 async def create_game_from_config(req: GameConfigRequest):
-
     # Load the requested game config
-    cfg_key = req.cfg.get('cfg_key')
+    cfg_key = req.cfg.get("cfg_key")
     experiments_dir = Path(__file__).parent.parent / "experiments"
     config_path = experiments_dir / f"{cfg_key}.yaml"
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         _cfg = yaml.safe_load(f)
 
     # Update everything in the base configuration with the configuration except the player list -- this is
     # overwritten by the new config
-    player_config = copy.deepcopy(_cfg['players'])
+    player_config = copy.deepcopy(_cfg["players"])
     _cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), _cfg)
-    _cfg['players'] = player_config
+    _cfg["players"] = player_config
     del player_config
 
     # Fix the number of rounds specified in the configuration
-    _cfg["game"]["n_rounds"] = req.cfg.get('n_rounds')
+    _cfg["game"]["n_rounds"] = req.cfg.get("n_rounds")
 
     # Set the game id to match the Empirica id
-    _cfg["game"]["game_id"] = req.cfg.get('game_id')
+    _cfg["game"]["game_id"] = req.cfg.get("game_id")
 
     # Replace human player configs with actual HumanPlayer instances from survey_participants
     human_player_idx = 0
-    empirica_player_ids = req.cfg.get('players', [])
+    empirica_player_ids = req.cfg.get("players", [])
 
-    for idx in range(len(_cfg['players'])):
-        if _cfg['players'][idx]['type'] == 'human':
+    for idx in range(len(_cfg["players"])):
+        if _cfg["players"][idx]["type"] == "human":
             empirica_id = empirica_player_ids[human_player_idx]
             # Replace the config dict with the actual HumanPlayer instance
-            _cfg['players'][idx] = survey_participants.pop(empirica_id)
+            _cfg["players"][idx] = survey_participants.pop(empirica_id)
             human_player_idx += 1
 
     # Create a new game from the config and add to waiting survey games.
     # This game functions as a placeholder game with 'empty' human players, which can be filled
     # with survey participants as they arrive
-    game = game_from_config(_cfg, show_logs=_cfg.get('show_logs', False))
+    game = game_from_config(_cfg, show_logs=_cfg.get("show_logs", False))
 
     # Assign game ids to each player
     for idx, player in enumerate(game.players):
@@ -604,8 +667,9 @@ async def create_game_from_config(req: GameConfigRequest):
 
     # Add players to routing dict
     for player in game.players:
-        if player.type == 'human':
+        if player.type == "human":
             player_to_game[id(player.ws)] = game.game_id
+
 
 ## ---------------------------------------------------------------------------------------------------------------------
 ## ---------------------------------------------------------------------------------------------------------------------
@@ -614,7 +678,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=5050) # Port 3000 is reserved for AirPlay on macOS
+    parser.add_argument(
+        "--port", type=int, default=5050
+    )  # Port 3000 is reserved for AirPlay on macOS
     args = parser.parse_args()
 
     from hypercorn.asyncio import serve

@@ -1,15 +1,18 @@
-from .bot_messages import message_types
-from cheat.player import Player
 import random
 
+from cheat.player import Player
+
+from .bot_messages import message_types
+
+
 class BotPlayer(Player):
-    def __init__(self, id: int | None = None,
-                 name: str | None = None,
-                 avatar: str | None = None):
+    def __init__(
+        self, id: int | None = None, name: str | None = None, avatar: str | None = None
+    ):
         super().__init__(id=id, name=name, avatar=avatar, type="bot")
 
     def broadcast_message(self, game, type: str = None, *_, **__):
-        """ Broadcast an opinion based on the state of play"""
+        """Broadcast an opinion based on the state of play"""
 
         # Return a specific type of message if requested
         if type is not None and random.random() < self.verbosity:
@@ -22,14 +25,16 @@ class BotPlayer(Player):
             return None
 
         # Get the last action that is a play or a call
-        last_play_idx = len(game.history)-1
-        while game.history[last_play_idx].type not in ["play", "call"] and last_play_idx > 0:
+        last_play_idx = len(game.history) - 1
+        while (
+            game.history[last_play_idx].type not in ["play", "call"]
+            and last_play_idx > 0
+        ):
             last_play_idx -= 1
         last_play = game.history[last_play_idx]
 
         # If the last play was a call, the two players involved can say something and the others can send a taunt
         if last_play.type == "call":
-
             # Am the accused
             if last_play.data["accused_id"] == self.id:
                 # Got caught lying: only say something if you're not picking up just your own cards
@@ -47,7 +52,9 @@ class BotPlayer(Player):
                     return random.choice(message_types["suspicions_confirmed"])
                 # Failed to catch them and picked up the pile
                 else:
-                    return random.choice(message_types["surprise"] + message_types['pile_picked_up'])
+                    return random.choice(
+                        message_types["surprise"] + message_types["pile_picked_up"]
+                    )
 
             # Not involved in the play: can taunt a lie
             else:

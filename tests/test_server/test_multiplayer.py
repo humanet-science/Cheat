@@ -2,14 +2,20 @@
 Tests for multiplayer game scenarios, including multiple players joining, disconnecting, and quitting.
 """
 
-# Add the project root to Python path
-import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+# Add the project root to Python path
+import sys
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
+
+import asyncio
 
 import pytest
-import asyncio
+
 import cheat.server as server
 from tests.utils import MockWebSocket
 
@@ -19,9 +25,7 @@ class TestMultiplayerJoinFlow:
 
     @pytest.mark.asyncio
     async def test_multiple_players_join_queue(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that multiple players can join queue and game starts automatically."""
 
@@ -34,13 +38,15 @@ class TestMultiplayerJoinFlow:
 
         try:
             # Player 1 joins
-            ws1.queue_message({
-                "type": "player_join",
-                "name": "Player1",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player1",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             await asyncio.sleep(0.5)
@@ -52,13 +58,15 @@ class TestMultiplayerJoinFlow:
             assert queue_msgs1[0]["num_connected"] == 1
 
             # Player 2 joins
-            ws2.queue_message({
-                "type": "player_join",
-                "name": "Player2",
-                "avatar": "avatar2",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws2.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player2",
+                    "avatar": "avatar2",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
             await asyncio.sleep(0.5)
@@ -68,13 +76,15 @@ class TestMultiplayerJoinFlow:
             assert len(server.active_games) == 0
 
             # Player 3 joins: now game can start
-            ws3.queue_message({
-                "type": "player_join",
-                "name": "Player3",
-                "avatar": "avatar3",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws3.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player3",
+                    "avatar": "avatar3",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
             handler3_task = asyncio.create_task(server.websocket_endpoint(ws3))
 
             # Wait for game_manager to start the game
@@ -137,9 +147,7 @@ class TestMultiplayerJoinFlow:
 
     @pytest.mark.asyncio
     async def test_game_waits_for_minimum_players(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that game doesn't start until minimum number of players join."""
 
@@ -148,13 +156,15 @@ class TestMultiplayerJoinFlow:
 
         try:
             # Single player joins multiplayer queue
-            ws1.queue_message({
-                "type": "player_join",
-                "name": "Player1",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player1",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             await asyncio.sleep(0.5)
@@ -189,9 +199,7 @@ class TestMultiplayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_one_player_disconnects_game_continues(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that game continues when one player disconnects but others remain."""
 
@@ -204,29 +212,35 @@ class TestMultiplayerDisconnection:
 
         try:
             # All players join
-            ws1.queue_message({
-                "type": "player_join",
-                "name": "Player1",
-                "avatar": "avatar1",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player1",
+                    "avatar": "avatar1",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
-            ws2.queue_message({
-                "type": "player_join",
-                "name": "Player2",
-                "avatar": "avatar2",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws2.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player2",
+                    "avatar": "avatar2",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
-            ws3.queue_message({
-                "type": "player_join",
-                "name": "Player3",
-                "avatar": "avatar3",
-                "num_players": 4,
-                "game_mode": "multiplayer"
-            })
+            ws3.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player3",
+                    "avatar": "avatar3",
+                    "num_players": 4,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
@@ -265,7 +279,7 @@ class TestMultiplayerDisconnection:
 
             human_players = [p for p in game.players if p.type == "human"]
             assert len(human_players) == 2
-            assert 'Player1_bot' in [p.name for p in game.players]
+            assert "Player1_bot" in [p.name for p in game.players]
             bot_players = [p for p in game.players if p.type == "bot"]
             assert len(bot_players) == 2
 
@@ -306,9 +320,7 @@ class TestMultiplayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_all_players_disconnect_game_ends(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that game ends when all human players disconnect."""
 
@@ -319,21 +331,25 @@ class TestMultiplayerDisconnection:
 
         try:
             # Both players join
-            ws1.queue_message({
-                "type": "player_join",
-                "name": "Player1",
-                "avatar": "avatar1",
-                "num_players": 3,
-                "game_mode": "multiplayer"
-            })
+            ws1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player1",
+                    "avatar": "avatar1",
+                    "num_players": 3,
+                    "game_mode": "multiplayer",
+                }
+            )
 
-            ws2.queue_message({
-                "type": "player_join",
-                "name": "Player2",
-                "avatar": "avatar2",
-                "num_players": 3,
-                "game_mode": "multiplayer"
-            })
+            ws2.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player2",
+                    "avatar": "avatar2",
+                    "num_players": 3,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
@@ -394,9 +410,7 @@ class TestMultiplayerDisconnection:
 
     @pytest.mark.asyncio
     async def test_player_quits_explicitly_in_multiplayer(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test explicit quit in multiplayer game."""
 
@@ -407,21 +421,25 @@ class TestMultiplayerDisconnection:
 
         try:
             # Both players join
-            ws1.queue_message({
-                "type": "player_join",
-                "name": "Player1",
-                "avatar": "avatar1",
-                "num_players": 3,
-                "game_mode": "multiplayer"
-            })
+            ws1.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player1",
+                    "avatar": "avatar1",
+                    "num_players": 3,
+                    "game_mode": "multiplayer",
+                }
+            )
 
-            ws2.queue_message({
-                "type": "player_join",
-                "name": "Player2",
-                "avatar": "avatar2",
-                "num_players": 3,
-                "game_mode": "multiplayer"
-            })
+            ws2.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Player2",
+                    "avatar": "avatar2",
+                    "num_players": 3,
+                    "game_mode": "multiplayer",
+                }
+            )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
@@ -478,9 +496,7 @@ class TestMultiplayerStateManagement:
 
     @pytest.mark.asyncio
     async def test_multiple_concurrent_games(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test that multiple multiplayer games can run concurrently."""
 
@@ -491,13 +507,15 @@ class TestMultiplayerStateManagement:
         try:
             # All 4 players join queue
             for i, ws in enumerate(websockets):
-                ws.queue_message({
-                    "type": "player_join",
-                    "name": f"Player{i + 1}",
-                    "avatar": f"avatar{i + 1}",
-                    "num_players": 3,
-                    "game_mode": "multiplayer"
-                })
+                ws.queue_message(
+                    {
+                        "type": "player_join",
+                        "name": f"Player{i + 1}",
+                        "avatar": f"avatar{i + 1}",
+                        "num_players": 3,
+                        "game_mode": "multiplayer",
+                    }
+                )
 
                 task = asyncio.create_task(server.websocket_endpoint(ws))
                 handler_tasks.append(task)
@@ -541,9 +559,7 @@ class TestMultiplayerStateManagement:
 
     @pytest.mark.asyncio
     async def test_no_state_leaks_multiplayer_cycles(
-            self,
-            clean_server_state,
-            running_game_manager
+        self, clean_server_state, running_game_manager
     ):
         """Test no state leaks across multiple multiplayer game cycles."""
 
@@ -555,21 +571,25 @@ class TestMultiplayerStateManagement:
 
             try:
                 # Players join
-                ws1.queue_message({
-                    "type": "player_join",
-                    "name": f"Player1_C{cycle}",
-                    "avatar": "avatar1",
-                    "num_players": 3,
-                    "game_mode": "multiplayer"
-                })
+                ws1.queue_message(
+                    {
+                        "type": "player_join",
+                        "name": f"Player1_C{cycle}",
+                        "avatar": "avatar1",
+                        "num_players": 3,
+                        "game_mode": "multiplayer",
+                    }
+                )
 
-                ws2.queue_message({
-                    "type": "player_join",
-                    "name": f"Player2_C{cycle}",
-                    "avatar": "avatar2",
-                    "num_players": 3,
-                    "game_mode": "multiplayer"
-                })
+                ws2.queue_message(
+                    {
+                        "type": "player_join",
+                        "name": f"Player2_C{cycle}",
+                        "avatar": "avatar2",
+                        "num_players": 3,
+                        "game_mode": "multiplayer",
+                    }
+                )
 
                 handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
                 handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))

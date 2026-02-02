@@ -3,19 +3,24 @@ Tests for Empirica integration functionality.
 Tests participant registration, game creation from config, and survey flow.
 """
 
-# Add the project root to Python path
-import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), '..'), '..')))
+# Add the project root to Python path
+import sys
+
+sys.path.insert(
+    0,
+    os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), ".."), "..")),
+)
+
+import asyncio
+from pathlib import Path
 
 import pytest
-import asyncio
-from fastapi.testclient import TestClient
-import cheat.server as server
-from pathlib import Path
 import yaml
+from fastapi.testclient import TestClient
 
+import cheat.server as server
 from tests.utils import MockWebSocket
 
 
@@ -31,26 +36,28 @@ class TestEmpiricaParticipantRegistration:
 
         try:
             # Participant joins with Empirica ID
-            ws.queue_message({
-                "type": "empirica_join",
-                "empirica_id": "participant_12345",
-                "name": "Participant1",
-                "avatar": "avatar1"
-            })
+            ws.queue_message(
+                {
+                    "type": "empirica_join",
+                    "empirica_id": "participant_12345",
+                    "name": "Participant1",
+                    "avatar": "avatar1",
+                }
+            )
 
             handler_task = asyncio.create_task(server.websocket_endpoint(ws))
             await asyncio.sleep(0.5)
 
             # Should receive player_registered message
             registered_msgs = ws.get_sent_messages_of_type("player_registered")
-            assert len(registered_msgs) == 1, \
-                "Should receive player_registered message"
+            assert len(registered_msgs) == 1, "Should receive player_registered message"
 
             assert "participant_12345" in registered_msgs[0]["message"]
 
             # Participant should be in survey_participants dict
-            assert "participant_12345" in server.survey_participants, \
-                "Participant should be registered in survey_participants"
+            assert (
+                "participant_12345" in server.survey_participants
+            ), "Participant should be registered in survey_participants"
 
             participant = server.survey_participants["participant_12345"]
             assert participant.name == "Participant1"
@@ -84,14 +91,16 @@ class TestEmpiricaParticipantRegistration:
             for ws, empirica_id, name in [
                 (ws1, "part_001", "Alice"),
                 (ws2, "part_002", "Bob"),
-                (ws3, "part_003", "Charlie")
+                (ws3, "part_003", "Charlie"),
             ]:
-                ws.queue_message({
-                    "type": "empirica_join",
-                    "empirica_id": empirica_id,
-                    "name": name,
-                    "avatar": f"avatar_{name}"
-                })
+                ws.queue_message(
+                    {
+                        "type": "empirica_join",
+                        "empirica_id": empirica_id,
+                        "name": name,
+                        "avatar": f"avatar_{name}",
+                    }
+                )
 
             handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
             handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
@@ -136,12 +145,14 @@ class TestEmpiricaGameCreation:
         participants = []
         for i in range(2):
             ws = MockWebSocket()
-            ws.queue_message({
-                "type": "empirica_join",
-                "empirica_id": f"emp_{i}",
-                "name": f"Player{i}",
-                "avatar": f"avatar{i}"
-            })
+            ws.queue_message(
+                {
+                    "type": "empirica_join",
+                    "empirica_id": f"emp_{i}",
+                    "name": f"Player{i}",
+                    "avatar": f"avatar{i}",
+                }
+            )
 
             task = asyncio.create_task(server.websocket_endpoint(ws))
             participants.append((ws, task))
@@ -159,12 +170,9 @@ class TestEmpiricaGameCreation:
                     {"type": "human"},
                     {"type": "human"},
                     {"type": "RandomBot", "name": "Bot1"},
-                    {"type": "RandomBot", "name": "Bot2"}
+                    {"type": "RandomBot", "name": "Bot2"},
                 ],
-                "game": {
-                    "n_rounds": 3,
-                    "experimental_mode": True
-                }
+                "game": {"n_rounds": 3, "experimental_mode": True},
             }
 
             # Create temporary config file
@@ -172,19 +180,22 @@ class TestEmpiricaGameCreation:
             experiments_dir.mkdir(exist_ok=True)
 
             test_config_path = experiments_dir / "test_empirica.yaml"
-            with open(test_config_path, 'w') as f:
+            with open(test_config_path, "w") as f:
                 yaml.dump(test_config, f)
 
             # Use TestClient to make API request
             with TestClient(server.app) as client:
-                response = client.post("/api/games/from_config", json={
-                    "cfg": {
-                        "cfg_key": "test_empirica",
-                        "game_id": "empirica_game_001",
-                        "n_rounds": 5,
-                        "players": ["emp_0", "emp_1"]
-                    }
-                })
+                response = client.post(
+                    "/api/games/from_config",
+                    json={
+                        "cfg": {
+                            "cfg_key": "test_empirica",
+                            "game_id": "empirica_game_001",
+                            "n_rounds": 5,
+                            "players": ["emp_0", "emp_1"],
+                        }
+                    },
+                )
 
                 assert response.status_code == 200
 
@@ -192,8 +203,9 @@ class TestEmpiricaGameCreation:
             await asyncio.sleep(0.5)
 
             # Game should be in waiting_games
-            assert "empirica_game_001" in server.waiting_games, \
-                "Game should be created in waiting_games"
+            assert (
+                "empirica_game_001" in server.waiting_games
+            ), "Game should be created in waiting_games"
 
             game = server.waiting_games["empirica_game_001"]
 
@@ -244,12 +256,14 @@ class TestEmpiricaGameCreation:
         participants = []
         for i in range(2):
             ws = MockWebSocket()
-            ws.queue_message({
-                "type": "empirica_join",
-                "empirica_id": f"emp_{i}",
-                "name": f"Player{i}",
-                "avatar": f"avatar{i}"
-            })
+            ws.queue_message(
+                {
+                    "type": "empirica_join",
+                    "empirica_id": f"emp_{i}",
+                    "name": f"Player{i}",
+                    "avatar": f"avatar{i}",
+                }
+            )
 
             task = asyncio.create_task(server.websocket_endpoint(ws))
             participants.append((ws, task))
@@ -264,28 +278,28 @@ class TestEmpiricaGameCreation:
                     {"type": "human"},
                     {"type": "human"},
                 ],
-                "game": {
-                    "n_rounds": 10,
-                    "experimental_mode": False
-                }
+                "game": {"n_rounds": 10, "experimental_mode": False},
             }
 
             experiments_dir = Path(__file__).parent.parent.parent / "experiments"
             experiments_dir.mkdir(exist_ok=True)
             test_config_path = experiments_dir / "test_override.yaml"
 
-            with open(test_config_path, 'w') as f:
+            with open(test_config_path, "w") as f:
                 yaml.dump(test_config, f)
 
             with TestClient(server.app) as client:
-                response = client.post("/api/games/from_config", json={
-                    "cfg": {
-                        "cfg_key": "test_override",
-                        "game_id": "game_override_001",
-                        "n_rounds": 3,  # Override the config's n_rounds
-                        "players": ["emp_0", "emp_1"]
-                    }
-                })
+                response = client.post(
+                    "/api/games/from_config",
+                    json={
+                        "cfg": {
+                            "cfg_key": "test_override",
+                            "game_id": "game_override_001",
+                            "n_rounds": 3,  # Override the config's n_rounds
+                            "players": ["emp_0", "emp_1"],
+                        }
+                    },
+                )
 
                 assert response.status_code == 200
 
@@ -293,8 +307,9 @@ class TestEmpiricaGameCreation:
 
             # Verify override worked
             game = server.waiting_games["game_override_001"]
-            assert game.num_rounds == 3, \
-                "n_rounds should be overridden by request parameter"
+            assert (
+                game.num_rounds == 3
+            ), "n_rounds should be overridden by request parameter"
 
             print("✓ Config override successful")
 
@@ -318,23 +333,21 @@ class TestEmpiricaGameFlow:
     """Test complete Empirica game flow from registration to game start."""
 
     @pytest.mark.asyncio
-    async def test_full_empirica_flow(
-            self,
-            clean_server_state,
-            running_game_manager
-    ):
+    async def test_full_empirica_flow(self, clean_server_state, running_game_manager):
         """Test complete flow: register participants, create game, game starts."""
 
         # Step 1: Register participants
         participants = []
         for i in range(2):
             ws = MockWebSocket()
-            ws.queue_message({
-                "type": "empirica_join",
-                "empirica_id": f"emp_{i}",
-                "name": f"Player{i}",
-                "avatar": f"avatar{i}"
-            })
+            ws.queue_message(
+                {
+                    "type": "empirica_join",
+                    "empirica_id": f"emp_{i}",
+                    "name": f"Player{i}",
+                    "avatar": f"avatar{i}",
+                }
+            )
 
             task = asyncio.create_task(server.websocket_endpoint(ws))
             participants.append((ws, task))
@@ -349,29 +362,29 @@ class TestEmpiricaGameFlow:
                     {"type": "human"},
                     {"type": "human"},
                 ],
-                "game": {
-                    "n_rounds": 2,
-                    "experimental_mode": True
-                }
+                "game": {"n_rounds": 2, "experimental_mode": True},
             }
 
             experiments_dir = Path(__file__).parent.parent.parent / "experiments"
             experiments_dir.mkdir(exist_ok=True)
             test_config_path = experiments_dir / "test_full_flow.yaml"
 
-            with open(test_config_path, 'w') as f:
+            with open(test_config_path, "w") as f:
                 yaml.dump(test_config, f)
 
             # Step 3: Create game via API
             with TestClient(server.app) as client:
-                response = client.post("/api/games/from_config", json={
-                    "cfg": {
-                        "cfg_key": "test_full_flow",
-                        "game_id": "flow_game_001",
-                        "n_rounds": 2,
-                        "players": ["emp_0", "emp_1"]
-                    }
-                })
+                response = client.post(
+                    "/api/games/from_config",
+                    json={
+                        "cfg": {
+                            "cfg_key": "test_full_flow",
+                            "game_id": "flow_game_001",
+                            "n_rounds": 2,
+                            "players": ["emp_0", "emp_1"],
+                        }
+                    },
+                )
 
                 assert response.status_code == 200
 
@@ -382,8 +395,9 @@ class TestEmpiricaGameFlow:
             game = server.waiting_games["flow_game_001"]
 
             human_players = [p for p in game.players if p.type == "human"]
-            assert all(p.connected for p in human_players), \
-                "All human players should be connected"
+            assert all(
+                p.connected for p in human_players
+            ), "All human players should be connected"
 
             # Step 4: Wait for game_manager to start the game
             max_wait = 3.5
@@ -394,10 +408,12 @@ class TestEmpiricaGameFlow:
                 elapsed += 0.2
 
             # Game should have moved to active_games
-            assert "flow_game_001" not in server.waiting_games, \
-                "Game should have left waiting_games"
-            assert "flow_game_001" in server.active_games, \
-                "Game should be in active_games"
+            assert (
+                "flow_game_001" not in server.waiting_games
+            ), "Game should have left waiting_games"
+            assert (
+                "flow_game_001" in server.active_games
+            ), "Game should be in active_games"
 
             active_game = server.active_games["flow_game_001"]
             assert active_game.num_players == 2
@@ -429,12 +445,14 @@ class TestEmpiricaGameFlow:
 
         # Only register one participant, but try to create game with two
         ws = MockWebSocket()
-        ws.queue_message({
-            "type": "empirica_join",
-            "empirica_id": "emp_0",
-            "name": "Player0",
-            "avatar": "avatar0"
-        })
+        ws.queue_message(
+            {
+                "type": "empirica_join",
+                "empirica_id": "emp_0",
+                "name": "Player0",
+                "avatar": "avatar0",
+            }
+        )
 
         task = asyncio.create_task(server.websocket_endpoint(ws))
         await asyncio.sleep(0.5)
@@ -445,28 +463,34 @@ class TestEmpiricaGameFlow:
                     {"type": "human"},
                     {"type": "human"},
                 ],
-                "game": {"n_rounds": 2}
+                "game": {"n_rounds": 2},
             }
 
             experiments_dir = Path(__file__).parent.parent.parent / "experiments"
             experiments_dir.mkdir(exist_ok=True)
             test_config_path = experiments_dir / "test_missing.yaml"
 
-            with open(test_config_path, 'w') as f:
+            with open(test_config_path, "w") as f:
                 yaml.dump(test_config, f)
 
             # Try to create game with missing participant
             with TestClient(server.app) as client:
                 # This should raise an error or handle gracefully
                 with pytest.raises(Exception):
-                    response = client.post("/api/games/from_config", json={
-                        "cfg": {
-                            "cfg_key": "test_missing",
-                            "game_id": "missing_game_001",
-                            "n_rounds": 2,
-                            "players": ["emp_0", "emp_MISSING"]  # emp_MISSING not registered
-                        }
-                    })
+                    response = client.post(
+                        "/api/games/from_config",
+                        json={
+                            "cfg": {
+                                "cfg_key": "test_missing",
+                                "game_id": "missing_game_001",
+                                "n_rounds": 2,
+                                "players": [
+                                    "emp_0",
+                                    "emp_MISSING",
+                                ],  # emp_MISSING not registered
+                            }
+                        },
+                    )
 
             print("✓ Missing participant correctly raises error")
 
@@ -496,12 +520,14 @@ class TestEmpiricaPlayerMapping:
         participants = []
         for i in range(2):
             ws = MockWebSocket()
-            ws.queue_message({
-                "type": "empirica_join",
-                "empirica_id": f"emp_{i}",
-                "name": f"Player{i}",
-                "avatar": f"avatar{i}"
-            })
+            ws.queue_message(
+                {
+                    "type": "empirica_join",
+                    "empirica_id": f"emp_{i}",
+                    "name": f"Player{i}",
+                    "avatar": f"avatar{i}",
+                }
+            )
 
             task = asyncio.create_task(server.websocket_endpoint(ws))
             participants.append((ws, task))
@@ -512,25 +538,28 @@ class TestEmpiricaPlayerMapping:
         try:
             test_config = {
                 "players": [{"type": "human"}, {"type": "human"}],
-                "game": {"n_rounds": 2}
+                "game": {"n_rounds": 2},
             }
 
             experiments_dir = Path(__file__).parent.parent.parent / "experiments"
             experiments_dir.mkdir(exist_ok=True)
             test_config_path = experiments_dir / "test_mapping.yaml"
 
-            with open(test_config_path, 'w') as f:
+            with open(test_config_path, "w") as f:
                 yaml.dump(test_config, f)
 
             with TestClient(server.app) as client:
-                response = client.post("/api/games/from_config", json={
-                    "cfg": {
-                        "cfg_key": "test_mapping",
-                        "game_id": "mapping_game_001",
-                        "n_rounds": 2,
-                        "players": ["emp_0", "emp_1"]
-                    }
-                })
+                response = client.post(
+                    "/api/games/from_config",
+                    json={
+                        "cfg": {
+                            "cfg_key": "test_mapping",
+                            "game_id": "mapping_game_001",
+                            "n_rounds": 2,
+                            "players": ["emp_0", "emp_1"],
+                        }
+                    },
+                )
 
             await asyncio.sleep(0.5)
 
@@ -539,8 +568,9 @@ class TestEmpiricaPlayerMapping:
             human_players = [p for p in game.players if p.type == "human"]
 
             for player in human_players:
-                assert id(player.ws) in server.player_to_game, \
-                    f"Player {player.name} should have player_to_game mapping"
+                assert (
+                    id(player.ws) in server.player_to_game
+                ), f"Player {player.name} should have player_to_game mapping"
                 assert server.player_to_game[id(player.ws)] == "mapping_game_001"
 
             print("✓ Player mappings created correctly")

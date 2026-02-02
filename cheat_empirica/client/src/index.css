@@ -5,7 +5,7 @@
     -webkit-appearance: none;
     margin: 0;
   }
-  
+
   /* Firefox */
   input.number-arrows-none[type="number"] {
     -moz-appearance: textfield;

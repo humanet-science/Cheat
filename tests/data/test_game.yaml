@@ -85,6 +85,3 @@ all_smart:
       game:
         game_mode: single
         experimental_mode: False
-
-
-
