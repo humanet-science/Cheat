@@ -258,6 +258,7 @@ class TestMultiplayerDisconnection:
             assert len(server.active_games) == 1
             game_id = list(server.active_games.keys())[0]
             game = server.active_games[game_id]
+            assert len(list(server.player_to_game.keys())) == 3
 
             # Get player references
             human_players = [p for p in game.players if p.type == "human"]
@@ -272,6 +273,7 @@ class TestMultiplayerDisconnection:
             # Player 1 disconnects
             ws1.close()
             await asyncio.sleep(1.0)
+            assert len(list(server.player_to_game.keys())) == 2
 
             # Player 1 should be replaced with a bot (not disconnected from game)
             # Game should still be active
@@ -317,6 +319,8 @@ class TestMultiplayerDisconnection:
             for gid in list(server.active_games.keys()):
                 server.active_games[gid].game_over = True
             await asyncio.sleep(0.5)
+
+            assert len(list(server.player_to_game.keys())) == 0
 
     @pytest.mark.asyncio
     async def test_all_players_disconnect_game_ends(

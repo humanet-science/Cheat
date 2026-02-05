@@ -59,6 +59,7 @@ class TestGameCreation:
             # Creator should be marked as game creator and mapped to correct game
             assert id(ws_creator) in server.game_creators
             assert server.game_creators[id(ws_creator)] == game_key
+            assert list(server.player_to_game.keys()) == [id(ws_creator)]
 
             # Game should have 2 human slots (1 filled, 1 empty)
             game = server.waiting_games[game_key]
@@ -79,6 +80,8 @@ class TestGameCreation:
                     pass
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}
 
     @pytest.mark.asyncio
     async def test_player_joins_with_valid_key(self, clean_server_state):
@@ -137,6 +140,7 @@ class TestGameCreation:
                 p for p in game.players if p.type == "human" and p.connected
             ]
             assert len(connected_humans) == 2
+            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner)}
 
             player_names = {p.name for p in connected_humans}
             assert "Creator" in player_names
@@ -161,6 +165,8 @@ class TestGameCreation:
                     pass
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}
 
     @pytest.mark.asyncio
     async def test_join_with_invalid_key(self, clean_server_state):
@@ -187,6 +193,9 @@ class TestGameCreation:
             invalid_key_msgs = ws_joiner.get_sent_messages_of_type("invalid_key")
             assert len(invalid_key_msgs) == 1
             assert "not valid" in invalid_key_msgs[0]["message"].lower()
+
+            # Check they have not been added to the dict
+            assert id(ws_joiner) not in server.player_to_game.keys()
 
         finally:
             ws_joiner.close()
@@ -275,6 +284,9 @@ class TestGameCreation:
             assert len(invalid_key_msgs) == 1
             assert "already in progress" in invalid_key_msgs[0]["message"].lower()
 
+            # Check they have not been added to the dict
+            assert id(ws_late_joiner) not in server.player_to_game.keys()
+
         finally:
             ws_creator.close()
             ws_joiner1.close()
@@ -293,6 +305,8 @@ class TestGameCreation:
                 server.active_games[gid].game_over = True
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}
 
 
 class TestGameCreatorCancellation:
@@ -326,6 +340,9 @@ class TestGameCreatorCancellation:
             assert game_key in server.waiting_games
             assert id(ws_creator) in server.game_creators
 
+            # Verify only game creator in player_to_game
+            assert list(server.player_to_game.keys()) == [id(ws_creator)]
+
             # Creator exits queue
             ws_creator.queue_message({"type": "exit_queue"})
             await asyncio.sleep(0.5)
@@ -335,6 +352,7 @@ class TestGameCreatorCancellation:
 
             # Creator should be removed from game_creators
             assert id(ws_creator) not in server.game_creators
+            assert server.player_to_game == {}
 
             # Creator should receive game_cancelled message
             cancelled_msgs = ws_creator.get_sent_messages_of_type("game_cancelled")
@@ -390,6 +408,8 @@ class TestGameCreatorCancellation:
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
 
+            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner)}
+
             # Creator exits queue (cancels game)
             ws_creator.queue_message({"type": "exit_queue"})
             await asyncio.sleep(0.5)
@@ -400,6 +420,9 @@ class TestGameCreatorCancellation:
             # Both players should receive game_cancelled message
             creator_cancelled = ws_creator.get_sent_messages_of_type("game_cancelled")
             joiner_cancelled = ws_joiner.get_sent_messages_of_type("game_cancelled")
+
+            # Player to dict should be empty
+            assert server.player_to_game == {}
 
             assert len(creator_cancelled) >= 1
             assert len(joiner_cancelled) >= 1
@@ -423,6 +446,8 @@ class TestGameCreatorCancellation:
                     pass
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}
 
 
 class TestNonCreatorLeaving:
@@ -474,12 +499,16 @@ class TestNonCreatorLeaving:
             ]
             assert len(connected_before) == 2
 
+            # Check they are in player_to_server
+            assert set(server.player_to_game) == {id(ws_creator), id(ws_joiner)}
+
             # Joiner exits queue
             ws_joiner.queue_message({"type": "exit_queue"})
             await asyncio.sleep(0.5)
 
             # Game should still exist
             assert game_key in server.waiting_games
+            assert list(server.player_to_game.keys()) == [id(ws_creator)]
 
             # Joiner should be disconnected but creator still connected
             connected_after = [
@@ -515,6 +544,8 @@ class TestNonCreatorLeaving:
                     pass
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}
 
     @pytest.mark.asyncio
     async def test_multiple_joiners_leave_sequentially(self, clean_server_state):
@@ -572,6 +603,11 @@ class TestNonCreatorLeaving:
             game = server.waiting_games[game_key]
             connected = [p for p in game.players if p.type == "human" and p.connected]
             assert len(connected) == 3
+            assert set(server.player_to_game.keys()) == {
+                id(ws_creator),
+                id(ws_joiner1),
+                id(ws_joiner2),
+            }
 
             # Joiner1 leaves
             ws_joiner1.queue_message({"type": "exit_queue"})
@@ -580,6 +616,7 @@ class TestNonCreatorLeaving:
             connected = [p for p in game.players if p.type == "human" and p.connected]
             assert len(connected) == 2
             assert game_key in server.waiting_games, "Game should still exist"
+            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner2)}
 
             # Joiner2 leaves
             ws_joiner2.queue_message({"type": "exit_queue"})
@@ -591,6 +628,7 @@ class TestNonCreatorLeaving:
             assert (
                 game_key in server.waiting_games
             ), "Game should still exist with only creator"
+            assert set(server.player_to_game.keys()) == {id(ws_creator)}
 
         finally:
             ws_creator.close()
@@ -606,3 +644,5 @@ class TestNonCreatorLeaving:
                         pass
 
             await asyncio.sleep(0.5)
+
+            assert server.player_to_game == {}

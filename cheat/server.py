@@ -149,9 +149,10 @@ def new_game(
                     N_players=game.num_players, player_id=player.id
                 )
 
-    # Store a link to the human players in the dictionary
+    # Store a link to the human players in the dictionary, if not already present
     for player in human_players:
-        player_to_game[id(player.ws)] = game.game_id
+        if player.ws and id(player.ws) not in player_to_game.keys():
+            player_to_game[id(player.ws)] = game.game_id
 
     # Write metadata to folder
     if game.out_path is not None:
@@ -459,13 +460,23 @@ async def websocket_endpoint(ws: WebSocket):
                 # This does not occur if a non-creating player leaves the queue.
                 if message["type"] == "exit_queue":
                     # Game creator has left the waiting queue: exit game and notify all waiting players
-                    # Also remove the game directory, if it was created
+                    # Also remove the game directory, if it was created, as well as all other players
                     if id(player.ws) in game_creators.keys():
                         # Get the game and remove from all lists
                         _game_id = game_creators[id(player.ws)]
                         _game = waiting_games.pop(_game_id)
                         game_creators.pop(id(player.ws))
-                        player_to_game.pop(id(player.ws))
+                        for p in _game.players:
+                            if id(p.ws) in player_to_game:
+                                player_to_game.pop(id(p.ws))
+
+                            # Inform frontend
+                            await p.send_message(
+                                {
+                                    "type": "game_cancelled",
+                                    "is_creator": id(p.ws) == id(player.ws),
+                                }
+                            )
 
                         # Delete the game's data directory, if created
                         if _game.out_path is not None:
@@ -473,8 +484,6 @@ async def websocket_endpoint(ws: WebSocket):
 
                             shutil.rmtree(_game.out_path)
 
-                        # Inform frontend
-                        await _game.broadcast_to_all({"type": "game_cancelled"})
                         ws_log.info(f"{player.name} cancelled game {_game_id}.")
 
                     # Non-creating player has left the waiting queue for a specific game
@@ -483,9 +492,10 @@ async def websocket_endpoint(ws: WebSocket):
                         for p in _game.players:
                             if id(p.ws) == id(player.ws):
                                 p.connected = False
+                                player_to_game.pop(id(player.ws))
+                                await player.ws.send_json({"type": "quit_confirmed"})
                                 p.ws = None
-
-                        player_to_game.pop(id(player.ws))
+                                break
 
                         await _game.broadcast_to_all(
                             {
@@ -536,7 +546,7 @@ async def websocket_endpoint(ws: WebSocket):
                         else:
                             await game.replace_player_with_bot(player)
 
-                        del player_to_game[id(ws)]
+                        player_to_game.pop(id(ws))
 
                     # Send confirmation
                     await ws.send_json({"type": "quit_confirmed"})
@@ -603,7 +613,7 @@ async def websocket_endpoint(ws: WebSocket):
                         await _game.replace_player_with_bot(player)
 
                 # Remove from player_to_game mapping
-                del player_to_game[id(ws)]
+                player_to_game.pop(id(ws))
 
             # If player is survey participant, remove from queue
             if player.empirica_id is not None:

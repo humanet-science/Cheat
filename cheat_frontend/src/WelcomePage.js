@@ -90,11 +90,8 @@ const WelcomePage = ({onGameStart}) => {
                 type: "exit_queue",
                 name: playerName
             }));
-            socket.close();
-            setSocket(null);
-            setNumHumansWaiting(1);
+            console.log("Sent cancel signal.");
         }
-        console.log("Cancelled waiting");
     };
 
     // Join or create a game
@@ -108,7 +105,7 @@ const WelcomePage = ({onGameStart}) => {
                             game_mode = null,
                             game_key = null) => {
 
-        console.log("WelcomePage: Joining game with:", playerName, avatar, num_players, game_mode);
+        console.log("WelcomePage: ", playerName, "is joining.");
 
         // Create websocket
         const getWebSocketURL = () => {
@@ -152,6 +149,7 @@ const WelcomePage = ({onGameStart}) => {
         // If player is creator of game, set state
         if (create_game) {
             setIsGameCreator(true);
+            console.log('Set Game Creator true');
             setNumHumans(num_humans);
         }
 
@@ -182,13 +180,28 @@ const WelcomePage = ({onGameStart}) => {
 
             // Game cancelled
             else if (msg.type === 'game_cancelled') {
-                if (isGameCreator){
+                if (msg?.is_creator){
                     // If creator cancels game, reset flag
                     setIsGameCreator(false);
                 } else {
                     // Notify non-creator players in queue that game has been cancelled
                     setShowGameCancelled(true);
                 }
+                if (socket) {
+                    socket.close();
+                }
+                setSocket(null);
+                setNumHumansWaiting(1);
+                setGameKey('');
+            }
+
+            // Confirmed quit
+            else if (msg.type === 'quit_confirmed') {
+                if (socket) {
+                    socket.close();
+                }
+                setSocket(null);
+                setNumHumansWaiting(1);
             }
 
             // Non-creating player has exited the queue
@@ -242,7 +255,7 @@ const WelcomePage = ({onGameStart}) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (playerName.trim() && selectedAvatar && acceptedTerms) {
-            if (activeTab === 'create') {
+            if (activeTab === 'create' && ! showJoinForm) {
                 handleNewJoinGame(playerName.trim(), selectedAvatar, true, null, numHumans, numBots);
             } else {
                 handleNewJoinGame(playerName.trim(), selectedAvatar, false, numPlayers, null, null, gameMode, gameKey);
