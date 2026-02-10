@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useState, useEffect} from "react";
 import CheatGame from "./CheatGame";
 import WelcomePage from "./WelcomePage";
 import {HumanetLogo} from "./utils/Logo";
@@ -78,9 +78,21 @@ function App() {
 		};
 	};
 
+	const [showLogo, setShowLogo] = useState(window.innerHeight > 600);
+
+	useEffect(() => {
+			const handleResize = () => {
+					setShowLogo(window.innerHeight > 600);
+			};
+
+			window.addEventListener('resize', handleResize);
+			return () => window.removeEventListener('resize', handleResize);
+	}, []);
+
 	return (<div className="min-h-screen bg-gradient-to-br flex flex-col from-green-900 to-blue-900" id="game-root">
 		<div className="flex-1 overflow-auto">
-			{!gameStarted ? (<WelcomePage onGameStart={handleGameStart}/>) : (<CheatGame
+			{!gameStarted ? (
+				<WelcomePage onGameStart={handleGameStart}/>) : (<CheatGame
 				socket={gameSocket}
 				gameConfig={gameConfig}
 				currentRound={currentRound}
@@ -88,9 +100,11 @@ function App() {
 				onExitGame={handleExitGame}
 			/>)}
 		</div>
-		<div className="">
-			<HumanetLogo/>
-		</div>
+		{showLogo && !gameStarted && (
+				<div>
+						<HumanetLogo/>
+				</div>
+		)}
 	</div>);
 }
 

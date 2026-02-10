@@ -39,11 +39,12 @@ thinking_new_play = [
     "Let's see ...",
 ]
 
-thinking = ["Do I believe this?", "Can this be trusted?"] + thinking_new_play
+thinking_calling = ["Do I believe this?", "Can this be trusted?", "Sure about that?"]
+
 
 # Dictionary of message types
 message_types = {
-    "thinking": thinking,
+    "thinking_calling": thinking_calling,
     "thinking_new_play": thinking_new_play,
     "suspicious": suspicions,
     "suspicions_confirmed": suspicions_confirmed,

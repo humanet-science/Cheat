@@ -546,7 +546,9 @@ class CheatGame:
 
     async def play(self, player: Player, declared_rank: str, cards: list) -> None:
         """Play a card"""
-        await self.collect_messages(player_id=player.id, message_type="thinking")
+        await self.collect_messages(
+            player_id=player.id, message_type="thinking_new_play"
+        )
         self.play_turn(player, declared_rank, cards)
         self.player_logger.info(
             f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
@@ -575,7 +577,9 @@ class CheatGame:
 
         # Get the data from the last game play
         last_player, declared_rank, cards_played = self.last_play()
-        await self.collect_messages(player_id=player.id, message_type="thinking")
+        await self.collect_messages(
+            player_id=player.id, message_type="thinking_calling"
+        )
 
         # Result of the call
         result = self.call_bluff(player.id)
@@ -841,7 +845,7 @@ class CheatGame:
 
             # Broadcast countdown every second
             current_second = int(remaining)
-            if current_second >= 0:
+            if 0 <= current_second <= 120:
                 await self.broadcast_to_all(
                     {
                         "type": "countdown",

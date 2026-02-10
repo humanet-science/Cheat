@@ -34,19 +34,40 @@ export default function StatusMessage({statusMessages, tutorialScale = null}) {
 		pointerEvents: 'none',
 		zIndex: 50
 	}}>
-		{statusMessages.map(msg => (<div
+		{statusMessages.map(msg => {
+
+			const messageY = tutorialScale ? msg.position.y / tutorialScale : msg.position.y;
+     const viewportHeight = window.innerHeight;
+     const availableSpace = messageY; // Distance from top of screen to message
+
+     // Calculate max float distance (default is 132% which is roughly 1.32x message height)
+     // Assume message height is ~50px, so default float is ~66px
+     const defaultFloatDistance = 66;
+     const maxFloatDistance = Math.min(defaultFloatDistance, availableSpace - 20); // 20px margin from top
+     const floatPercentage = (maxFloatDistance / defaultFloatDistance) * 132; // Scale the percentage
+
+			return <div
 			key={msg.id}
 			id={`status-${msg.id}`}
-			className={`absolute pointer-events-none backdrop-blur-lg drop-shadow-lg
-          ${msg.is_connection_timer ? 'text-sm rounded-3xl p-3 bg-opacity-20 bg-amber-50 -translate-x-1/2 -translate-y-full' : msg.is_play_announcement ? 'rounded-3xl p-3 bg-amber-200 bg-opacity-60 text-lg play-announcement' : 'text-sm rounded-3xl p-3 bg-opacity-20 bg-amber-50 message_float'}`}
+			className={`
+				absolute pointer-events-none backdrop-blur-lg drop-shadow-lg rounded-3xl p-3
+      	${msg.is_connection_timer
+					? 'bg-amber-50 bg-opacity-20 text-sm -translate-x-1/2 -translate-y-full'
+				  : msg.message === 'Call!'
+					? 'bg-red-400 bg-opacity-60 text-[clamp(0.875rem, 0.7vw, 1.125rem)] play-announcement'
+					: msg.is_play_announcement
+						? 'bg-amber-200 bg-opacity-60 text-[clamp(0.875rem, 0.7vw, 1.125rem)] play-announcement'
+						: 'bg-amber-50 bg-opacity-20 text-xs md:text-sm message_float'
+				}`}
 			style={{
 				left: tutorialScale ? `${msg.position.x / tutorialScale}px` : `${msg.position.x}px`,
 				top: tutorialScale ? `${msg.position.y / tutorialScale}px` : `${msg.position.y}px`,
+				'--float-distance': `-${floatPercentage}%`,
 			}}
 		>
 			<div className="text-white font-semibold whitespace-nowrap">
 				{msg.message}
 			</div>
-		</div>))}
+		</div>})}
 	</div>, gameRoot);
 }

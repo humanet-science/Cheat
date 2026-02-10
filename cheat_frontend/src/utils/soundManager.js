@@ -2,28 +2,43 @@ export class SoundManager {
   constructor() {
     this.sounds = {};
     this.enabled = true;
-    this.defaultVolume = 0.7; // Global default volume
+    this.defaultVolume = 0.7;
+    this.audioContext = null;
   }
 
-  loadSound(name, url, volume = 0.7) {
-    const audio = new Audio(url);
-    // Store both the audio object and its volume setting
+  async initAudioContext() {
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  async loadSound(name, url, volume = 0.7) {
+    await this.initAudioContext();
+
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
     this.sounds[name] = {
-      audio: audio,
+      buffer: audioBuffer,
       volume: volume !== null ? volume : this.defaultVolume
     };
   }
 
-    play(name, customVolume = null) {
-    if (this.enabled && this.sounds[name]) {
-      const soundData = this.sounds[name];
-      const sound = soundData.audio.cloneNode();
+  play(name, customVolume = null) {
+    if (!this.enabled || !this.sounds[name] || !this.audioContext) return;
 
-      // Use custom volume if provided, otherwise use the stored volume
-      sound.volume = customVolume !== null ? customVolume : soundData.volume;
+    const soundData = this.sounds[name];
+    const source = this.audioContext.createBufferSource();
+    const gainNode = this.audioContext.createGain();
 
-      sound.play().catch(e => console.log('Sound play failed:', e));
-    }
+    source.buffer = soundData.buffer;
+    gainNode.gain.value = customVolume !== null ? customVolume : soundData.volume;
+
+    source.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    source.start(0);
   }
 
   setDefaultVolume(volume) {
@@ -32,7 +47,10 @@ export class SoundManager {
 
   setSoundVolume(name, volume) {
     if (this.sounds[name]) {
-      this.sounds[name].volume = Math.max(0, Math.min(1, volume));
+      const newVolume = Math.max(0, Math.min(1, volume));
+      this.sounds[name].volume = newVolume;
+      // Update all pooled sounds
+      this.sounds[name].pool.forEach(sound => sound.volume = newVolume);
     }
   }
 

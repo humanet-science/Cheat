@@ -10,29 +10,6 @@ export const getPlayerColor = (playerId) => {
 };
 
 
-/** Calculate the positions of each player at the table, used e.g. for positioning message bubbles. This can be done
- * once at the start of the game. The table is an ellipse parametrised by two radii, allowing for adjustment to the
- * device display settings.
- *
- * @param totalPlayers
- * @param radiusX
- * @param radiusY
- * @returns {{}}
- */
-export function getPlayerPositions(totalPlayers, yourId, radiusX = 400, radiusY = 250) {
-    const positions = {};
-    for (let id = 0; id < totalPlayers; id++) {
-        const relativePosition = (id - yourId + totalPlayers) % totalPlayers;
-        const angle = 90 + (360 / totalPlayers) * relativePosition;
-        const angleRad = (angle * Math.PI) / 180;
-        const x = Math.cos(angleRad) * radiusX;  // Wider X radius
-        const y = Math.sin(angleRad) * radiusY;  // Shorter Y radius
-        positions[id] = {x, y, angle};
-    }
-
-    return positions;
-}
-
 // Helper function to visualise cards
 export const parseCard = (cardStr) => {
     // Extract rank and suit from string

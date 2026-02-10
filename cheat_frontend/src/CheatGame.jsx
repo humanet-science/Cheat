@@ -6,16 +6,18 @@ import PlayerHand from './components/CheatGame/PlayerHand';
 import CardFlyAnimation from "./components/CheatGame/Animations/CardFly";
 import PilePickUpAnimation from "./components/CheatGame/Animations/PilePickUp";
 import DiscardAnimation from "./components/CheatGame/Animations/Discard";
+import {CardDeal, useCardDealAnimation} from './components/CheatGame/Animations/CardDeal';
 
 // Components
-import {CardRevealOverlay, GameOverOverlay} from "./components/CheatGame/GameOverlay";
+import {CardRevealOverlay, GameOverOverlay, GameStartOverlay} from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
 import GameMenu from './components/Menu';
 
 // Hooks and utils
-import {getPlayerColor, getPlayerPositions, parseCard} from './utils/cardUtils';
+import {getPlayerColor, parseCard} from './utils/cardUtils';
+import {usePlayerPositions} from "./utils/PlayerPositions";
 import {soundManager} from './utils/soundManager';
 import {useActionQueue} from './components/CheatGame/hooks/useActionQueue';
 import {useScreenSize} from "./components/CheatGame/hooks/useScreenSize";
@@ -135,99 +137,30 @@ export default function CheatGame({
 	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 	const [messageInput, setMessageInput] = useState("");
 
-	// Positions of the players at the table: these are dynamically adapted to the screen dimensions
-	// We also need a const playerPositions array to trigger re-renders when the screen changes
-	const playerPositionsRef = useRef({});
-	const [playerPositions, setPlayerPositions] = useState({});
-
 	// Use containerWidth/containerHeight if provided, otherwise fall back to window
 	const {width: windowWidth, height: windowHeight} = useScreenSize();
 	const width = containerWidth ?? windowWidth;
 	const height = containerHeight ?? windowHeight;
 
-  // Dealing animation - cards fly from center to players one at a time, round-robin
-	useEffect(() => {
-		if (!state || !dealingFromCenter) return;
+	// Positions of the players at the table: these are dynamically adapted to the screen dimensions
+	// We also need a const playerPositions array to trigger re-renders when the screen changes
+	const {playerPositions, playerPositionsRef, tableCenter} = usePlayerPositions(
+		numPlayers, selfId, width, height, isMyTurn, hasActed, state.your_info.hand
+	);
 
-		const cardsPerPlayer = state.your_info.hand.length;
-		const players = state.players.map(p => p.your_info.id);
-
-		// Create cards in dealing order: one to each player, then repeat
-		const allCards = [];
-		for (let round = 0; round < cardsPerPlayer; round++) {
-			for (let playerIdx = 0; playerIdx < players.length; playerIdx++) {
-				const cardDelay = allCards.length * 80;
-				allCards.push({
-					id: Math.random(), targetPlayer: players[playerIdx], cardNumber: round, // Which card in their hand (0-9)
-					delay: cardDelay, // Deal one every 80ms
-				});
-			}
-		}
-
-		setCenterDealCards(allCards);
-
-		// Update dealtCards as cards arrive at player's position
-		allCards.forEach((card) => {
-			if (card.targetPlayer === selfId) {
-				setTimeout(() => {
-					setDealtCards(prev => prev + 1);
-					soundManager.play('cardPlay'); // Play sound when card arrives
-				}, card.delay); // Delay + flight time
-			}
-		});
-
-		// Finish dealing animation
-		const totalDuration = allCards.length * 80 + 1000;
-		const lastCardsStart = (allCards.length - 5) * 80; // When last 5 cards start dealing
-
-		// Show "Let's Go!" during last 5 cards
-		setTimeout(() => {
-			setShowLetsGo(true);
-			soundManager.play('start_bell');
-		}, lastCardsStart);
-
-		// Finish dealing
-		setTimeout(() => {
-			setDealingFromCenter(false);
-			setCenterDealCards([]);
-		}, totalDuration);
-
-		// Hide "Let's Go!" and start game
-		setTimeout(() => {
-			setShowLetsGo(false);
-			setIsDealingCards(false);
-		}, lastCardsStart + 3500); // Extra 3500ms for text to fade
-
-	}, [state?.players, selfId]);
-
-	// If skipping animation, set dealing to false immediately when state loads
-	useEffect(() => {
-		if (!showDealAnimation && state) {
-			setDealingFromCenter(false);
-			setIsDealingCards(false);
-			setDealtCards(state.your_info.hand.length); // Set to full hand length
-		}
-	}, [showDealAnimation, state]);
-
-	// Adjust player positions to the width and height of the screen
-	useEffect(() => {
-		const aspectRatio = width / height;
-		let radiusX, radiusY;
-
-		if (aspectRatio > 1.5) {  // Wide screen
-			radiusX = Math.min(width * 0.3, height * 1.5);   // Use more horizontal space
-			radiusY = height * 0.3;  // But don't squash vertically
-		} else if (aspectRatio < 0.5) {
-			radiusX = width * 0.35;
-			radiusY = Math.min(radiusX * 2, height * 0.3);
-		} else {  // Tall/narrow screen
-			radiusX = Math.min(width, height) * 0.35;
-			radiusY = radiusX * 0.9;
-		}
-		const positions = getPlayerPositions(numPlayers, selfId, radiusX, radiusY);
-		playerPositionsRef.current = positions;
-		setPlayerPositions(positions);
-	}, [width, height]);
+	// Card Dealing animation
+	useCardDealAnimation({
+		state,
+		selfId,
+		dealingFromCenter,
+		showDealAnimation,
+		setCenterDealCards,
+		setDealtCards,
+		setDealingFromCenter,
+		setShowLetsGo,
+		setIsDealingCards,
+		soundManager
+	});
 
 	// Set up WebSocket handlers for gameplay only
 	useEffect(() => {
@@ -356,12 +289,15 @@ export default function CheatGame({
 			setIsMyTurn(Boolean(msg.player_id === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
+			const scatterRange = Math.min(Math.min(width * 0.08, 60), Math.min(height * 0.08, 50))  // Horizontal scatter based on width
+
 			const newCards = Array(msg.card_count)
 				.fill(0)
 				.map((_, i) => ({
 					id: Math.random(), rotation: Math.random() * 60 - 30, // -30 to +30 degrees
-					offsetX: Math.random() * 100 - 50,  // -50 to +50 px
-					offsetY: Math.random() * 100 - 50, startRotation: -(5 + (i * 5))  // Starting rotation from hand
+					offsetX: Math.random() * scatterRange * 2 - scatterRange,  // -50 to +50 px
+					offsetY: Math.random() * scatterRange * 2 - scatterRange,
+					startRotation: -(5 + (i * 5))  // Starting rotation from hand
 				}));
 
 			// Animate cards moving to pile
@@ -593,18 +529,6 @@ export default function CheatGame({
 		}
 	}, [state?.players, state?.your_info.id]);
 
-	// Load sounds
-	useEffect(() => {
-		soundManager.loadSound('cardPlay', '/sounds/card_play.mp3', 0.3);
-		soundManager.loadSound('bluffSuccess', '/sounds/success.mp3');
-		soundManager.loadSound('bluffFail', '/sounds/busted.mp3');
-		soundManager.loadSound('callBluff', '/sounds/pop_low.mp3');
-		soundManager.loadSound('discard', '/sounds/discard.wav');
-		soundManager.loadSound('win', '/sounds/win.wav');
-		soundManager.loadSound('pick_up', '/sounds/pick_up.mp3', 0.2);
-		soundManager.loadSound('start_bell', '/sounds/start_bell.wav', 0.7);
-	}, []);
-
 	// Play sound when Call Bluff! button pops up
 	useEffect(() => {
 		if (isMyTurn && state?.pile_size > 0 && state?.current_rank && !hasActed) {
@@ -658,8 +582,7 @@ export default function CheatGame({
 			const rect = playerElement.getBoundingClientRect();
 			const position = {
 				x: rect.left + rect.width / 2, // Center horizontally
-				y: playerPositionsRef.current[playerId].angle === 90 ? rect.top // Push up for bottom player
-					: rect.top
+				y: playerId === state.your_info.id ? 1.02 * rect.top : 0.99 * rect.top
 			};
 
 			if (is_connection_timer) {
@@ -762,7 +685,7 @@ export default function CheatGame({
 
 			{/* Game logo */}
 			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-				<Logo className="opacity-20" style={{width: "20rem", height: "auto"}} animated={false}/>
+				<Logo className="opacity-20" style={{width: "min(20rem, 50vw)", height: "auto"}} animated={false}/>
 			</div>
 
 			{/* Game menu */}
@@ -826,27 +749,40 @@ export default function CheatGame({
 					getPlayerColor={getPlayerColor}
 				/>
 
+				{/* Animation of cards being dealt */}
+				<CardDeal
+					dealingCards={centerDealCards}
+					playerPositions={playerPositionsRef.current}
+					tableCenter={tableCenter}
+				/>
+
+				{/* Banner when game begins */}
+				<GameStartOverlay
+					showLetsGo = {showLetsGo}
+				/>
+
+				{/* Card pile in the center of the table */}
 				<CenterPile
 					isMyTurn={isMyTurn}
 					hasActed={hasActed}
 					pileCards={pileCards}
 					lastPlayedCount={lastPlayedCount}
-					dealingCards={centerDealCards}
-					playerPositions={playerPositionsRef.current}
+					tableCenter={tableCenter}
 				/>
 
+				{/* Overlay of revealed plays */}
 				<CardRevealOverlay
 					revealedCards={revealedCards}
 					parseCard={parseCard}
 					state={state}
 				/>
 
+				{/* Player hand with cards and play controls */}
 				<PlayerHand
 					isMyTurn={isMyTurn}
 					hasActed={hasActed}
 					isNewRound={isNewRound}
 					showRankInput={showRankInput}
-					experimentalMode={experimentalMode}
 					rankError={rankError}
 					selectedCards={selectedCards}
 					state={state}
@@ -864,27 +800,23 @@ export default function CheatGame({
 					pileCards={pileCards}
 					callBluff={callBluff}
 					isDealingCards={isDealingCards}
-					dealtCardsCount={dealtCards}
 				/>
 
-				<CardFlyAnimation animatingCards={animatingCards}/>
+				{/* Animation of cards being played flying out */}
+				<CardFlyAnimation animatingCards={animatingCards} tableCenter={tableCenter}/>
 
+				{/* Animation of the pile being picked up after a call */}
 				<PilePickUpAnimation pilePickupAnimation={pilePickupAnimation}/>
 
-				<DiscardAnimation discards={discards}/>
+				{/* Animation of cards being discarded */}
+				<DiscardAnimation discards={discards}
+													width={width}
+													height={height}
+													playerPositions={playerPositionsRef.current}
+													selfId={state.your_info.id}
+				/>
 
 			</div>
 
-
-			{showLetsGo && (<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-				<div
-					className="text-white text-6xl font-bold satisfy-regular animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl"
-					style={{
-						animation: 'fadeInOut 3.5s ease-in-out', textShadow: '0 0 20px rgba(255,255,255,0.5)'
-					}}
-				>
-					Let's Gooo!
-				</div>
-			</div>)}
 		</div>);
 }

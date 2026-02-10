@@ -12,10 +12,10 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 	if (!revealedCards) return null;
 	return (<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60]">
 		<div
-			className="text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl">
+			className="text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-6 border-2 border-white border-opacity-20 shadow-2xl">
 			{/* Dramatic result text */}
 			<div
-				className="text-5xl font-bold mb-4 satisfy-regular"
+				className="text-5xl font-bold mb-4 satisfy-regular whitespace-nowrap"
 				style={{
 					animation: 'dramaticZoom 0.8s ease-out',
 					color: revealedCards.wasLying ? '#ef4444' : '#9BE9B7',
@@ -26,7 +26,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 			</div>
 
 			{/* Player info */}
-			<div className="text-2xl mb-6 text-white drop-shadow-lg">
+			<div className="text-2xl mb-6 text-white drop-shadow-lg whitespace-nowrap">
 				{revealedCards.wasLying ? (<p className="mb-2">
 					{revealedCards.accused === state.your_info.id ? "You" : `${revealedCards.accused_name}`} played:
 				</p>) : (<p className="mb-2">
@@ -114,7 +114,7 @@ export function GameOverOverlay({
 	if (!gameOver) return null;
 	return (<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
 		<div
-			className="text-center text-5xl items-center justify-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-8 border-2 border-white border-opacity-20 shadow-2xl">
+			className="text-center text-5xl items-center justify-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-6 border-2 border-white border-opacity-20 shadow-2xl">
 			<div className="mb-2 satisfy-regular">
 				{winner === state.your_info.name ? "🎉 You win! 🎉" : `${winner} wins!`}
 			</div>
@@ -135,7 +135,9 @@ export function GameOverOverlay({
 				{((!experimentalMode) || (experimentalMode && !empiricaExperimentOver)) && (<button
 					onClick={() => {
 						ws.send(JSON.stringify({type: "new_round"}));
-						ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
+						if (totalHumans > 1) {
+							ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
+						}
 						setGameOver(false);
 						setWinner(null);
 						setSelectedCards([]);     // clear any lingering selections
@@ -147,7 +149,7 @@ export function GameOverOverlay({
 						setDiscards([]);
 						setPlayAnnouncements([]);
 					}}
-					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
+					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
 				>
 					Next Round
 				</button>)}
@@ -157,7 +159,7 @@ export function GameOverOverlay({
 					onClick={() => {
 						empiricaPlayer.stage.set("submit", true);
 					}}
-					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg"
+					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
 				>
 					Finish
 				</button>)}
@@ -167,11 +169,28 @@ export function GameOverOverlay({
 					onClick={() => {
 						onQuit();
 					}}
-					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg whitespace-nowrap"
 				>
 					Leave Game
 				</button>)}
 			</div>
 		</div>
 	</div>)
+}
+
+export function GameStartOverlay({showLetsGo}) {
+	if (!showLetsGo) return null
+	return (
+		(<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+			<div
+				className="text-white text-6xl font-bold satisfy-regular animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl
+					p-6 border-2 border-white border-opacity-20 shadow-2xl"
+				style={{
+					animation: 'fadeInOut 2.5s ease-in-out', textShadow: '0 0 20px rgba(255,255,255,0.5)'
+				}}
+			>
+				Let's Gooo!
+			</div>
+		</div>)
+	)
 }

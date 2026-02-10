@@ -1,34 +1,13 @@
 import React from "react";
 
-export function CenterPile({isMyTurn, hasActed, pileCards, lastPlayedCount, dealingCards = [], playerPositions = {}}) {
+export function CenterPile({isMyTurn, hasActed, pileCards, lastPlayedCount, tableCenter}) {
+
 	return (
-		<div className="fixed left-1/2 top-1/2 z-20" style={{transform: "translate(-50%, -50%)"}}>
 
-			{/* Dealing animation - cards appear and fly to players */}
-			{dealingCards.map((card) => {
-				const target = playerPositions[card.targetPlayer];
-				if (!target) return null;
-
-				// Random offset from center to simulate hand movement
-				const startOffsetX = Math.random() * 40 - 20; // -20 to 20px
-				const startOffsetY = Math.random() * 40 - 20;
-				return (
-					<div
-						key={card.id}
-						className="absolute w-12 h-16 rounded bg-blue-600 border-2 border-white pointer-events-none"
-						style={{
-							opacity: 0,
-							animation: `dealCardFlick 0.6s ease-out forwards`,
-							animationDelay: `${card.delay}ms`,
-							'--start-offset-x': `${startOffsetX}px`,
-							'--start-offset-y': `${startOffsetY}px`,
-							'--target-x': `${target.x}px`,
-							'--target-y': `${target.y}px`,
-							'--target-rotation': `${Math.random() * 360}deg`,
-						}}
-					/>
-				);
-			})}
+			<div className="fixed z-20"
+					 style={{left: `calc(50% + ${tableCenter.x}px)`,
+                    top: `calc(50% + ${tableCenter.y}px)`,
+                    transform: "translate(-50%, -50%)"}}>
 
 			{/* Regular pile cards */}
 			{pileCards.map((card, index) => {
@@ -36,8 +15,8 @@ export function CenterPile({isMyTurn, hasActed, pileCards, lastPlayedCount, deal
 				return (
 					<div
 						key={card.id}
-						className={`absolute w-12 h-16 rounded bg-blue-600 border-2 shadow-lg transition-all ${
-							isRecentlyPlayed ? 'border-red-500 border-4 shadow-red-500/50' : 'border-white'
+						className={`absolute w-[clamp(30px,min(5.66vw,8.3vh),45.3px)] h-[clamp(45px,min(8.5vw,12.6vh),68px)] rounded bg-blue-600 border-2 shadow-lg transition-all ${
+							isRecentlyPlayed ? 'border-red-500 border-[3px] shadow-red-500/50' : 'border-white'
 						}`}
 						style={{
 							transform: `translate(${card.offsetX}px, ${card.offsetY}px) rotate(${card.rotation}deg)`,

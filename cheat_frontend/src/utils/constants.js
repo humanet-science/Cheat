@@ -8,12 +8,11 @@ export const PLAYER_GRADIENTS = [
 
 export const VALID_RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-// TODO: set this from config
-export const PREDEFINED_MESSAGES = [
-	"Taunt", "Surprise", "Shock", "Thinking", "Doubt", "Approval"
-];
-
 export const AVATARS = [
 	'🐶', '🐱', '🐯', '🐰', '🐮', '🐹', '🐨',
 	'🐼', '🐙', '🐵', '🐧', '🐦', '🦊', '🐷', '🐸', '🦁'
 ];
+
+// Settings for the card deal animation
+export const CARD_DEAL_INTERVAL = 70; // ms between each card deal
+export const CARD_FLIGHT_TIME = 500; // ms for card to fly to player

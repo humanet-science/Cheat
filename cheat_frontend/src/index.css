@@ -55,11 +55,11 @@
 
 @keyframes cardFly {
   0% {
-    transform: translate(var(--start-x), var(--start-y)) scale(1);
+    transform: translate(var(--start-x), var(--start-y)) ;
     opacity: 1;
   }
   100% {
-    transform: translate(0, 0) scale(1);
+    transform: translate(0, 0);
     opacity: 0.5;
   }
 }
@@ -280,17 +280,6 @@
   }
 }
 
-@keyframes floatUp_Bubble {
-  0% {
-    transform: translate(-50%, -20%) scale(1);
-  }
-  5% {
-    transform: translate(-50%, -100%) scale(1);
-  }
-  100% {
-    transform: translate(-50%, -120%) scale(1);
-  }
-}
 
 #game-root .player-opponent {
   transform: translate(-50%, -50%) !important;
@@ -318,43 +307,56 @@
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.10s !important;
 }
 
+@keyframes floatUp_Bubble {
+  0% {
+    transform: translate(-50%, calc(var(--float-distance, -120%) * 0.16)) scale(1);
+  }
+  5% {
+    transform: translate(-50%, calc(var(--float-distance, -120%) * 0.83)) scale(1);
+  }
+  100% {
+    transform: translate(-50%, calc(var(--float-distance, -120%))) scale(1);
+  }
+}
+
+
 @keyframes floatUpWithWiggle {
   0% {
-    transform: translate(-50%, -20%) scale(1) rotate(-4deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.15)) scale(1) rotate(-4deg);
     opacity: 0;
   }
   5% {
-    transform: translate(-50%, -100%) scale(1.1) rotate(4deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.76)) scale(1.1) rotate(4deg);
     opacity: 1;
   }
   10% {
-    transform: translate(-50%, -102%) scale(1.15) rotate(-3deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.77)) scale(1.15) rotate(-3deg);
   }
   15% {
-    transform: translate(-50%, -104%) scale(1.2) rotate(3deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.79)) scale(1.2) rotate(3deg);
   }
   20% {
-    transform: translate(-50%, -106%) scale(1.15) rotate(-2deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.80)) scale(1.15) rotate(-2deg);
   }
   25% {
-    transform: translate(-50%, -108%) scale(1.12) rotate(2deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.82)) scale(1.12) rotate(2deg);
   }
   30% {
-    transform: translate(-50%, -110%) scale(1.11) rotate(-1.5deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.83)) scale(1.11) rotate(-1.5deg);
   }
   40% {
-    transform: translate(-50%, -117%) scale(1.09) rotate(1.2deg);
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.89)) scale(1.09) rotate(1.2deg);
   }
   60% {
-    transform: translate(-50%, -123%) scale(1.05) rotate(-0.5deg);
-      opacity: 1;
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.93)) scale(1.05) rotate(-0.5deg);
+    opacity: 1;
   }
   90% {
-      transform: translate(-50%, -129%) scale(1.05) rotate(0.3deg);
-      opacity: 1;
+    transform: translate(-50%, calc(var(--float-distance, -132%) * 0.98)) scale(1.05) rotate(0.3deg);
+    opacity: 1;
   }
   100% {
-    transform: translate(-50%, -132%) scale(1.03);
+    transform: translate(-50%, var(--float-distance, -132%)) scale(1.03);
     opacity: 0;
   }
 }
@@ -397,19 +399,33 @@
   to { fill: white; }
 }
 
-@keyframes dealCardFlick {
+@keyframes cardAppear {
   0% {
-    transform: translate(var(--start-offset-x), var(--start-offset-y)) rotate(0deg) scale(0.9);
     opacity: 0;
-  }
-  10% {
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
+    transform: translateY(20px) scale(0.8);
   }
   100% {
-    transform: translate(var(--target-x), var(--target-y)) rotate(var(--target-rotation)) scale(0.8);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dealCardFlick {
+  0% {
+    transform: translate(calc(-1 * var(--target-x) + var(--start-offset-x)), calc(-1 * var(--target-y) + var(--start-offset-y))) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: translate(0, 0) rotate(var(--target-rotation));
     opacity: 0;
   }
 }
@@ -423,17 +439,13 @@
     opacity: 1;
     transform: scale(1.4);
   }
-  85% {
-    opacity: 1;
-    transform: scale(1.0);
-  }
   90% {
     opacity: 1;
-    transform: scale(1.3);
+    transform: scale(1.5);
   }
   100% {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(2.5);
   }
 }
 
