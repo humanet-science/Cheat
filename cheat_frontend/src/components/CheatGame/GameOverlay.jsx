@@ -19,7 +19,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 				style={{
 					animation: 'dramaticZoom 0.8s ease-out',
 					color: revealedCards.wasLying ? '#ef4444' : '#9BE9B7',
-					textShadow: revealedCards.wasLying ? '0 0 50px #ef4444' : '0 0 50px rgba(34, 197, 94, 0.8)'
+					filter: revealedCards.wasLying ? 'drop-shadow(0 0 30px rgba(239, 68, 68, 1.0))' : 'drop-shadow(0 0 50px rgba(34, 197, 94, 0.8))'
 				}}
 			>
 				{revealedCards.wasLying ? '🎭 Busted!' : "No lies detected!"}
@@ -183,13 +183,19 @@ export function GameStartOverlay({showLetsGo}) {
 	return (
 		(<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
 			<div
-				className="text-white text-6xl font-bold satisfy-regular animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl
+				className="animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl
 					p-6 border-2 border-white border-opacity-20 shadow-2xl"
 				style={{
-					animation: 'fadeInOut 2.5s ease-in-out', textShadow: '0 0 20px rgba(255,255,255,0.5)'
+					animation: 'fadeInOut 2.5s ease-in-out',
 				}}
 			>
-				Let's Gooo!
+				<div className="text-white text-6xl font-bold satisfy-regular "
+					style={{
+						filter: 'drop-shadow(0 0 30px rgba(256, 256, 256, 0.8))'
+					}}
+				>
+					Let's Gooo!
+				</div>
 			</div>
 		</div>)
 	)
