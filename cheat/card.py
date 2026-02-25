@@ -27,7 +27,7 @@ WORD_TO_RANK = {
     "queen": "Q",
     "q": "Q",
     "king": "K",
-    "k": "Q",
+    "k": "K",
     "ace": "A",
     "a": "A",
     "two": "2",

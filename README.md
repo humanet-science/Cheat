@@ -62,7 +62,19 @@ yarn start
 in another. The game should open automatically in a browser window.
 
 ## Adding LLMs
-To play with LLMs, you must have an API key stored as an environment variable. To do this, run the following command
+To play with LLMs, you must have an API key stored as an environment variable. We recommend creating an `.env` file in your
+root directory, and adding keys via
+```console
+NAME_OF_API_KEY="your_api_key_here"
+```
+Then use the `dotenv` package to load them:
+```python
+from dotenv import load_dotenv
+load_dotenv()
+```
+This will load the keys into your environment. Make sure to never commit the `.env` file---for this reason, it has been
+added to the `.gitignore`. Alternatively, you can export API keys directly to your environment by running the following
+command:
 ```console
 export <NAME_OF_API_KEY>="your_api_key_here"
 ```
@@ -70,7 +82,9 @@ on macOS/Linux, or
 ```shell
 setx <NAME_OF_API_KEY> "your_api_key_here"
 ```
-on Windows. Replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>` with the following client name:
+on Windows.
+
+In all cases, replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>` with the following client name:
 
 | Client        | Name of API key  |
 |---------------|------------------|

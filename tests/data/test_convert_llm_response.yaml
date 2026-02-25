@@ -15,6 +15,11 @@ test_cases:
     name: play_list
 
   - current_rank: "K"
+    input: "Play [J♣, Q♣, K♣]; Declare K"
+    expected: ("play", "K", ['J♣', 'Q♣', 'K♣'])
+    name: play_list_3
+
+  - current_rank: "K"
     input: "play [2♥]"
     expected: ("play", "K", ['2♥'])
     name: play_lowercase
