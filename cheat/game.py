@@ -113,10 +113,12 @@ class CheatGame:
             # Make a folder for the players
             self.player_info_path = os.path.join(self.out_path, "players")
             os.makedirs(self.player_info_path, exist_ok=True)
+            self.player_info_written = {}
 
         else:
             self.out_path = None
             self.player_info_path = None
+            self.player_info_written = None
 
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
@@ -140,10 +142,15 @@ class CheatGame:
                 data=dict(player_info=[p.__dict__() for p in self.players]),
             )
         )
+
         for p in self.players:
             p.logger = self.player_logger
             if self.player_info_path:
-                p.write_info(self.player_info_path)
+                # Write out the player info for all players with an assigned id.
+                # If they have not yet been assigned an id, their info will be written out once they do
+                if p.id is not None:
+                    p.write_info(self.player_info_path)
+                    self.player_info_written[p.id] = True
 
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
@@ -162,7 +169,7 @@ class CheatGame:
         self.discarded_ranks = []
         self.turn = random.randint(
             0, len(self.players) - 1
-        )  # TODO: also shuffle the order of play?
+        )  # Randomly decide who starts
         self.current_rank = None
         self.round_over = False
         self.winner = None
@@ -234,6 +241,7 @@ class CheatGame:
                 data=dict(
                     declared_rank=declared_rank,
                     cards_played=[str_to_Card(c) for c in cards_played],
+                    pile_size=len(self.pile),
                 ),
             )
         )
@@ -357,11 +365,13 @@ class CheatGame:
         self.history.append(action)
         self.write_action(action, **kwargs)
 
-        # Also write out updates to the internal state of any SmartBots
+        # Also write out updates to the internal state of any SmartBots or players whose information has not yet
+        # been stored (e.g. because they previously had not been assigned an id)
         if self.player_info_path:
             for p in self.players:
-                if isinstance(p, SmartBot):
+                if isinstance(p, SmartBot) or p.id not in self.player_info_written:
                     p.write_info(self.player_info_path)
+                    self.player_info_written[p.id] = True
 
     def write_action(self, action: GameAction, *, file_name: str = "game_history"):
         """Write a single action to the data file, if available. If an error occurs during writing,
@@ -734,19 +744,9 @@ class CheatGame:
                         if round_is_over:
                             break
                         action = await current_player.make_move(self)
-                        if action.type == "failure":
-                            self.log(action)
-                            await self.replace_player_with_bot(current_player)
-                            continue
                         declared_rank = action.data.get("declared_rank")
                         cards = action.data.get("cards_played")
                         await self.play(current_player, declared_rank, cards)
-
-                # Failure: disconnect player
-                elif action.type == "failure":
-                    self.log(action)
-                    await self.replace_player_with_bot(current_player)
-                    continue
 
             # Add a small delay to account for the animations in the frontend: this way the backend is not always
             # too many steps ahead of the frontend

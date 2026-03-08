@@ -34,6 +34,11 @@ failures:
     move: ("play", [ 'A♥', 'K♦', 'Q♠', '8♣' ], "J")
     match_str: select between one and three cards
 
+  - hand: ['A♠', 'A♦', 'A♣', 'A♥']
+    current_rank: "2"
+    move: ("play", ['A♠', 'A♦', 'A♣', 'A♥'], None)
+    match_str: select between one and three cards
+
   - hand: [ 'A♥', 'K♦', 'Q♠', '8♣' ]
     current_rank: ~
     move: ("play", [], "J")

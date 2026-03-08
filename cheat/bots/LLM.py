@@ -1,4 +1,6 @@
 import os
+import pickle
+import random
 import re
 from datetime import datetime
 from typing import Literal
@@ -80,7 +82,8 @@ def generate_client_input(
             res = dict(
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt
-                    + f" Remember: {additional_prompts}."
+                    + f" Remember: {additional_prompts}.",
+                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
                 ),
                 contents=game_summary,
             )
@@ -264,6 +267,7 @@ class LLM_Player(Player):
         name: str | None = None,
         avatar: str | None = None,
         system_prompt: str | None = None,
+        speaker_types: dict | None = None,
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
         model_kwargs: dict = {},
     ):
@@ -272,6 +276,7 @@ class LLM_Player(Player):
         self.system_prompt = system_prompt
         self.kind = kind
         self.model_kwargs = model_kwargs
+        self.speaker_types = speaker_types
 
     def __dict__(self):
         return dict(
@@ -283,13 +288,29 @@ class LLM_Player(Player):
             system_prompt=self.system_prompt,
         )
 
+    def write_info(self, path) -> None:
+        """Write out the internal configuration"""
+
+        # TODO: Use json instead
+        with open(
+            f"{path}/Player_{self.id if self.id is not None else self.name}.pickle",
+            "wb",
+        ) as file:
+            res = self.__dict__()
+            pickle.dump(res, file)
+
     def game_summary(self, game) -> tuple[str, str]:
         """Return a summary of the game that can be passed to the LLM"""
 
-        game_summary = "Here is the game history so far:\n"
-        game_summary += "\n".join(
-            [f"- {action.__str__(speaker_id=self.id)}" for action in game.history]
-        )
+        game_summary = "Here is the game history so far; analyse it in order to decide what to play:\n"
+        summary = []
+        for action in game.history:
+            action_str = action.__str__(
+                speaker_id=self.id, speaker_types=self.speaker_types
+            )
+            if action_str != "":
+                summary.append(action_str)
+        game_summary += "\n".join(summary)
 
         play_prompt = ""
         if game.turn == self.id:
@@ -336,16 +357,6 @@ class LLM_Player(Player):
         """Checks if the extracted LLM response is a valid move and catches any errors."""
         return is_valid_move(move, game, self.hand)
 
-    def disconnect(self) -> GameAction:
-        """If failing to produce a valid move, disconnect from game and return a failure signal"""
-        self.connected = False
-        return GameAction(
-            type="failure",
-            player_id=self.id,
-            timestamp=datetime.now(),
-            data=dict(reason="invalid response"),
-        )
-
     async def make_move(self, game):
         """Ask the LLM to make a move. This requires passing entire game history as an input"""
 
@@ -353,18 +364,92 @@ class LLM_Player(Player):
         move = self.move_from_LLM_response(game)
         is_valid, additional_prompts = self.check_LLM_move_valid(game, move)
 
-        # If the move is not valid, try again with an additional hint from the
+        # If the move is not valid, log the failure and try again with an additional hint
         if not is_valid:
+            game.log(
+                GameAction(
+                    type="invalid_LLM_response",
+                    player_id=self.id,
+                    timestamp=datetime.now(),
+                    data=dict(
+                        move_type=move.type,
+                        move_data={}
+                        if move.type != "play"
+                        else dict(
+                            declared_rank=move.data["declared_rank"],
+                            cards_played=[str(c) for c in move.data["cards_played"]],
+                        ),
+                    ),
+                )
+            )
             move = self.move_from_LLM_response(
                 game, additional_prompts=additional_prompts
             )
             is_valid, additional_prompts = self.check_LLM_move_valid(game, move)
 
-        # If the move is still not valid, send a disconnect signal
+        # If the move is still not valid, catch the error and make a random move instead
         if not is_valid:
-            return self.disconnect()
+            game.log(
+                GameAction(
+                    type="invalid_LLM_response",
+                    player_id=self.id,
+                    timestamp=datetime.now(),
+                    data=dict(
+                        move_type=move.type,
+                        move_data={}
+                        if move.type != "play"
+                        else dict(
+                            declared_rank=move.data["declared_rank"],
+                            cards_played=[str(c) for c in move.data["cards_played"]],
+                        ),
+                    ),
+                )
+            )
+            return await self.random_move(game)
 
         return move
+
+    async def random_move(self, game) -> GameAction:
+        """Make a random move if the API reponse is invalid
+
+        :param game: the current `CheatGame` instance
+        :return: (tuple) tuple of declared rank and played cards
+        """
+
+        # Call with probability 0.5
+        if game.pile and (
+            random.random() < 0.5 or len(game.players[game.last_play()[0]].hand) == 0
+        ):
+            return GameAction(type="call", player_id=self.id)
+
+        else:
+            # If this is the first play of the trick, choose a declared rank (not Ace)
+            if len(game.pile) == 0:
+                # choose declared rank strategically or randomly (cannot declare Ace, and also do not declare a discarded rank)
+                declared_rank = random.choice(
+                    [r for r in RANKS if (r != "A" and r not in game.discarded_ranks)]
+                )
+            else:
+                declared_rank = game.current_rank  # must match current trick rank
+
+            # Check that there are cards that could be played
+            true_cards = [c for c in self.hand if c.rank == declared_rank]
+
+            # Play some true cards with probability 0.5
+            if true_cards and random.random() > 0.5:
+                chosen = random.sample(true_cards, random.randint(1, len(true_cards)))
+
+            # Lie: play random cards, but not from those that have been discarded (must still declare current rank)
+            else:
+                chosen = random.sample(
+                    self.hand, random.randint(1, min(3, len(self.hand)))
+                )
+
+            return GameAction(
+                type="play",
+                player_id=self.id,
+                data=dict(declared_rank=declared_rank, cards_played=chosen),
+            )
 
     async def choose_action(self, game) -> GameAction:
         """Pass-through; required for interface compatibility with bot players"""
