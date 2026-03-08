@@ -1,0 +1,32 @@
+# Basic game settings, passed to CheatGame
+game:
+  experimental_mode: True
+  out_dir: ~ # Directory for game data
+  note: 'HHHBHB' # Additional note to add to the output directory
+  game_id: ~
+
+# Player settings
+players:
+  - type: human
+    avatar: 🧜‍♂️
+    name: Mike
+  - type: human
+    avatar: 🧜‍♂️
+    name: Anton
+  - type: human
+    avatar: 🧜‍♂️
+    name: Bob
+  - type: SmartBot
+    name: Cindy
+    avatar: 🍾
+    verbosity: 0.1
+  - type: human
+    avatar: 🧜‍♂️
+    name: Cooper
+  - type: SmartBot
+    name: Rajesh
+    avatar: 🤖
+    verbosity: 0.1
+
+experiment:
+  predefined_messages: ~

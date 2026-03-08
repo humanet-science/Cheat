@@ -32,8 +32,9 @@ export function Introduction({next}) {
                 return 'ws://localhost:5050/ws';
             }
 
-            // If accessing via IP, connect to that IP
-            return `ws://${hostname}:5050/ws`;
+            // Use wss:// when page is served over HTTPS, proxied via nginx
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            return `${protocol}://${hostname}/cheat-ws/ws`;
         };
         const ws = new WebSocket(getWebSocketURL());
 

@@ -1,43 +1,48 @@
 factors:
-  - name: playerCount
-    desc: determines the number of human players in a game
-    values:
-      - value: 3
-      - value: 4
-      - value: 5
-      - value: 6
-  - name: gameConfiguration
-    desc: Player configuration types; must correspond to filenames located in 'experiments'
-    values:
-      - value: 'HRRR' # One human, three random bots
-      - value: 'HSHS' # Human, smart bot, human, smart bot
-      - value: 'Test' # Everybody lying and calling for a fast-tracked game
-  - name: numRounds
-    desc: Number of rounds to play
-    values:
-      - value: 1
-      - value: 2
-      - value: 3
-      - value: 4
-      - value: 5
+    - name: playerCount
+      desc: determines the number of human players in a game
+      values:
+        - value: 3
+        - value: 4
+        - value: 5
+        - value: 6
+    - name: numRounds
+      desc: Number of rounds to play
+      values:
+        - value: 1
+        - value: 2
+        - value: 3
+        - value: 4
+        - value: 5
+    - name: gameConfiguration
+      desc: Player configuration types; must correspond to filenames located in 'experiments'
+      values:
+        - value: HRRR
+        - value: HSHS
+        - value: Test
+        - value: HHHBHB
 treatments:
-  - name: Solo
-    desc: "One human vs three random bots"
-    factors:
-      playerCount: 1
-      numRounds: 1
-      gameConfiguration: 'HRRR'
-
-  - name: Two Players
-    desc: "Two humans vs two smart bots, placed alternately"
-    factors:
-      playerCount: 2
-      numRounds: 1
-      gameConfiguration: 'HSHS'
-
-  - name: Test
-    desc: "Test"
-    factors:
-      playerCount: 1
-      numRounds: 2
-      gameConfiguration: 'Test'
+    - name: Solo
+      desc: One human vs three random bots
+      factors:
+        gameConfiguration: HRRR
+        numRounds: 1
+        playerCount: 1
+    - name: Two Players
+      desc: Two humans vs two smart bots, placed alternately
+      factors:
+        gameConfiguration: HSHS
+        numRounds: 1
+        playerCount: 2
+    - name: Test
+      desc: Test
+      factors:
+        gameConfiguration: Test
+        numRounds: 2
+        playerCount: 1
+    - name: SixPlayer
+      desc: Four humans, two bots
+      factors:
+        gameConfiguration: HHHBHB
+        numRounds: 2
+        playerCount: 4
