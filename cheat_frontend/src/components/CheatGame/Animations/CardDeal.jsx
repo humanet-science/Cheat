@@ -25,29 +25,7 @@ export function useCardDealAnimation({
 																			 setShowLetsGo,
 																			 setIsDealingCards,
 																			 soundManager,
-																			 debug = false
 																		 }) {
-
-	// Debug mode: Loop the animation
-	useEffect(() => {
-		if (!debug || !state) return;
-
-		const totalDuration = state.your_info.hand.length * state.players.length * 80 + 5000;
-
-		const interval = setInterval(() => {
-			// Reset and restart animation
-			setDealingFromCenter(true);
-			setIsDealingCards(true);
-			setDealtCards(0);
-			setShowLetsGo(false);
-		}, totalDuration);
-
-		// Start first loop
-		setDealingFromCenter(true);
-		setIsDealingCards(true);
-
-		return () => clearInterval(interval);
-	}, [debug, state, setDealingFromCenter, setIsDealingCards, setDealtCards, setShowLetsGo]);
 
 	// Dealing animation - cards fly from center to players one at a time, round-robin
 	useEffect(() => {
@@ -64,9 +42,9 @@ export function useCardDealAnimation({
 				allCards.push({
 					id: Math.random(),
 					targetPlayer: players[playerIdx],
-					cardNumber: round, // Which card in their hand (0-9)
-					delay: cardDelay, // Deal one every 80ms
-					rotation: 180 * Math.random() // Generate rotation
+					cardNumber: round,
+					delay: cardDelay,
+					rotation: 180 * Math.random()
 				});
 			}
 		}
@@ -74,20 +52,20 @@ export function useCardDealAnimation({
 		setCenterDealCards(allCards);
 
 		// Update dealtCards as cards arrive at player's position
-		allCards.forEach((card, index) => {
+		allCards.forEach((card) => {
 			if (card.targetPlayer === selfId) {
 				setTimeout(() => {
 					setDealtCards(prev => prev + 1);
-					soundManager.play('cardPlay', 0.2); // Play sound when card arrives
-				}, card.delay + CARD_FLIGHT_TIME); // Delay + flight time
+					soundManager.play('cardPlay', 0.2);
+				}, card.delay + CARD_FLIGHT_TIME);
 			}
 		});
 
 		// Finish dealing animation
 		const totalDuration = allCards.length * 80 + 1000;
-		const lastCardsStart = (allCards.length - 2) * 80; // When last 2 cards start dealing
+		const lastCardsStart = (allCards.length - 2) * 80;
 
-		// Show "Let's Go!" during last 5 cards
+		// Show "Let's Go!" during last cards
 		setTimeout(() => {
 			setShowLetsGo(true);
 			soundManager.play('start_bell');
@@ -103,7 +81,7 @@ export function useCardDealAnimation({
 		setTimeout(() => {
 			setShowLetsGo(false);
 			setIsDealingCards(false);
-		}, lastCardsStart + 2500); // Extra 2.5s for text to fade
+		}, lastCardsStart + 2500);
 
 	}, [state?.players, selfId, dealingFromCenter, setCenterDealCards, setDealtCards, setDealingFromCenter, setShowLetsGo, setIsDealingCards, soundManager]);
 
@@ -121,7 +99,7 @@ export function CardDeal({dealingCards = [], playerPositions = {}, tableCenter})
 
 	return (
 
-		<div className="fixed -z-1"
+		<div className="fixed z-0"
 				 style={{
 					 left: `calc(50% + ${tableCenter.x}px)`,
 					 top: `calc(50% + ${tableCenter.y}px)`,
