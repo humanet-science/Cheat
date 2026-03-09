@@ -27,16 +27,11 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 
 			{/* Player info */}
 			<div className="text-2xl mb-6 text-white drop-shadow-lg whitespace-nowrap">
-				{revealedCards.wasLying ? (<p className="mb-2">
-					{revealedCards.accused === state.your_info.id ? "You" : `${revealedCards.accused_name}`} played:
-				</p>) : (<p className="mb-2">
-					{revealedCards.caller === state.your_info.id ? "You pick" : `${revealedCards.caller_name} picks`} up the
-					pile.
-				</p>)}
+				{revealedCards.accused === state.your_info.id ? "You" : `${revealedCards.accused_name}`} played:
 			</div>
 
 			{/* Cards - only show if they were lying */}
-			{revealedCards.wasLying && (<div className="flex justify-center gap-6 perspective-1000">
+			{(<div className="flex justify-center gap-6 perspective-1000">
 				{revealedCards.cards.map((card, i) => {
 					const {rank, suit, isRed} = parseCard(card);
 					return (<div
@@ -58,7 +53,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 
 						{/* Card front (reveals after flip) */}
 						<div
-							className="w-20 h-28 bg-white rounded-lg border-4 border-red-400 shadow-2xl relative"
+							className={`w-20 h-28 bg-white rounded-lg border-4 border-gray-400 shadow-2xl relative`}
 							style={{
 								backfaceVisibility: 'hidden', animation: `cardFlipIn 1s ease-out ${i * 0.15}s both`
 							}}
@@ -84,6 +79,12 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 					</div>);
 				})}
 			</div>)}
+
+			<div className="text-2xl mt-6 mb-2 text-white drop-shadow-lg whitespace-nowrap">
+				{revealedCards.wasLying && revealedCards.accused === state.your_info.id ? "You pick" : revealedCards.wasLying ? `${revealedCards.accused_name} picks` : revealedCards.caller === state.your_info.id ? 'You pick' : `${revealedCards.caller_name} picks`} up the
+					pile.
+			</div>
+
 		</div>
 	</div>)
 }

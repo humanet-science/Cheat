@@ -17,27 +17,41 @@ export function PlayerNameInput({ playerName, setPlayerName }) {
   );
 }
 
-export function AvatarSelection({ selectedAvatar, setSelectedAvatar }) {
+export function AvatarSelection({ selectedAvatar, setSelectedAvatar, nrows = 1 }) {
+  // Split avatars into rows
+  const avatarsPerRow = Math.ceil(AVATARS.length / nrows);
+  const rows = [];
+
+  for (let i = 0; i < nrows; i++) {
+    const start = i * avatarsPerRow;
+    const end = start + avatarsPerRow;
+    rows.push(AVATARS.slice(start, end));
+  }
+
   return (
     <div className="mb-6">
       <label className="block text-gray-500 text-sm font-bold mb-4">
         Choose your Avatar
       </label>
       <div className="overflow-x-auto scrollbar-thin border border-gray-200 rounded-lg p-3 bg-gray-50">
-        <div className="flex gap-3" style={{ minWidth: 'min-content' }}>
-          {AVATARS.map((avatar, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => setSelectedAvatar(avatar)}
-              className={`flex-shrink-0 text-4xl p-3 rounded-xl transform-gpu transition-transform ${
-                selectedAvatar === avatar
-                  ? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-300'
-                  : 'bg-gray-100 hover:bg-gray-200 hover:scale-110'
-              }`}
-            >
-              {avatar}
-            </button>
+        <div className="flex flex-col gap-3">
+          {rows.map((row, rowIndex) => (
+            <div key={rowIndex} className="flex gap-3 justify-center" style={{ minWidth: 'min-content' }}>
+              {row.map((avatar, index) => (
+                <button
+                  key={`${rowIndex}-${index}`}
+                  type="button"
+                  onClick={() => setSelectedAvatar(avatar)}
+                  className={`flex-shrink-0 text-4xl p-3 rounded-xl transform-gpu transition-transform ${
+                    selectedAvatar === avatar
+                      ? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-300'
+                      : 'bg-gray-100 hover:bg-gray-200 hover:scale-110'
+                  }`}
+                >
+                  {avatar}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>

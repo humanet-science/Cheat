@@ -4,7 +4,7 @@ import Tutorial from "../../../../cheat_frontend/src/components/Tutorial";
 import {useState} from "react";
 import {usePlayer, useGame} from "@empirica/core/player/classic/react";
 import {
-    PlayerNameInput, AvatarSelection, TermsCheckbox
+    PlayerNameInput, AvatarSelection
 } from "../../../../cheat_frontend/src/components/WelcomeBox.jsx";
 import { useWebSocket } from '../WebSocketContext';
 
@@ -90,12 +90,9 @@ function ReadyScreen({onReady}) {
     const [playerName, setPlayerName] = useState('');
     const [selectedAvatar, setSelectedAvatar] = useState('');
 
-    // Has accepted the T&Cs
-    const [acceptedTerms, setAcceptedTerms] = useState(false);
-
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (playerName.trim() && selectedAvatar && acceptedTerms) {
+        if (playerName.trim() && selectedAvatar) {
             onReady(playerName.trim(), selectedAvatar);
         }
     };
@@ -111,18 +108,14 @@ function ReadyScreen({onReady}) {
             {/* Avatar Selection */}
             <AvatarSelection
                 selectedAvatar={selectedAvatar}
-                setSelectedAvatar={setSelectedAvatar}/>
-
-            {/* Terms and Conditions Checkbox */}
-            <TermsCheckbox
-                acceptedTerms={acceptedTerms}
-                setAcceptedTerms={setAcceptedTerms}
+                setSelectedAvatar={setSelectedAvatar}
+                nrows={4}
             />
 
             {/* Join Button */}
             <button
                 type="submit"
-                disabled={!playerName.trim() || !selectedAvatar || !acceptedTerms}
+                disabled={!playerName.trim() || !selectedAvatar}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
 					text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
             >
