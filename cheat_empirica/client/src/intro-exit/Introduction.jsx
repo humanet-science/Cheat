@@ -102,8 +102,16 @@ function ReadyScreen({onReady}) {
         id="game-root">
         <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-8 max-w-md w-full shadow-2xl">
 
+            <label className="block text-gray-500 text-sm font-bold mb-4">
+                Choose a player name
+            </label>
+
             {/* Player name selection*/}
-            <PlayerNameInput playerName={playerName} setPlayerName={setPlayerName}/>
+            <PlayerNameInput
+              playerName={playerName}
+              setPlayerName={setPlayerName}
+              placeholder={"Player name"}
+            />
 
             {/* Avatar Selection */}
             <AvatarSelection

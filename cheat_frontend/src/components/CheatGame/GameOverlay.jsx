@@ -12,7 +12,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 	if (!revealedCards) return null;
 	return (<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60]">
 		<div
-			className="text-center bg-opacity-80 backdrop-blur-sm rounded-2xl p-6 border-2 border-white border-opacity-20 shadow-2xl">
+			className="text-center bg-opacity-80 backdrop-blur-md rounded-2xl p-6 border-2 border-white border-opacity-20 shadow-2xl">
 			{/* Dramatic result text */}
 			<div
 				className="text-5xl font-bold mb-4 satisfy-regular whitespace-nowrap"

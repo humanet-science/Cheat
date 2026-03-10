@@ -1,14 +1,14 @@
 import React from 'react';
 import { AVATARS } from '../utils/constants';
 
-export function PlayerNameInput({ playerName, setPlayerName }) {
+export function PlayerNameInput({ playerName, setPlayerName, placeholder =  "Choose a player name ..."}) {
   return (
     <div className="mb-6 mt-3">
       <input
         type="text"
         value={playerName}
         onChange={(e) => setPlayerName(e.target.value)}
-        placeholder="Choose a player name ..."
+        placeholder={placeholder}
         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         maxLength={20}
         required

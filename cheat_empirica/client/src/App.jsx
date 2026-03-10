@@ -6,6 +6,9 @@ import {Game} from "./Game";
 import {ExitSurvey} from "./intro-exit/ExitSurvey";
 import {Introduction} from "./intro-exit/Introduction";
 import { Thanks } from "./intro-exit/Thanks";
+import { Consent } from "./intro-exit/Consent";
+import { playerCreate } from "./intro-exit/PlayerCreate";
+import LoadingWindow from "../../../cheat_frontend/src/components/GameLoading.jsx";
 import {noGames} from "./intro-exit/NoGames.jsx";
 import {WebSocketProvider} from "./WebSocketContext";
 
@@ -30,14 +33,18 @@ export default function App() {
                 <EmpiricaMenu position="bottom-left"/>
                 <div className="h-full overflow-auto">
                     <EmpiricaContext
+                      consent={Consent}
+                      playerCreate={playerCreate}
                       noGames={noGames}
                       introSteps={introSteps}
                       exitSteps={exitSteps}
                       finished={Thanks}
+                      lobby={() => <LoadingWindow showCancel={false} zValue={0} />}
                     >
                         <Game/>
                     </EmpiricaContext>
                 </div>
             </div>
-        </EmpiricaParticipant></WebSocketProvider>);
+        </EmpiricaParticipant>
+    </WebSocketProvider>);
 }

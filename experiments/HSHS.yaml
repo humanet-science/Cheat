@@ -10,17 +10,21 @@ players:
   - type: human
     avatar: 🧜‍♂️
     name: Mike
-  - type: SmartBot
-    name: B0Ttled Up
-    avatar: 🍾
-    verbosity: 0.1
+  - type: RandomBot
+    name: Beep Boop
+    avatar: 🤖
+    verbosity: 0.2
+    p_call: 0.3
+    p_lie: 0.3
   - type: human
     avatar: 🧚‍♀️
     name: Mary
-  - type: SmartBot
-    name: Beep Boop
+  - type: RandomBot
+    name: His Botness
     avatar: 🤖
-    verbosity: 0.1
+    verbosity: 0.2
+    p_call: 0.3
+    p_lie: 0.3
 
 experiment:
   predefined_messages: ~

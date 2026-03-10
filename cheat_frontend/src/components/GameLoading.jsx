@@ -7,6 +7,8 @@ const LoadingWindow = ({
                            joinedHumans = 1,
                            isGameCreator = false,
                            totalSlots = null,
+                           showCancel = true,
+                           zValue=50
                        }) => {
     const [cardAnimationPhase, setCardAnimationPhase] = useState('top-pause');
     const [waitingDots, setWaitingDots] = useState('');
@@ -128,7 +130,7 @@ const LoadingWindow = ({
     };
 
     return (<div
-        className="fixed inset-0 bg-gradient-to-br from-green-900 to-blue-900 flex items-center justify-center z-50 overflow-hidden">
+        className={`fixed inset-0 bg-gradient-to-br from-green-900 to-blue-900 flex items-center justify-center z-${zValue} overflow-hidden`}>
 
         <div className="text-center max-w-sm">
 
@@ -196,12 +198,13 @@ const LoadingWindow = ({
             )}
 
             {/* Cancel Button */}
+            {showCancel && (
             <button
                 onClick={handleCancelClick}
                 className="bg-red-400 hover:bg-red-500 text-white px-4 py-1 rounded-lg transition-colors"
             >
                 Cancel
-            </button>
+            </button>)}
 
             {/* Cancel confirmation dialogue */}
             {showCancelConfirm && (

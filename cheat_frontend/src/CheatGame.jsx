@@ -681,11 +681,14 @@ export default function CheatGame({
 
 	return (
 
-		<div className="min-h-screen text-white flex flex-col p-6">
+		<div className={`${containerWidth ? 'h-full' : 'min-h-screen'} text-white flex flex-col p-6`}>
 
 			{/* Game logo */}
 			<div className="fixed inset-0 flex items-center justify-center pointer-events-none">
-				<Logo className="opacity-20" style={{width: "min(20rem, 50vw)", height: "auto"}} animated={false}/>
+				<Logo className="opacity-20"
+							style={{width: "min(20rem, 50vw)", height: "auto"}}
+							animated={false}
+				/>
 			</div>
 
 			{/* Game menu */}
@@ -747,6 +750,7 @@ export default function CheatGame({
 					handlePlayerClick={handlePlayerClick}
 					state={state}
 					getPlayerColor={getPlayerColor}
+					experimentalMode={experimentalMode}
 				/>
 
 				{/* Animation of cards being dealt */}

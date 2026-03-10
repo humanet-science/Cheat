@@ -1,13 +1,17 @@
 import React, {useState} from "react";
 
 export function OpponentIcons({
-																opponents, playerPositions, handlePlayerClick, state, playAnnouncements, getPlayerColor,
+																opponents,
+																playerPositions,
+																handlePlayerClick,
+																state,
+																playAnnouncements,
+																getPlayerColor,
+																experimentalMode
 															}) {
 
 	const [hoveredPlayer, setHoveredPlayer] = useState(null);
-
 	return (opponents.map((opp, index) => {
-
 		return (
 			<div
 				key={opp.id}
@@ -18,7 +22,8 @@ export function OpponentIcons({
 					top: `calc(50% + ${playerPositions[opp.id]?.y || 0}px)`,
 					transform: 'translate(-50%, -50%)',
 				}}
-				className={`player-opponent rounded-full z-10 p-4 w-[clamp(50px,7vw,80px)] h-[clamp(50px,7vw,80px)] border-2 ${getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
+				className={`player-opponent rounded-full z-10 p-4 w-[clamp(50px,7vw,80px)] h-[clamp(50px,7vw,80px)] border-2
+										${experimentalMode && opp.type === 'bot' ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
 				onClick={() => handlePlayerClick(opp)}
 			>
 				<div className="text-center flex flex-col items-center justify-center h-full relative">
@@ -37,7 +42,7 @@ export function OpponentIcons({
 					</svg>
 					{/* Avatar in center */}
 					<span
-						className="text-[clamp(20px,4vw,50px)] z-10 relative group-hover:scale-110 transition-all">{opp.avatar}</span>
+						className="text-[clamp(20px,4vw,50px)] z-10 relative group-hover:scale-110 transition-all">{experimentalMode && opp.type === 'bot' ? '🤖' : opp.avatar}</span>
 				</div>
 
 				{/* Card icons for each opponent */}

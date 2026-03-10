@@ -16,17 +16,21 @@ players:
   - type: human
     avatar: 🧜‍♂️
     name: Bob
-  - type: SmartBot
-    name: Cindy
-    avatar: 🍾
+  - type: RandomBot
+    name: Beep Boop
+    avatar: 🤖
     verbosity: 0.1
+    p_call: 0.3
+    p_lie: 0.6
   - type: human
     avatar: 🧜‍♂️
     name: Cooper
-  - type: SmartBot
-    name: Rajesh
+  - type: RandomBot
+    name: His Botness
     avatar: 🤖
     verbosity: 0.1
+    p_call: 0.3
+    p_lie: 0.6
 
 experiment:
   predefined_messages: ~
