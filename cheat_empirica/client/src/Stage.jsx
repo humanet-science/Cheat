@@ -13,6 +13,7 @@ export function Stage() {
 	const [gameConfig, setGameConfig] = useState(null);
 	const [currentRound, setCurrentRound] = useState(null);
 	const [isReady, setIsReady] = useState(false);
+	const [showLogo, setShowLogo] = useState(true);
 
 	useEffect(() => {
 		if (!ws) return;
@@ -72,10 +73,32 @@ export function Stage() {
 
 	const handleExitGame = () => {
 
-      if (ws) {
-				ws.close();
-			}
+		if (ws) {
+			ws.close();
+		}
 	};
+
+	// Check if there is space for the logo
+	useEffect(() => {
+		const checkSpace = () => {
+			const playerHand = document.querySelector('[data-role="player-hand"]');
+			if (!playerHand) return;
+			const rect = playerHand.getBoundingClientRect();
+			const spaceOnRight = window.innerWidth - rect.right;
+			setShowLogo(spaceOnRight > 250);
+		};
+
+		checkSpace();
+		window.addEventListener('resize', checkSpace);
+		const ro = new ResizeObserver(checkSpace);
+		const el = document.querySelector('[data-role="player-hand"]');
+		if (el) ro.observe(el);
+
+		return () => {
+			window.removeEventListener('resize', checkSpace);
+			ro.disconnect();
+		};
+	}, []);
 
 
 	if (!ws) {
@@ -93,9 +116,9 @@ export function Stage() {
 			currentRound={currentRound}
 			onUpdateRound={updateRoundState}
 			onExitGame={handleExitGame}
-      empiricaPlayer={player}
+			empiricaPlayer={player}
 		/>
-		<div className="">
+		<div className={showLogo ? '' : 'hidden'}>
 			<HumanetLogo/>
 		</div>
 	</div>);

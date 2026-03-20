@@ -335,7 +335,7 @@ export default function CheatGame({
 			// Add a play announcement unless player is self
 			if (msg.your_info.id !== msg.current_player) {
 				addStatusMessage(msg.current_player, 'Call!', true);
-				await new Promise(r => setTimeout(r, 3000));
+				await new Promise(r => setTimeout(r, 2500));
 			}
 			setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
 

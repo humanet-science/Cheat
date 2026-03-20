@@ -57,7 +57,9 @@ export default function PlayerHand({
 			top: `calc(50% + ${playerPositions[yourId]?.y || 0}px)`,
 			transform: 'translate(-50%, -50%)'
 		}}
-		className="z-30 transition-all duration-200 ease-in-out" id={`player-${yourId}`}
+		className="z-30 transition-all duration-200 ease-in-out"
+		id={`player-${yourId}`}
+		data-role="player-hand"
 	>
 		<div className="flex justify-center">
 			<div className="w-full">

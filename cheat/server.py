@@ -85,6 +85,9 @@ waiting_queues: dict[str, dict[str, deque[Any]]] = {
 # Games waiting to be started
 waiting_games: dict[str, CheatGame] = {}  # {game_id: CheatGame instance}
 
+# Track when games were created, and remove them after one hour if they haven't yet started
+waiting_game_created_at: dict[str, float] = {}  # {game_id: timestamp}
+
 # Dictionary of game creators. Only the people who open a room can cancel the game, and when they cancel the game
 # the room is closed and removed from the server to prevent 'zombie' games from accumulating
 game_creators: dict[str, str] = {}  # {player_id: game_id}
@@ -266,8 +269,30 @@ async def run_game(_game: CheatGame):
 async def game_manager():
     """Continuously check queues and start games when possible"""
     while True:
+        # Get current time
+        now = asyncio.get_event_loop().time()
+
         # Start waiting games, if they are ready
         for game_id in list(waiting_games.keys()):
+            # Check when game was created, and remove if game hasn't been started after one hour
+            created_at = waiting_game_created_at[game_id]
+            if now - created_at > 3600:
+                game = waiting_games.pop(game_id)
+                waiting_game_created_at.pop(game_id)
+
+                # Notify any still-connected waiting players
+                for p in game.players:
+                    if p.type == "human" and p.connected and p.ws:
+                        try:
+                            await p.ws.send_json(
+                                {"type": "game_cancelled", "is_creator": False}
+                            )
+                        except Exception:
+                            pass
+                        game_creators.pop(id(p.ws), None)
+                server_log.info(f"Expired waiting game {game_id} after 1 hour.")
+
+            # Try to start game
             if all([p.connected for p in waiting_games[game_id].players]):
                 if len(active_games) < MAX_NUM_ACTIVE_GAMES:
                     game = waiting_games.pop(game_id)
@@ -331,6 +356,7 @@ async def websocket_endpoint(ws: WebSocket):
             # Add the game to waiting games
             player_to_game[id(ws)] = game.game_id
             waiting_games[game.game_id] = game
+            waiting_game_created_at[game.game_id] = asyncio.get_event_loop().time()
 
             # Name the player as the game creator: only they can terminate the game
             game_creators[id(ws)] = game.game_id
@@ -620,6 +646,11 @@ async def websocket_endpoint(ws: WebSocket):
                 if player.empirica_id in survey_participants:
                     survey_participants.pop(player.empirica_id)
 
+            # If player was a game_creator, remove from dictionary but keep the game they created for one hour
+            # (so people can still join using the key)
+            if id(player.ws) in game_creators.keys():
+                game_creators.pop(id(player.ws))
+
 
 ## ---------------------------------------------------------------------------------------------------------------------
 ## Empirica endpoint: create a game from a config
@@ -674,6 +705,7 @@ async def create_game_from_config(req: GameConfigRequest):
 
     # Add game to survey games
     waiting_games[game.game_id] = game
+    waiting_game_created_at[game.game_id] = asyncio.get_event_loop().time()
 
     # Add players to routing dict
     for player in game.players:

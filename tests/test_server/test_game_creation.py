@@ -449,6 +449,83 @@ class TestGameCreatorCancellation:
 
             assert server.player_to_game == {}
 
+    @pytest.mark.asyncio
+    async def test_creator_disconnects_game_remains(self, clean_server_state):
+        """Test that when the creator's websocket disconnects, they are removed from
+        game_creators but the waiting game is kept alive so others can still join."""
+
+        ws_creator = MockWebSocket()
+        ws_joiner = MockWebSocket()
+        creator_task = None
+        joiner_task = None
+
+        try:
+            # Creator creates a game
+            ws_creator.queue_message(
+                {
+                    "type": "create_game",
+                    "name": "Creator",
+                    "avatar": "avatar1",
+                    "num_humans": 2,
+                    "num_bots": 2,
+                }
+            )
+
+            creator_task = asyncio.create_task(server.websocket_endpoint(ws_creator))
+            await asyncio.sleep(0.5)
+
+            game_key = ws_creator.get_sent_messages_of_type("game_created")[0]["key"]
+
+            # Verify initial state
+            assert game_key in server.waiting_games
+            assert id(ws_creator) in server.game_creators
+            assert id(ws_creator) in server.player_to_game
+
+            # Creator's websocket disconnects abruptly (no exit_queue message)
+            ws_creator.close()
+            await asyncio.sleep(0.5)
+
+            # Creator should be removed from game_creators and player_to_game
+            assert id(ws_creator) not in server.game_creators
+            assert id(ws_creator) not in server.player_to_game
+
+            # But the game should still be in waiting_games so others can join with the key
+            assert game_key in server.waiting_games
+
+            # After creator disconnects, a new player can still join with the key
+            ws_joiner.queue_message(
+                {
+                    "type": "player_join",
+                    "name": "Joiner",
+                    "avatar": "avatar2",
+                    "game_key": game_key,
+                }
+            )
+            joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
+            await asyncio.sleep(0.5)
+
+            assert game_key in server.waiting_games
+            game = server.waiting_games[game_key]
+            connected = [p for p in game.players if p.type == "human" and p.connected]
+            assert any(p.name == "Joiner" for p in connected)
+
+        finally:
+            if creator_task and not creator_task.done():
+                creator_task.cancel()
+                try:
+                    await creator_task
+                except asyncio.CancelledError:
+                    pass
+
+            if joiner_task and not joiner_task.done():
+                joiner_task.cancel()
+                try:
+                    await joiner_task
+                except asyncio.CancelledError:
+                    pass
+
+            await asyncio.sleep(0.5)
+
 
 class TestNonCreatorLeaving:
     """Test what happens when a non-creator leaves the queue."""

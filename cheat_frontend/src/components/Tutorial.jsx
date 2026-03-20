@@ -701,7 +701,8 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 	>
 
 		{/* Close button */}
-		{(isEmpirica && currentSlide !== TUTORIAL_SLIDES.length - 1) ? <></> : <button
+		{/* (isEmpirica && currentSlide !== TUTORIAL_SLIDES.length - 1) */}
+		{(1!=1) ? <></> : <button
 			onClick={handleClose}
 			className={`absolute top-5 right-5 text-gray-500 hover:text-gray-700 transition-all duration-300 z-10 ${showText ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
 		>
