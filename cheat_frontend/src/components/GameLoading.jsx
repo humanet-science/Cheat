@@ -14,26 +14,7 @@ const LoadingWindow = ({
     const [waitingDots, setWaitingDots] = useState('');
 
     // Load sounds on mount
-    useEffect(() => {
-        const loadSounds = async () => {
-            try {
-                await soundManager.loadSound('cardPlay', '/sounds/card_play.mp3', 0.3);
-                await soundManager.loadSound('bluffSuccess', '/sounds/success.mp3');
-                await soundManager.loadSound('bluffFail', '/sounds/busted.mp3');
-                await soundManager.loadSound('callBluff', '/sounds/pop_low.mp3');
-                await soundManager.loadSound('discard', '/sounds/discard.wav');
-                await soundManager.loadSound('win', '/sounds/win.mp3');
-                await soundManager.loadSound('pick_up', '/sounds/pick_up.mp3', 0.2);
-                await soundManager.loadSound('start_bell', '/sounds/start_bell.mp3', 0.5);
-                console.log('All sounds loaded successfully');
-            } catch (error) {
-                // Continue anyway
-                console.error('Error loading sounds:', error);
-            }
-        };
-
-        loadSounds();
-    }, []);
+    useEffect(() => { soundManager.loadAll(); }, []);
 
     // Cancel confirmation box: only appears if game creator wants to exit the queue
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);

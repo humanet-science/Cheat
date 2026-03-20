@@ -24,7 +24,7 @@ export default function App() {
     }
 
     function exitSteps({game, player}) {
-        return [ExitSurvey];
+        return [];
     }
 
     return (<WebSocketProvider>

@@ -110,7 +110,10 @@ export function GameOverOverlay({
 																	setPlayAnnouncements,
 																	experimentalMode,
 																	empiricaPlayer = null,
-																	empiricaExperimentOver
+																	empiricaExperimentOver,
+																	hasClickedNextRound,
+																	setHasClickedNextRound,
+																	onFinish,
 																}) {
 	if (!gameOver) return null;
 	return (<div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
@@ -133,33 +136,38 @@ export function GameOverOverlay({
 			<div className={`${experimentalMode ? '' : 'flex'}  gap-4`}>
 
 				{/* Next round option if not in experimental mode or if experiment has not yet finished */}
-				{((!experimentalMode) || (experimentalMode && !empiricaExperimentOver)) && (<button
-					onClick={() => {
-						ws.send(JSON.stringify({type: "new_round"}));
-						if (totalHumans > 1) {
-							ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
-						}
-						setGameOver(false);
-						setWinner(null);
-						setSelectedCards([]);     // clear any lingering selections
-						setDeclaredRank("");      // reset the rank box
-						setHasActed(false);       // reset action flag
-						setPileCards([]);
-						setActionQueue([]);
-						setIsNewRound(true);
-						setDiscards([]);
-						setPlayAnnouncements([]);
-					}}
-					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
-				>
-					Next Round
-				</button>)}
+				{((!experimentalMode) || (experimentalMode && !empiricaExperimentOver)) && (<div className="flex flex-col items-center gap-2">
+					<button
+						disabled={hasClickedNextRound}
+						onClick={() => {
+							ws.send(JSON.stringify({type: "new_round"}));
+							if (totalHumans > 1) {
+								ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
+							}
+							setSelectedCards([]);     // clear any lingering selections
+							setDeclaredRank("");      // reset the rank box
+							setHasActed(false);       // reset action flag
+							setPileCards([]);
+							setActionQueue([]);
+							setIsNewRound(true);
+							setDiscards([]);
+							setPlayAnnouncements([]);
+							setHasClickedNextRound(true);
+						}}
+						className={`${hasClickedNextRound ? 'bg-gray-500 cursor-not-allowed text-gray-400' : 'bg-green-600 hover:bg-green-700 text-white '} font-bold py-2 px-6 rounded-lg text-lg whitespace-nowrap`}
+					>
+						Next Round
+					</button>
+					{hasClickedNextRound && experimentalMode && (
+						<div className="text-sm text-gray-300 whitespace-nowrap">
+							Waiting for other participants<span className="dot-bounce"><span>.</span><span>.</span><span>.</span></span>
+						</div>
+					)}
+				</div>)}
 
 				{/* In Experimental mode: if experiment finished, set finish and mark player complete */}
 				{experimentalMode && empiricaExperimentOver && (<button
-					onClick={() => {
-						empiricaPlayer.stage.set("submit", true);
-					}}
+					onClick={onFinish}
 					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
 				>
 					Finish
@@ -170,7 +178,7 @@ export function GameOverOverlay({
 					onClick={() => {
 						onQuit();
 					}}
-					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg whitespace-nowrap"
+					className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors text-lg whitespace-nowrap"
 				>
 					Leave Game
 				</button>)}

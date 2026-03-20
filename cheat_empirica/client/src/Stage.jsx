@@ -5,6 +5,8 @@ import React, {useState, useEffect} from "react";
 import CheatGame from "../../../cheat_frontend/src/CheatGame.jsx";
 import {HumanetLogo} from "../../../cheat_frontend/src/utils/Logo.jsx";
 import {useWebSocket} from './WebSocketContext';
+import {ExitSurvey} from './intro-exit/ExitSurvey';
+import {Thanks} from './intro-exit/Thanks';
 
 export function Stage() {
 	const player = usePlayer();
@@ -14,6 +16,8 @@ export function Stage() {
 	const [currentRound, setCurrentRound] = useState(null);
 	const [isReady, setIsReady] = useState(false);
 	const [showLogo, setShowLogo] = useState(true);
+	const [showSurvey, setShowSurvey] = useState(false);
+	const [showThanks, setShowThanks] = useState(false);
 
 	useEffect(() => {
 		if (!ws) return;
@@ -72,10 +76,13 @@ export function Stage() {
 	};
 
 	const handleExitGame = () => {
-
 		if (ws) {
 			ws.close();
 		}
+	};
+
+	const handleFinish = () => {
+		setShowSurvey(true);
 	};
 
 	// Check if there is space for the logo
@@ -88,17 +95,19 @@ export function Stage() {
 			setShowLogo(spaceOnRight > 250);
 		};
 
-		checkSpace();
+		// Use rAF so the check runs after React has painted the updated DOM
+		const raf = requestAnimationFrame(checkSpace);
 		window.addEventListener('resize', checkSpace);
 		const ro = new ResizeObserver(checkSpace);
 		const el = document.querySelector('[data-role="player-hand"]');
 		if (el) ro.observe(el);
 
 		return () => {
+			cancelAnimationFrame(raf);
 			window.removeEventListener('resize', checkSpace);
 			ro.disconnect();
 		};
-	}, []);
+	}, [currentRound]);
 
 
 	if (!ws) {
@@ -109,6 +118,14 @@ export function Stage() {
 		return <div className="text-center text-white">Waiting for game to start...</div>;
 	}
 
+	if (showThanks) {
+		return <Thanks />;
+	}
+
+	if (showSurvey) {
+		return <ExitSurvey next={() => { player.stage.set("submit", true); setShowThanks(true); }} />;
+	}
+
 	return (<div id="game-root">
 		<CheatGame
 			socket={ws}
@@ -117,6 +134,7 @@ export function Stage() {
 			onUpdateRound={updateRoundState}
 			onExitGame={handleExitGame}
 			empiricaPlayer={player}
+			onFinish={handleFinish}
 		/>
 		<div className={showLogo ? '' : 'hidden'}>
 			<HumanetLogo/>

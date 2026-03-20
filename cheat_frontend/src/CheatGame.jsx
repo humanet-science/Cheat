@@ -59,6 +59,7 @@ export default function CheatGame({
 																		onExitGame,
 																		highlightMenu = false,
 																		empiricaPlayer = null,
+																		onFinish = null,
 																		containerWidth = null,
 																		containerHeight = null,
 																		tutorialScale = null,
@@ -102,6 +103,7 @@ export default function CheatGame({
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
 	const [winner, setWinner] = useState(null);
+	const [hasClickedNextRound, setHasClickedNextRound] = useState(false);
 
 	// Track experiment over (experimental mode only)
 	const [experimentOver, setExperimentOver] = useState(false);
@@ -162,6 +164,9 @@ export default function CheatGame({
 		soundManager
 	});
 
+	// Load sounds (idempotent — safe to call even if LoadingWindow already loaded them)
+	useEffect(() => { soundManager.loadAll(); }, []);
+
 	// Set up WebSocket handlers for gameplay only
 	useEffect(() => {
 		if (socket) {
@@ -177,12 +182,20 @@ export default function CheatGame({
 					setConfirmedCount(0);
 					setTotalHumans(0);
 					setWinner(null);
+					setGameOver(false);
+					setHasClickedNextRound(false);
 					removeAllConnectionTimers();
 					setSpeakingPlayers(new Set());
 					if (msg.current_player === msg.your_info.id) {
 						setHasActed(false);
 					}
 					setIsMyTurn(msg.current_player === msg.your_info.id);
+					if (showDealAnimation) {
+						setCenterDealCards([]);
+						setDealtCards(0);
+						setIsDealingCards(true);
+						setDealingFromCenter(true);
+					}
 				}
 
 				if (["state", "state_update", "cards_played", "bluff_called", "discard", "round_over", "bot_message"].includes(msg.type)) {
@@ -731,6 +744,9 @@ export default function CheatGame({
 				experimentalMode={experimentalMode}
 				empiricaPlayer={empiricaPlayer}
 				empiricaExperimentOver={experimentOver}
+				hasClickedNextRound={hasClickedNextRound}
+				setHasClickedNextRound={setHasClickedNextRound}
+				onFinish={onFinish}
 			/>
 
 			{/* Status Message bubbles floating up from each player */}

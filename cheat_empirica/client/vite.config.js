@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import builtins from "rollup-plugin-polyfill-node";
 import { defineConfig, searchForWorkspaceRoot } from "vite";
+import path from "path";
 import restart from "vite-plugin-restart";
 import UnoCSS from "unocss/vite";
 import dns from "dns";
@@ -16,6 +17,7 @@ const builtinsPlugin = {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  publicDir: path.resolve(__dirname, "../../cheat_frontend/public"),
   optimizeDeps: {
     exclude: ["@empirica/tajriba", "@empirica/core"],
   },

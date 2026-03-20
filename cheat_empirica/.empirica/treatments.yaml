@@ -1,11 +1,4 @@
 factors:
-    - name: playerCount
-      desc: determines the number of human players in a game
-      values:
-        - value: 3
-        - value: 4
-        - value: 5
-        - value: 6
     - name: numRounds
       desc: Number of rounds to play
       values:
@@ -21,6 +14,14 @@ factors:
         - value: HSHS
         - value: Test
         - value: HHHBHB
+    - name: playerCount
+      desc: determines the number of human players in a game
+      values:
+        - value: 3
+        - value: 4
+        - value: 5
+        - value: 6
+        - value: 2
 treatments:
     - name: Solo
       desc: One human vs three random bots
@@ -28,12 +29,6 @@ treatments:
         gameConfiguration: HRRR
         numRounds: 1
         playerCount: 1
-    - name: Two Players
-      desc: Two humans vs two smart bots, placed alternately
-      factors:
-        gameConfiguration: HSHS
-        numRounds: 1
-        playerCount: 2
     - name: Test
       desc: Test
       factors:
@@ -46,3 +41,9 @@ treatments:
         gameConfiguration: HHHBHB
         numRounds: 2
         playerCount: 4
+    - name: Two Players
+      desc: Two humans vs two smart bots, placed alternately
+      factors:
+        gameConfiguration: HSHS
+        numRounds: 2
+        playerCount: 2

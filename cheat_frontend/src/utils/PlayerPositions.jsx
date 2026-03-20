@@ -46,8 +46,8 @@ export function usePlayerPositions(numPlayers, selfId, width, height, isMyTurn, 
 
 			// Calculate positions. Screen size is given a 10% margin, and the ellipse is restricted to 400px for large
 			// screens. Also restrict the eccentricity of the ellipse to at most 1.5
-			let radiusX = Math.min(0.5 * width * 0.95 - opponentWidth / 2 - 20, 400);
-			let radiusY = Math.min(0.5 * height * 0.95 - opponentHeight / 2 - 20, 400); // need to account for curved player name
+			let radiusX = Math.min(0.5 * width * 0.9 - opponentWidth / 2 - 20, 400);
+			let radiusY = Math.min(0.5 * height * 0.9 - opponentHeight / 2 - 20, 400); // need to account for curved player name
 			radiusY = Math.min(radiusY, 2.0 * radiusX);
 			let positions = getPlayerPositions(numPlayers, selfId, radiusX, radiusY);
 
