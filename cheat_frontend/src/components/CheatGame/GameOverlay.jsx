@@ -160,7 +160,7 @@ export function GameOverOverlay({
 					</button>
 					{hasClickedNextRound && experimentalMode && (
 						<div className="text-sm text-gray-300 whitespace-nowrap">
-							Waiting for other participants<span className="dot-bounce"><span>.</span><span>.</span><span>.</span></span>
+							Waiting for the other participants<span className="dot-bounce"><span>.</span><span>.</span><span>.</span></span>
 						</div>
 					)}
 				</div>)}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AVATARS } from '../utils/constants';
 
 export function PlayerNameInput({ playerName, setPlayerName, placeholder =  "Choose a player name ..."}) {
@@ -17,15 +17,19 @@ export function PlayerNameInput({ playerName, setPlayerName, placeholder =  "Cho
   );
 }
 
-export function AvatarSelection({ selectedAvatar, setSelectedAvatar, nrows = 1 }) {
-  // Split avatars into rows
-  const avatarsPerRow = Math.ceil(AVATARS.length / nrows);
+export function AvatarSelection({ selectedAvatar, setSelectedAvatar, nrows = 1, random_shuffle = false, scrollable = true }) {
+  // Optionally shuffle avatars before splitting into rows — memoized so it doesn't reshuffle on re-render
+  const avatarList = useMemo(() => {
+    return random_shuffle ? [...AVATARS].sort(() => Math.random() - 0.5) : AVATARS;
+  }, [random_shuffle]);
+
+  const avatarsPerRow = Math.ceil(avatarList.length / nrows);
   const rows = [];
 
   for (let i = 0; i < nrows; i++) {
     const start = i * avatarsPerRow;
     const end = start + avatarsPerRow;
-    rows.push(AVATARS.slice(start, end));
+    rows.push(avatarList.slice(start, end));
   }
 
   return (
@@ -33,16 +37,17 @@ export function AvatarSelection({ selectedAvatar, setSelectedAvatar, nrows = 1 }
       <label className="block text-gray-500 text-sm font-bold mb-4">
         Choose your Avatar
       </label>
-      <div className="overflow-x-auto scrollbar-thin border border-gray-200 rounded-lg p-3 bg-gray-50">
+      <div className={`${scrollable ? 'overflow-x-auto scrollbar-thin' : ''} border border-gray-200 rounded-lg p-3 bg-gray-50`}>
         <div className="flex flex-col gap-3">
           {rows.map((row, rowIndex) => (
-            <div key={rowIndex} className="flex gap-3 justify-center" style={{ minWidth: 'min-content' }}>
+            <div key={rowIndex} className="flex gap-3 justify-center" style={scrollable ? { minWidth: 'min-content' } : {}}>
               {row.map((avatar, index) => (
                 <button
                   key={`${rowIndex}-${index}`}
                   type="button"
                   onClick={() => setSelectedAvatar(avatar)}
-                  className={`flex-shrink-0 text-4xl p-3 rounded-xl transform-gpu transition-transform ${
+                  style={scrollable ? {} : { aspectRatio: '1' }}
+                  className={`${scrollable ? 'flex-shrink-0 text-4xl p-3' : 'flex-1 min-w-0 text-3xl p-2'} rounded-xl transform-gpu transition-transform ${
                     selectedAvatar === avatar
                       ? 'bg-blue-500 text-white scale-110 ring-4 ring-blue-300'
                       : 'bg-gray-100 hover:bg-gray-200 hover:scale-110'

@@ -1,5 +1,4 @@
 import React, {useState} from "react";
-import {Logo} from "../../../../cheat_frontend/src/utils/Logo.jsx";
 
 export function playerCreate({onPlayerID, connecting}) {
 	// For the text input field.
@@ -67,10 +66,10 @@ export function playerCreate({onPlayerID, connecting}) {
 				<p className="text-2xl text-center font-bold text-gray-700 mb-4">
 					Thank you for participating!
 				</p>
-				<p className="text-lg text-justify text-gray-700 mb-6">
-					This experiment is part of a scientific research project conducted at the
+				<p className="text-lg text-justify hyphens-auto text-gray-700 mb-6">
+					This experiment is part of a research project conducted by the
 					<a href="https://humanet.science" style={{"color": "#6DB4EE"}}> Humanet lab</a> at the
-					London School of Economics and Political Science. The results of our research may be presented at
+					London School of Economics and Political Science. The results will be presented at
 					scientific meetings or published in scientific journals.
 					<span className="font-bold"> All collected data is fully anonymised. </span>
 				</p>

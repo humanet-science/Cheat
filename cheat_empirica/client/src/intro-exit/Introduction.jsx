@@ -49,10 +49,10 @@ export function Introduction({next}) {
                 console.log("Registration confirmed, moving to next stage");
 
                 // Store websocket in context
-				setWs(ws);
+                setWs(ws);
 
                 // Clear the handler so Stage.jsx can set its own
-				ws.onmessage = null;
+                ws.onmessage = null;
 
                 next();
             }
@@ -117,6 +117,8 @@ function ReadyScreen({onReady}) {
             <AvatarSelection
                 selectedAvatar={selectedAvatar}
                 setSelectedAvatar={setSelectedAvatar}
+                random_shuffle={true}
+                scrollable={false}
                 nrows={4}
             />
 

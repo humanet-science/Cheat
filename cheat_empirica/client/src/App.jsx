@@ -24,7 +24,27 @@ export default function App() {
     }
 
     function exitSteps({game, player}) {
-        return [];
+        return [ExitSurvey];
+    }
+
+    if (urlParams.get("devThanks") === "true") {
+        return (
+            <div className="h-screen relative bg-gradient-to-br from-green-900 to-blue-900">
+                <div className="h-full overflow-auto">
+                    <Thanks />
+                </div>
+            </div>
+        );
+    }
+
+    if (urlParams.get("devSurvey") === "true") {
+        return (
+            <div className="h-screen relative bg-gradient-to-br from-green-900 to-blue-900">
+                <div className="h-full overflow-auto">
+                    <ExitSurvey next={() => alert("Survey submitted (dev mode)")} />
+                </div>
+            </div>
+        );
     }
 
     return (<WebSocketProvider>
