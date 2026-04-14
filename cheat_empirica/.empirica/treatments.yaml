@@ -10,8 +10,11 @@ factors:
     - name: gameConfiguration
       desc: Player configuration types; must correspond to filenames located in 'experiments'
       values:
+        - value: HSSS
         - value: HRRR
         - value: HSHS
+        - value: HRHR
+        - value: HSHHs
         - value: Test
         - value: HHHBHB
     - name: playerCount
@@ -22,18 +25,13 @@ factors:
         - value: 5
         - value: 6
         - value: 2
+        - value: 1
 treatments:
     - name: Solo
       desc: One human vs three random bots
       factors:
-        gameConfiguration: HRRR
+        gameConfiguration: HBBB
         numRounds: 1
-        playerCount: 1
-    - name: Test
-      desc: Test
-      factors:
-        gameConfiguration: Test
-        numRounds: 2
         playerCount: 1
     - name: SixPlayer
       desc: Four humans, two bots
@@ -44,6 +42,12 @@ treatments:
     - name: Two Players
       desc: Two humans vs two smart bots, placed alternately
       factors:
-        gameConfiguration: HSHS
+        gameConfiguration: HBHB
         numRounds: 2
         playerCount: 2
+    - name: Test
+      desc: Test
+      factors:
+        gameConfiguration: Test
+        numRounds: 1
+        playerCount: 1

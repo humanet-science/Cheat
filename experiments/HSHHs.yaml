@@ -1,8 +1,8 @@
-# Two humans, two smartbots
+# One smartbot, three humans with one displayed as a bot to the others
 game:
   experimental_mode: True
   out_dir: ~/Cheat_game_data/ # Directory for game data
-  note: 'empirica_HSHS' # Additional note to add to the output directory
+  note: 'empirica_HSHHs' # Additional note to add to the output directory
   game_id: ~
 
 # Player settings
@@ -11,16 +11,17 @@ players:
     avatar: 🧜‍♂️
     name: Mike
   - type: SmartBot
-    name: Beep Boop
+    name: His Botness
     avatar: 🤖
     verbosity: 0.2
   - type: human
-    avatar: 🧚‍♀️
-    name: Mary
-  - type: SmartBot
-    name: His Botness
+    avatar: 🧜‍♂️
+    name: Mike2
+  - type: human
     avatar: 🤖
-    verbosity: 0.3
+    name: Mike3
+    display_name: Beep Boop
+    display_type: bot
 
 experiment:
   predefined_messages: ~

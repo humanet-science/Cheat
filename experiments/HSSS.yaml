@@ -1,8 +1,8 @@
-# One human, three random bots
+# One human, three smart bots
 game:
   experimental_mode: True
   out_dir: ~/Cheat_game_data/ # Directory for game data
-  note: 'empirica_HRRR' # Additional note to add to the output directory
+  note: 'empirica_HSSS' # Additional note to add to the output directory
   game_id: ~
 
 # Player settings
@@ -10,24 +10,18 @@ players:
   - type: human
     avatar: 🧜‍♂️
     name: Mike
-  - type: RandomBot
+  - type: SmartBot
     name: His Botness
     avatar: 🤖
     verbosity: 0.1
-    p_lie: 0.3
-    p_call: 0.3
-  - type: RandomBot
+  - type: SmartBot
     name: Beep Boop
     avatar: 🤖
     verbosity: 0.1
-    p_call: 0.3
-    p_lie: 0.3
-  - type: RandomBot
+  - type: SmartBot
     name: ChattyBot
     avatar: 🤖
     verbosity: 0.4
-    p_call: 0.3
-    p_lie: 0.3
 
 experiment:
   predefined_messages: ~

@@ -1,8 +1,7 @@
 # Basic game settings, passed to CheatGame
 game:
   experimental_mode: True
-  out_dir: ~ # Directory for game data
-  note: 'Test' # Additional note to add to the output directory
+  out_dir: ~
   game_id: ~
 
 # Player settings
@@ -12,6 +11,8 @@ players:
     name: Mike
   - type: RandomBot
     name: B0Ttled Up
+    display_name: I am Hooman
+    display_type: human
     avatar: 🍾
     verbosity: 0.1
     p_lie: 1.0
