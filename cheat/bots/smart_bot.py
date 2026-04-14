@@ -20,10 +20,18 @@ class SmartBot(BotPlayer):
         self,
         id: int | None = None,
         name: str | None = None,
+        display_name: str | None = None,
         avatar: str | None = None,
         verbosity: float = 0.3,
+        display_type: str | None = None,
     ):
-        super().__init__(id=id, name=name, avatar=avatar)
+        super().__init__(
+            id=id,
+            name=name,
+            avatar=avatar,
+            display_name=display_name,
+            display_type=display_type,
+        )
         self.verbosity = verbosity
 
         # Dictionary containing information about other players — this is built dynamically

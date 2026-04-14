@@ -7,9 +7,21 @@ from .bot_messages import message_types
 
 class BotPlayer(Player):
     def __init__(
-        self, id: int | None = None, name: str | None = None, avatar: str | None = None
+        self,
+        id: int | None = None,
+        name: str | None = None,
+        display_name: str | None = None,
+        display_type: str | None = None,
+        avatar: str | None = None,
     ):
-        super().__init__(id=id, name=name, avatar=avatar, type="bot")
+        super().__init__(
+            id=id,
+            name=name,
+            display_name=display_name,
+            avatar=avatar,
+            type="bot",
+            display_type=display_type,
+        )
 
     def broadcast_message(self, game, type: str = None, *_, **__):
         """Broadcast an opinion based on the state of play"""

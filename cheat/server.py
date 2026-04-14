@@ -329,6 +329,8 @@ async def websocket_endpoint(ws: WebSocket):
                 id=None,
                 ws=ws,
                 empirica_id=data.get("empirica_id"),  # for Empirica experiments only
+                display_name=None,  # is set in experiments from the config
+                display_type=None,  # is set in experiments from the config
                 name=data["name"],
                 avatar=data["avatar"],
             )
@@ -690,8 +692,20 @@ async def create_game_from_config(req: GameConfigRequest):
     for idx in range(len(_cfg["players"])):
         if _cfg["players"][idx]["type"] == "human":
             empirica_id = empirica_player_ids[human_player_idx]
+
+            # Get display names and types from the config, if specified
+            _display_name = _cfg["players"][idx].get("display_name")
+            _display_type = _cfg["players"][idx].get("display_type")
+
             # Replace the config dict with the actual HumanPlayer instance
             _cfg["players"][idx] = survey_participants.pop(empirica_id)
+
+            # Add a display name and type, if specified
+            if _display_name is not None:
+                _cfg["players"][idx].display_name = _display_name
+            if _display_type is not None:
+                _cfg["players"][idx].display_type = _display_type
+
             human_player_idx += 1
 
     # Create a new game from the config and add to waiting survey games.

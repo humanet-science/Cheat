@@ -586,6 +586,13 @@ export default function CheatGame({
 	const addStatusMessage = (playerId, message, is_play_announcement = false, is_connection_timer = false) => {
 
 		const playerElement = document.getElementById(`player-${playerId}`);
+
+		// Replace any display names that do not match the actual player's name to avoid revealing
+		// experimental conditions. Make this independent of capitalisation since players will be typing fast.
+		if (state.your_info.name !== state.your_info.true_name) {
+			message = message.replace(new RegExp(state.your_info.name, 'gi'), state.your_info.true_name);
+		}
+
 		if (playerElement) {
 
 			// Add player to speaking set

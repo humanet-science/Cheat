@@ -14,12 +14,20 @@ class RandomBot(BotPlayer):
         self,
         id: int | None = None,
         name: str | None = None,
+        display_name: str | None = None,
         avatar: str | None = None,
+        display_type: str | None = None,
         p_call: float = 0.3,
         p_lie: float = 0.3,
         verbosity: float = 0.3,
     ):
-        super().__init__(id=id, name=name, avatar=avatar)
+        super().__init__(
+            id=id,
+            name=name,
+            display_name=display_name,
+            avatar=avatar,
+            display_type=display_type,
+        )
         self.p_call = p_call
         self.p_lie = p_lie
         self.verbosity = verbosity

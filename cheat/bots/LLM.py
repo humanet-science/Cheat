@@ -265,13 +265,22 @@ class LLM_Player(Player):
         self,
         id: int | None = None,
         name: str | None = None,
+        display_name: str | None = None,
         avatar: str | None = None,
         system_prompt: str | None = None,
         speaker_types: dict | None = None,
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
+        display_type: str | None = None,
         model_kwargs: dict = {},
     ):
-        super().__init__(id=id, name=name, avatar=avatar, type="LLM")
+        super().__init__(
+            id=id,
+            name=name,
+            display_name=display_name,
+            avatar=avatar,
+            type="LLM",
+            display_type=display_type,
+        )
         self.client = get_client(kind)
         self.system_prompt = system_prompt
         self.kind = kind

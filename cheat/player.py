@@ -17,9 +17,11 @@ class Player:
     id: int | None = None
     ws: WebSocket = None
     name: str | None = ""
+    display_name: str | None = None
     avatar: str | None = ""
     hand: List[Card] = None
     type: str = "human"
+    display_type: str | None = None
     connected: bool = True
     input_function: Callable = None
     logger: logging.Logger = None
@@ -27,6 +29,10 @@ class Player:
     def __post_init__(self):
         if self.hand is None:
             self.hand = []
+        if self.display_name is None:
+            self.display_name = self.name
+        if self.display_type is None:
+            self.display_type = self.type
 
     def __dict__(self):
         pass  # Implemented by each type
@@ -36,9 +42,10 @@ class Player:
         return dict(
             your_info={
                 "id": self.id,
-                "name": self.name,
+                "name": self.display_name,
+                "true_name": self.name,
                 "avatar": self.avatar,
-                "type": self.type,
+                "type": self.display_type,
                 "hand": [str(card) for card in self.hand],
                 "connected": self.connected,
                 "cardCount": len(self.hand),
@@ -82,13 +89,17 @@ class HumanPlayer(Player):
         name: str,
         avatar: str,
         ws: WebSocket = None,
+        display_name: str | None = None,
+        display_type: str | None = None,
         empirica_id: int | None = None,
     ):
         super().__init__(
             id=id,
             name=name,
+            display_name=display_name,
             avatar=avatar,
             type="human",
+            display_type=display_type,
             ws=ws,
             connected=ws is not None,
         )
