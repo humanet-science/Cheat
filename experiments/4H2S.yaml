@@ -1,0 +1,32 @@
+# Four humans, two smart bots
+game:
+  experimental_mode: True
+  out_dir: ~/Cheat_game_data/ # Directory for game data
+  note: 'empirica_4H2S' # Additional note to add to the output directory
+  game_id: ~
+
+# Player settings
+players:
+  - type: human
+    avatar: 🧜‍♂️
+    name: Mike
+  - type: human
+    avatar: 🧜‍♂️
+    name: Anton
+  - type: human
+    avatar: 🧜‍♂️
+    name: Bob
+  - type: SmartBot
+    name: Beep Boop
+    avatar: 🤖
+    verbosity: 0.3
+  - type: human
+    avatar: 🧜‍♂️
+    name: Cooper
+  - type: SmartBot
+    name: His Botness
+    avatar: 🤖
+    verbosity: 0.2
+
+experiment:
+  predefined_messages: ~

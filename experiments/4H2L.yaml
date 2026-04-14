@@ -1,8 +1,8 @@
-# Basic game settings, passed to CheatGame
+# Four humans, two LLMS
 game:
   experimental_mode: True
-  out_dir: ~ # Directory for game data
-  note: 'HHHBHB' # Additional note to add to the output directory
+  out_dir: ~/Cheat_game_data/ # Directory for game data
+  note: 'empirica_4H2L' # Additional note to add to the output directory
   game_id: ~
 
 # Player settings
@@ -16,21 +16,21 @@ players:
   - type: human
     avatar: 🧜‍♂️
     name: Bob
-  - type: RandomBot
+  - type: LLM
     name: Beep Boop
     avatar: 🤖
-    verbosity: 0.1
-    p_call: 0.3
-    p_lie: 0.6
+    kind: gemini
+    model_kwargs:
+      model: 'gemini-3-flash-preview'
   - type: human
     avatar: 🧜‍♂️
     name: Cooper
-  - type: RandomBot
+  - type: LLM
     name: His Botness
     avatar: 🤖
-    verbosity: 0.1
-    p_call: 0.3
-    p_lie: 0.6
+    kind: gemini
+    model_kwargs:
+      model: 'gemini-3-flash-preview'
 
 experiment:
   predefined_messages: ~

@@ -1,0 +1,34 @@
+# Six humans, with two displayed as bots
+game:
+  experimental_mode: True
+  out_dir: ~/Cheat_game_data/ # Directory for game data
+  note: 'empirica_4H2S_control' # Additional note to add to the output directory
+  game_id: ~
+
+# Player settings
+players:
+  - type: human
+    avatar: 🧜‍♂️
+    name: Mike
+  - type: human
+    avatar: 🧜‍♂️
+    name: Anton
+  - type: human
+    avatar: 🧜‍♂️
+    name: Bob
+  - type: human
+    avatar: 🧜‍♂️
+    name: Candice
+    display_name: Beep Boop
+    display_type: bot
+  - type: human
+    avatar: 🧜‍♂️
+    name: Cooper
+  - type: human
+    avatar: 🧜‍♂️
+    name: Owen
+    display_name: His Botness
+    display_type: bot
+
+experiment:
+  predefined_messages: ~

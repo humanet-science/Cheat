@@ -16,7 +16,9 @@ factors:
         - value: HRHR
         - value: HSHHs
         - value: Test
-        - value: HHHBHB
+        - value: 4H2L
+        - value: 4H2S
+        - value: 4H2S_control
     - name: playerCount
       desc: determines the number of human players in a game
       values:
@@ -30,14 +32,26 @@ treatments:
     - name: Solo
       desc: One human vs three random bots
       factors:
-        gameConfiguration: HBBB
+        gameConfiguration: HRRR
         numRounds: 1
         playerCount: 1
     - name: SixPlayer
-      desc: Four humans, two bots
+      desc: Four humans, two smart bots
       factors:
-        gameConfiguration: HHHBHB
-        numRounds: 2
+        gameConfiguration: 4H2S
+        numRounds: 4
+        playerCount: 4
+    - name: SixPlayer_control
+      desc: Six humans, two displayed as bots
+      factors:
+        gameConfiguration: 4H2S_control
+        numRounds: 4
+        playerCount: 6
+    - name: SixPlayer_LLM
+      desc: Four humans, two LLMs
+      factors:
+        gameConfiguration: 4H2L
+        numRounds: 4
         playerCount: 4
     - name: Two Players
       desc: Two humans vs two smart bots, placed alternately
