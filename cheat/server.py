@@ -12,9 +12,14 @@ from typing import Any, Dict, Literal
 
 import paramspace
 import yaml
+
+# Load the API keys
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+load_dotenv(override=True)
 
 # Local imports
 import cheat.bots
@@ -149,7 +154,10 @@ def new_game(
         if isinstance(player, cheat.bots.LLM_Player):
             if player.system_prompt is None:
                 player.system_prompt = game_config["default_system_prompt"].format(
-                    N_players=game.num_players, player_id=player.id
+                    N_players=game.num_players,
+                    player_id=player.id,
+                    player_id_before=(player.id - 1) % game.num_players,
+                    player_id_after=(player.id + 1) % game.num_players,
                 )
 
     # Store a link to the human players in the dictionary, if not already present
@@ -707,6 +715,17 @@ async def create_game_from_config(req: GameConfigRequest):
                 _cfg["players"][idx].display_type = _display_type
 
             human_player_idx += 1
+
+        # Add system prompt to LLM players
+        elif _cfg["players"][idx]["type"] == "LLM":
+            _cfg["players"][idx]["system_prompt"] = _cfg[
+                "default_system_prompt"
+            ].format(
+                N_players=len(_cfg["players"]),
+                player_id=idx,
+                player_id_before=(idx - 1) % len(_cfg["players"]),
+                player_id_after=(idx + 1) % len(_cfg["players"]),
+            )
 
     # Create a new game from the config and add to waiting survey games.
     # This game functions as a placeholder game with 'empty' human players, which can be filled

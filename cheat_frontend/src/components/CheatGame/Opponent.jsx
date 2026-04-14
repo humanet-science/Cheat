@@ -23,7 +23,7 @@ export function OpponentIcons({
 					transform: 'translate(-50%, -50%)',
 				}}
 				className={`player-opponent rounded-full z-10 p-4 w-[clamp(50px,7vw,80px)] h-[clamp(50px,7vw,80px)] border-2
-										${experimentalMode && opp.type === 'bot' ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
+										${experimentalMode && ['bot', 'LLM'].includes(opp.type) ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
 				onClick={() => handlePlayerClick(opp)}
 			>
 				<div className="text-center flex flex-col items-center justify-center h-full relative">
