@@ -27,11 +27,20 @@ export function Thanks() {
           Thank you for participating!
         </h1>
         <p className="text-gray-600">
-          Your responses have been recorded. Submit the following code to Prolific to obtain your bonus:
+          Your responses have been recorded. Submit the following code to&nbsp;
+          <a
+            href="https://app.prolific.com/submissions/complete?cc=CACBLBNZ"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-700 underline"
+          >
+              Prolific
+          </a>
+           &nbsp;to obtain your bonus:
         </p>
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-6 py-4">
           <span className="text-2xl font-mono font-bold text-blue-500 tracking-widest">
-            {bonusCode}
+            CACBLBNZ
           </span>
         </div>
         <p className="text-gray-600">

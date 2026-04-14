@@ -73,7 +73,9 @@ export function ExitSurvey({next}) {
 						Exit Survey
 					</h3>
 					<p className="mt-1 text-sm text-gray-500">
-						We are trying to improve the game and players' experience and would be grateful for your feedback. Please help us by answering all or any of the following questions:
+						We are trying to improve the game and players' experience and would be grateful for your feedback.
+						Please help us by answering all or any of the following questions. If questions do not apply (e.g. due to
+						early time out), you can simply write 'N/A'.
 					</p>
 				</div>
 
