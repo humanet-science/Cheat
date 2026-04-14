@@ -13,3 +13,4 @@ cheat_empirica/*.tar.zst
 .coverage
 coverage
 coverage.json
+.claude
