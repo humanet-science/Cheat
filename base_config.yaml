@@ -14,7 +14,7 @@ min_human_players:
   6: 3
 
 # Maximum number of parallel games server can handle
-max_num_active_games: 5
+max_num_active_games: 50
 
 # Basic game settings, passed to CheatGame
 game:
@@ -32,25 +32,27 @@ players:
 #    model_kwargs:
 #      model: deepseek-chat
 #      stream: False
-  - type: SmartBot
-    name: B0Ttled Up
-    avatar: 🍾
-    verbosity: 0.1
-  - type: SmartBot
+  - type: RandomBot
     name: Beep Boop
-    avatar: 🤖
-    verbosity: 0.1
+    avatar: 🍕
+    verbosity: 0.6
+    p_call: 0.2
+    p_lie: 0.6
+  - type: SmartBot
+    name: His Botness
+    avatar: 🧜‍♂️
+    verbosity: 0.6
   - type: SmartBot
     name: ChattyBot
     avatar: 🐭
-    verbosity: 0.3
+    verbosity: 0.9
   - type: SmartBot
     name: B0Tanical
     avatar: 🌼
-    verbosity: 0.2
+    verbosity: 0.6
   - type: RandomBot
-    name: His Botness
-    avatar: ✈️
+    name: BOTtled Up
+    avatar: 🍾
     verbosity: 0.2
     p_call: 0.5
     p_lie: 0.5
