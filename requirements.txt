@@ -1,5 +1,6 @@
 colorlog
 coverage
+dotenv
 hypercorn
 fastapi
 pandas
