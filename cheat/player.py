@@ -1,6 +1,7 @@
 # Get the logger
 import logging
-import random
+import pickle
+
 from dataclasses import dataclass
 from typing import Callable, List
 
@@ -106,7 +107,19 @@ class HumanPlayer(Player):
         self.empirica_id = empirica_id
 
     def __dict__(self):
-        return dict(id=self.id, name=self.name, avatar=self.avatar, type=self.type)
+        return dict(id=self.id,
+                    name=self.name,
+                    avatar=self.avatar,
+                    type=self.type,
+                    display_name=self.display_name,
+                    display_type=self.display_type)
+
+    def write_info(self, path) -> None:
+        with open(
+            f"{path}/Player_{self.id if self.id is not None else self.name}.pickle",
+            "wb",
+        ) as file:
+            pickle.dump(self.__dict__(), file)
 
     async def make_move(self, game) -> GameAction:
         # Human players make moves via WebSocket
