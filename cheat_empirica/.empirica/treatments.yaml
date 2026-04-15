@@ -56,7 +56,7 @@ treatments:
     - name: Two Players
       desc: Two humans vs two smart bots, placed alternately
       factors:
-        gameConfiguration: HBHB
+        gameConfiguration: HSHS
         numRounds: 2
         playerCount: 2
     - name: Test

@@ -111,6 +111,7 @@ class HumanPlayer(Player):
                     name=self.name,
                     avatar=self.avatar,
                     type=self.type,
+                    empirica_id=self.empirica_id,
                     display_name=self.display_name,
                     display_type=self.display_type)
 
