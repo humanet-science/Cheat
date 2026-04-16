@@ -16,6 +16,12 @@ min_human_players:
 # Maximum number of parallel games server can handle
 max_num_active_games: 50
 
+# Study queue settings (Empirica-free flow)
+# study_min_players: minimum humans needed to start a game (set to 1 to test solo)
+# study_num_players: total players including bots (must be >= study_min_players)
+study_min_players: 4
+study_num_players: 6
+
 # Basic game settings, passed to CheatGame
 game:
   experimental_mode: False
@@ -57,9 +63,9 @@ players:
     p_call: 0.5
     p_lie: 0.5
 
-# Settings specifically for the experimental mode
-experiment:
-  predefined_messages: ~
+# Predefined messages: if a list of messages is passed, only these messages can be sent between the players.
+# If none, they can use the message box to send arbitrary messages
+predefined_messages: ~
 #    - "No way!"
 #    - "That's some BS"
 #    - "Flip that"

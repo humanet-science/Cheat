@@ -30,7 +30,7 @@ import {VALID_RANKS} from "./utils/constants";
  * Main Cheat card game component
  *
  * Handles game state, player interactions, animations, and WebSocket communication.
- * Can be used standalone or embedded in contexts like Tutorial or Empirica experiments.
+ * Can be used standalone or embedded in contexts like Tutorial or experiments.
  *
  * @param {WebSocket} socket - WebSocket connection for real-time game communication
  * @param {Object} gameConfig - Game configuration object:
@@ -42,8 +42,6 @@ import {VALID_RANKS} from "./utils/constants";
  * @param {Function} onUpdateRound - Callback to update round state
  * @param {Function} onExitGame - Callback when player exits game
  * @param {boolean} [highlightMenu=false] - Whether to highlight menu (used in Tutorial)
- * @param {Object|null} [empiricaPlayer=null] - Empirica player object for experiment context.
- *   If provided, game will handle Empirica-specific behaviors (e.g., stage transitions)
  * @param {number|null} [containerWidth=null] - Override container width for player positioning.
  *   Used in Tutorial where game is scaled/transformed. If null, uses window width.
  * @param {number|null} [containerHeight=null] - Override container height for player positioning.
@@ -58,7 +56,6 @@ export default function CheatGame({
 																		onUpdateRound,
 																		onExitGame,
 																		highlightMenu = false,
-																		empiricaPlayer = null,
 																		onFinish = null,
 																		containerWidth = null,
 																		containerHeight = null,
@@ -230,8 +227,10 @@ export default function CheatGame({
 					removeConnectionTimer(state.your_info.id);
 					if (experimentalMode) {
 						setExperimentOver(true);
+						// Don't exit yet — user must click Finish
+					} else {
+						onExitGame();
 					}
-					onExitGame();
 				}
 			};
 
@@ -500,9 +499,12 @@ export default function CheatGame({
 	}, [selectedCards, declaredRank, socket]);
 
 	// Allow using the Enter key to play, without having to click on the button all the time
+	// Guard: don't fire if focus is on a text input (e.g. the message box or rank input)
 	useEffect(() => {
 		const handleKeyPress = (e) => {
 			if (e.key === 'Enter') {
+				const tag = document.activeElement?.tagName;
+				if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 				e.preventDefault();
 				play();
 			}
@@ -749,8 +751,7 @@ export default function CheatGame({
 				confirmedCount={confirmedCount}
 				totalHumans={totalHumans}
 				experimentalMode={experimentalMode}
-				empiricaPlayer={empiricaPlayer}
-				empiricaExperimentOver={experimentOver}
+				experimentOver={experimentOver}
 				hasClickedNextRound={hasClickedNextRound}
 				setHasClickedNextRound={setHasClickedNextRound}
 				onFinish={onFinish}

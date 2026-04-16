@@ -403,6 +403,7 @@ class CheatGame:
     def get_info(self) -> dict:
         """Produce a dictionary that can be broadcast to the frontend"""
         return {
+            "game_id": self.game_id,
             "current_player": self.turn,
             "current_player_name": self.players[self.turn].name,
             "current_rank": self.current_rank,
@@ -611,9 +612,9 @@ class CheatGame:
             {
                 "type": "bluff_called",
                 "caller": player.id,
-                "caller_name": player.name,
+                "caller_name": player.display_name,
                 "accused": self.players[last_player].id,
-                "accused_name": self.players[last_player].name,
+                "accused_name": self.players[last_player].display_name,
                 "declared_rank": declared_rank,
                 "actual_cards": [str(c) for c in cards_played],
                 "was_lying": was_lying,
@@ -766,7 +767,7 @@ class CheatGame:
                 "type": "human_message",
                 "sender_id": player.id,
                 "sender_name": player.name,
-                "message": f"{player.name} has left the game.",
+                "message": f"{player.display_name} has left the game.",
                 "num_players": len(self.players),
             }
         )
@@ -785,6 +786,7 @@ class CheatGame:
         bot = RandomBot(
             id=player.id,  # Keep the same ID
             name=bot_name,
+            display_name=f"{player.display_name}_bot",
             avatar=player.avatar,  # Keep the same avatar
             p_call=0.3,
             p_lie=0.3,
@@ -811,7 +813,7 @@ class CheatGame:
             {
                 "type": "bot_message",
                 "sender_id": bot.id,
-                "message": f"🤖 {bot_name} has taken over for {player.name}",
+                "message": f"🤖 {bot.display_name} has taken over for {player.display_name}",
                 **self.get_info(),
             }
         )

@@ -1,0 +1,144 @@
+# Whether to randomly shuffle all the games or to assign players to games in the order in which they
+# are listed
+randomize_treatments: true
+
+# Specific game treatments. Each treatment is a game configuration, detailing the player types,
+# number of players, total number of games to initialise with this config,
+treatments:
+
+  # Four humans, two LLMS
+#  - game:
+#      experimental_mode: True
+#      out_dir: ~/Cheat_game_data/ # Directory for game data
+#      note: 'empirica_4H2L' # Additional note to add to the output directory
+#      game_id: ~
+#
+#    players:
+#      - type: human
+#        avatar: 🧜‍♂️
+#        name: Mike
+#      - type: human
+#        avatar: 🧜‍♂️
+#        name: Anton
+#      - type: human
+#        avatar: 🧜‍♂️
+#        name: Bob
+#      - type: LLM
+#        name: Beep Boop
+#        avatar: 🤖
+#        kind: gemini
+#        model_kwargs:
+#          model: 'gemini-3-flash-preview'
+#      - type: human
+#        avatar: 🧜‍♂️
+#        name: Cooper
+#      - type: LLM
+#        name: His Botness
+#        avatar: 🤖
+#        kind: gemini
+#        model_kwargs:
+#          model: 'gemini-3-flash-preview'
+#
+#    # Only allow certain custom messages. If None, players can use the full message box
+#    predefined_messages: ~
+#
+#    # Total number of games of this kind
+#    num_games: 4
+#
+#    # Number of rounds per game
+#    num_rounds: 2
+#
+#    # Max waiting time (in minutes)
+#    # After this time, players will be shown the completion code and can submit.
+#    # Default is 15 minutes
+#    max_waiting_time: 10
+
+  # Four humans, two bots
+  - game:
+      experimental_mode: True
+      out_dir: ~/Cheat_game_data/ # Directory for game data
+      note: '4H2S' # Additional note to add to the output directory
+      game_id: ~
+
+    # Player settings
+    players:
+      - type: human
+        avatar: 🧜‍♂️
+        name: Mike
+      - type: human
+        avatar: 🧜‍♂️
+        name: Anton
+      - type: human
+        avatar: 🧜‍♂️
+        name: Bob
+      - type: SmartBot
+        name: Beep Boop
+        avatar: 🤖
+        verbosity: 0.3
+      - type: human
+        avatar: 🧜‍♂️
+        name: Cooper
+      - type: SmartBot
+        name: His Botness
+        avatar: 🤖
+        verbosity: 0.2
+
+    # Only allow certain custom messages. If None, players can use the full message box
+    predefined_messages: ~
+
+    # Total number of games of this kind
+    num_games: 4
+
+    # Number of rounds per game
+    num_rounds: 1
+
+    # Max waiting time (in minutes)
+    # After this time, players will be shown the completion code and can submit.
+    # Default is 15 minutes
+    max_waiting_time: 10
+
+  # Six humans, with two displayed as bots
+  - game:
+      experimental_mode: True
+      out_dir: ~/Cheat_game_data/ # Directory for game data
+      note: '4H2S_control' # Additional note to add to the output directory
+      game_id: ~
+
+    # Player settings
+    players:
+      - type: human
+        avatar: 🧜‍♂️
+        name: Mike
+      - type: human
+        avatar: 🧜‍♂️
+        name: Anton
+      - type: human
+        avatar: 🧜‍♂️
+        name: Bob
+      - type: human
+        avatar: 🧜‍♂️
+        name: Candice
+        display_name: Beep Boop
+        display_type: bot
+      - type: human
+        avatar: 🧜‍♂️
+        name: Cooper
+      - type: human
+        avatar: 🧜‍♂️
+        name: Owen
+        display_name: His Botness
+        display_type: bot
+
+    # Only allow certain custom messages. If None, players can use the full message box
+    predefined_messages: ~
+
+    # Total number of games of this kind
+    num_games: 4
+
+    # Number of rounds per game
+    num_rounds: 1
+
+    # Max waiting time (in minutes)
+    # After this time, players will be shown the completion code and can submit.
+    # Default is 15 minutes
+    max_waiting_time: 10

@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import json
 import os
 import random
 import traceback
@@ -7,16 +8,20 @@ import traceback
 # Package imports
 from collections import deque
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Literal
 
+import aiosqlite
 import paramspace
 import yaml
 
 # Load the API keys
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 load_dotenv(override=True)
@@ -47,12 +52,118 @@ if seed is not None:
 # Store the game manager task for potential cleanup
 game_manager_task = None
 
+# Track pending out_path cleanup tasks so they can be cancelled on shutdown
+_cleanup_tasks: set[asyncio.Task] = set()
+
+# Participant tracking database
+DB_PATH = Path(__file__).parent.parent / "game_data" / "participants.db"
+
+# Delay (seconds) before removing a game's out_path from the cache after it ends
+OUT_PATH_CLEANUP_DELAY = 1800
+
+# Admin panel password — set ADMIN_PASSWORD in .env; no default so it fails closed
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+
+async def init_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS participants (
+                prolific_id   TEXT PRIMARY KEY,
+                tutorial_done INTEGER DEFAULT 0,
+                game_assigned INTEGER DEFAULT 0,
+                created_at    TEXT DEFAULT (datetime('now'))
+            )
+        """
+        )
+        await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Study schedule
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class GameSlot:
+    """A scheduled study game that has not yet been instantiated."""
+
+    config: dict  # merged treatment + base config
+    num_humans: int  # participants needed to start
+    max_waiting_time: int  # seconds before frontend redirects to timeout screen
+
+
+def build_schedule() -> deque:
+    """Read experiments.yaml and return a shuffled deque of GameSlots."""
+    experiments_path = Path(__file__).parent.parent / "experiments.yaml"
+    if not experiments_path.exists():
+        server_log.warning("experiments.yaml not found; study schedule is empty")
+        return deque()
+
+    with open(experiments_path) as f:
+        experiments = yaml.safe_load(f)
+
+    randomize = experiments.get("randomize_treatments", False)
+    slots = []
+
+    for treatment in experiments.get("treatments", []):
+        num_humans = sum(1 for p in treatment["players"] if p.get("type") == "human")
+        num_games = treatment.get("num_games", 1)
+
+        # Merge treatment config into a copy of the base config
+        player_config = copy.deepcopy(treatment["players"])
+        cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), treatment)
+        cfg["players"] = player_config
+
+        # Normalise: num_rounds → game.n_rounds
+        if "num_rounds" in treatment:
+            cfg["game"]["n_rounds"] = treatment["num_rounds"]
+
+        # Normalise: top-level predefined_messages → experiment.predefined_messages
+        if "predefined_messages" in treatment:
+            cfg.setdefault("experiment", {})["predefined_messages"] = treatment.get(
+                "predefined_messages"
+            )
+
+        # max_waiting_time is in minutes in the yaml; convert to seconds here
+        max_waiting_time = treatment.get("max_waiting_time", 15) * 60
+
+        # Remove treatment-only top-level keys that don't belong in the game config
+        for key in (
+            "num_games",
+            "num_rounds",
+            "predefined_messages",
+            "max_waiting_time",
+        ):
+            cfg.pop(key, None)
+
+        for i in range(num_games):
+            slots.append(
+                GameSlot(
+                    config=copy.deepcopy(cfg),
+                    num_humans=num_humans,
+                    max_waiting_time=max_waiting_time,
+                )
+            )
+
+    if randomize:
+        random.shuffle(slots)
+
+    server_log.info(
+        f"Study schedule built with {len(slots)} slot{'s' if len(slots) != 1 else ''}"
+    )
+    return deque(slots)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global game_manager_task
+    global game_manager_task, schedule
     # Startup code
     try:
+        await init_db()
+        schedule = build_schedule()
         game_manager_task = asyncio.create_task(game_manager())
         server_log.info("Game manager started")
     except Exception as e:
@@ -70,6 +181,13 @@ async def lifespan(app: FastAPI):
             server_log.info("Game manager task cancelled successfully")
         except Exception as e:
             server_log.error(f"Error during game manager shutdown: {e}")
+
+    # Cancel any pending out_path cleanup tasks
+    for task in list(_cleanup_tasks):
+        task.cancel()
+    if _cleanup_tasks:
+        await asyncio.gather(*_cleanup_tasks, return_exceptions=True)
+        _cleanup_tasks.clear()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -100,14 +218,20 @@ game_creators: dict[str, str] = {}  # {player_id: game_id}
 # Active games currently playing
 active_games: dict[str, CheatGame] = {}  # {game_id: CheatGame instance}
 
-# Survey participants with a websocket waiting to be assigned to a game
-survey_participants: dict[str, HumanPlayer] = {}  # {empirica_id: HumanPlayer instance}
-
 # Maximum number of parallel games server can handle
 MAX_NUM_ACTIVE_GAMES = game_config["max_num_active_games"]
 
+# Study schedule: deque of GameSlots, populated at startup from experiments.yaml
+schedule: deque[GameSlot] = deque()
+
+# Participants who have joined the study queue and are waiting to be assigned a game
+study_participants: deque[HumanPlayer] = deque()
+
 # WebSocket-to-Game dictionary for routing messages
 player_to_game: dict[int, str] = {}  # {websocket: game_id} for routing messages
+
+# Maps game_id -> out_path for survey saving (persists after game ends)
+game_out_paths: dict[str, str] = {}
 
 
 def new_game(
@@ -145,7 +269,7 @@ def new_game(
         message_queue=asyncio.Queue(),  # Set up a new queue
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
-        predefined_messages=game_config["experiment"].get("predefined_messages", None),
+        predefined_messages=game_config.get("predefined_messages", None),
     )
 
     # Set the system prompt for all LLM players, if not specified from the config
@@ -170,6 +294,7 @@ def new_game(
         file_path = os.path.join(game.out_path, "game_config.yaml")
         with open(file_path, "w") as f:
             yaml.dump(game_config, f)
+        game_out_paths[game.game_id] = game.out_path
 
     # Return the game
     return game
@@ -210,6 +335,47 @@ async def try_start_game_from_queue(num_players, mode):
         # If an API key is missing (e.g. for a mixed LLM-human game), kick waiting players out of the queue
         except cheat.MissingAPIKeyError as e:
             server_log.error(e)
+
+
+async def start_study_slot(slot: GameSlot):
+    """Instantiate and start a study game, pulling players from study_participants."""
+    try:
+        cfg = copy.deepcopy(slot.config)
+        human_idx = 0
+
+        for idx in range(len(cfg["players"])):
+            p_cfg = cfg["players"][idx]
+            if isinstance(p_cfg, dict) and p_cfg.get("type") == "human":
+                real_player = study_participants.popleft()
+                # Preserve display_name / display_type from the treatment config
+                if p_cfg.get("display_name"):
+                    real_player.display_name = p_cfg["display_name"]
+                if p_cfg.get("display_type"):
+                    real_player.display_type = p_cfg["display_type"]
+                cfg["players"][idx] = real_player
+                human_idx += 1
+            elif isinstance(p_cfg, dict) and p_cfg.get("type") == "LLM":
+                p_cfg["system_prompt"] = cfg["default_system_prompt"].format(
+                    N_players=len(cfg["players"]),
+                    player_id=idx,
+                    player_id_before=(idx - 1) % len(cfg["players"]),
+                    player_id_after=(idx + 1) % len(cfg["players"]),
+                )
+
+        game = game_from_config(cfg, show_logs=cfg.get("show_logs", False))
+
+        for player in game.players:
+            if player.type == "human":
+                player_to_game[id(player.ws)] = game.game_id
+
+        active_games[game.game_id] = game
+        if game.out_path is not None:
+            game_out_paths[game.game_id] = game.out_path
+        asyncio.create_task(run_game(game))
+        server_log.info(f"Started study game {game.game_id}.")
+    except Exception as e:
+        server_log.error(f"Error starting study slot: {e}")
+        traceback.print_exc()
 
 
 async def run_game(_game: CheatGame):
@@ -268,6 +434,18 @@ async def run_game(_game: CheatGame):
                 f"Number of active games remaining: {len(active_games.keys())}."
             )
 
+        # Schedule out_path cleanup after 30 minutes (enough time for survey submission)
+        async def _cleanup_out_path():
+            try:
+                await asyncio.sleep(OUT_PATH_CLEANUP_DELAY)
+                game_out_paths.pop(_game.game_id, None)
+            except asyncio.CancelledError:
+                pass
+
+        task = asyncio.create_task(_cleanup_out_path())
+        _cleanup_tasks.add(task)
+        task.add_done_callback(_cleanup_tasks.discard)
+
         # Remove player mappings
         for player in _game.players:
             if id(player.ws) in player_to_game:
@@ -316,6 +494,12 @@ async def game_manager():
                 ):
                     await try_start_game_from_queue(key, mode)
 
+        # Start study game when enough participants are queued for the next slot
+        if schedule and len(study_participants) >= schedule[0].num_humans:
+            if len(active_games) < MAX_NUM_ACTIVE_GAMES:
+                slot = schedule.popleft()
+                await start_study_slot(slot)
+
         # Check every second
         await asyncio.sleep(1)
 
@@ -332,11 +516,11 @@ async def websocket_endpoint(ws: WebSocket):
         # If a new player wants to join, create Player instance and append to relevant queue.
         # The queue may be the queue for a quick-pairing match, or, if a game key is provided, for a
         # specific game.
-        if data["type"] in ["player_join", "create_game", "empirica_join"]:
+        if data["type"] in ["player_join", "create_game", "study_join"]:
             player = HumanPlayer(
                 id=None,
                 ws=ws,
-                empirica_id=data.get("empirica_id"),  # for Empirica experiments only
+                identifier=data.get("prolific_id"),  # for Prolific experiments only
                 display_name=None,  # is set in experiments from the config
                 display_type=None,  # is set in experiments from the config
                 name=data["name"],
@@ -467,23 +651,28 @@ async def websocket_endpoint(ws: WebSocket):
                     }
                 )
 
-        # Survey participant has completed introduction and is waiting to be assigned to a game.
-        # We store the player alongside their websocket and assign them to a game once it is created
-        elif data["type"] == "empirica_join":
-            survey_participants[data["empirica_id"]] = player
+        # Study participant: assign directly to the first pending slot in the schedule.
+        elif data["type"] == "study_join":
+            player.identifier = data.get("prolific_id")
 
-            ws_log.info(
-                f"Player {data['name']} joined survey queue. "
-                f"WebSocket id: {id(ws)}. "
-                f"Number of active games: {len(active_games)}"
-            )
-
-            await ws.send_json(
-                {
-                    "type": "player_registered",
-                    "message": f"Id {data['empirica_id']} has been added to the participant queue",
-                }
-            )
+            if not schedule:
+                await ws.send_json({"type": "no_games_available"})
+                ws_log.info(
+                    f"Player {data['name']} tried to join study but schedule is empty."
+                )
+            else:
+                study_participants.append(player)
+                await ws.send_json(
+                    {
+                        "type": "queue_joined",
+                        "max_wait_seconds": schedule[0].max_waiting_time,
+                    }
+                )
+                ws_log.info(
+                    f"Player {data['name']} joined study queue "
+                    f"(position {len(study_participants)}). "
+                    f"Prolific: {data.get('prolific_id')}"
+                )
 
         # Keep connection alive and listen for messages
         while True:
@@ -552,7 +741,12 @@ async def websocket_endpoint(ws: WebSocket):
                             f"{player.name} left the queue for game {_game.game_id}."
                         )
 
-                    # Player was not yet assigned a game
+                    # Study player leaving the queue
+                    elif player in study_participants:
+                        study_participants.remove(player)
+                        ws_log.info(f"{player.name} exited study queue.")
+
+                    # Player was not yet assigned a game in the regular queue
                     else:
                         waiting_queues[data["num_players"]][data["game_mode"]].remove(
                             player
@@ -651,10 +845,10 @@ async def websocket_endpoint(ws: WebSocket):
                 # Remove from player_to_game mapping
                 player_to_game.pop(id(ws))
 
-            # If player is survey participant, remove from queue
-            if player.empirica_id is not None:
-                if player.empirica_id in survey_participants:
-                    survey_participants.pop(player.empirica_id)
+            # If player was in the study queue, remove them
+            if player in study_participants:
+                study_participants.remove(player)
+                ws_log.info(f"Removed {player.name} from study queue")
 
             # If player was a game_creator, remove from dictionary but keep the game they created for one hour
             # (so people can still join using the key)
@@ -663,87 +857,166 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 ## ---------------------------------------------------------------------------------------------------------------------
-## Empirica endpoint: create a game from a config
+## Survey endpoint
 ## ---------------------------------------------------------------------------------------------------------------------
 
 
-class GameConfigRequest(BaseModel):
-    cfg: Dict  # overlay with Empirica IDs, experimental_mode, etc.
+class SurveyRequest(BaseModel):
+    prolific_id: str
+    game_id: str | None = None
+    survey: Dict
 
 
-@app.post("/api/games/from_config")
-async def create_game_from_config(req: GameConfigRequest):
-    # Load the requested game config
-    cfg_key = req.cfg["cfg_key"]
-    experiments_dir = Path(__file__).parent.parent / "experiments"
-    config_path = experiments_dir / f"{cfg_key}.yaml"
-    with open(config_path) as f:
-        _cfg = yaml.safe_load(f)
+@app.post("/api/survey")
+async def submit_survey(req: SurveyRequest):
+    # Save into the game's players/ folder if we know where it is;
+    # fall back to game_data/surveys/ if the game_id is unknown or had no out_dir.
+    out_path = game_out_paths.get(req.game_id) if req.game_id else None
+    if out_path:
+        save_dir = Path(out_path) / "surveys"
+    else:
+        save_dir = Path(__file__).parent.parent / "game_data" / "surveys"
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Update everything in the base configuration with the configuration except the player list -- this is
-    # overwritten by the new config
-    player_config = copy.deepcopy(_cfg["players"])
-    _cfg = paramspace.tools.recursive_update(copy.deepcopy(game_config), _cfg)
-    _cfg["players"] = player_config
-    del player_config
+    filename = f"{req.prolific_id}.json"
 
-    # Fix the number of rounds specified in the configuration
-    _cfg["game"]["n_rounds"] = req.cfg.get("n_rounds")
+    payload = {
+        "prolific_id": req.prolific_id,
+        "game_id": req.game_id,
+        "submitted_at": datetime.now().isoformat(),
+        "survey": req.survey,
+    }
 
-    # Set the game id to match the Empirica id
-    _cfg["game"]["game_id"] = req.cfg.get("game_id")
+    with open(save_dir / filename, "w") as f:
+        json.dump(payload, f, indent=2)
 
-    # Replace human player configs with actual HumanPlayer instances from survey_participants
-    human_player_idx = 0
-    empirica_player_ids = req.cfg.get("players", [])
+    server_log.info(f"Survey saved for {req.prolific_id} → {save_dir / filename}")
+    return {"status": "ok"}
 
-    for idx in range(len(_cfg["players"])):
-        if _cfg["players"][idx]["type"] == "human":
-            empirica_id = empirica_player_ids[human_player_idx]
 
-            # Get display names and types from the config, if specified
-            _display_name = _cfg["players"][idx].get("display_name")
-            _display_type = _cfg["players"][idx].get("display_type")
+## ---------------------------------------------------------------------------------------------------------------------
+## Participant tracking endpoints
+## ---------------------------------------------------------------------------------------------------------------------
 
-            # Replace the config dict with the actual HumanPlayer instance
-            _cfg["players"][idx] = survey_participants.pop(empirica_id)
 
-            # Add a display name and type, if specified
-            if _display_name is not None:
-                _cfg["players"][idx].display_name = _display_name
-            if _display_type is not None:
-                _cfg["players"][idx].display_type = _display_type
+class ParticipantRequest(BaseModel):
+    prolific_id: str
+    tutorial_done: bool | None = None
+    game_assigned: bool | None = None
 
-            human_player_idx += 1
 
-        # Add system prompt to LLM players
-        elif _cfg["players"][idx]["type"] == "LLM":
-            _cfg["players"][idx]["system_prompt"] = _cfg[
-                "default_system_prompt"
-            ].format(
-                N_players=len(_cfg["players"]),
-                player_id=idx,
-                player_id_before=(idx - 1) % len(_cfg["players"]),
-                player_id_after=(idx + 1) % len(_cfg["players"]),
+@app.post("/api/participant")
+async def upsert_participant(req: ParticipantRequest):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO participants (prolific_id) VALUES (?)",
+            (req.prolific_id,),
+        )
+        if req.tutorial_done is not None:
+            await db.execute(
+                "UPDATE participants SET tutorial_done = ? WHERE prolific_id = ?",
+                (int(req.tutorial_done), req.prolific_id),
             )
+        if req.game_assigned is not None:
+            await db.execute(
+                "UPDATE participants SET game_assigned = ? WHERE prolific_id = ?",
+                (int(req.game_assigned), req.prolific_id),
+            )
+        await db.commit()
+        async with db.execute(
+            "SELECT tutorial_done, game_assigned FROM participants WHERE prolific_id = ?",
+            (req.prolific_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
 
-    # Create a new game from the config and add to waiting survey games.
-    # This game functions as a placeholder game with 'empty' human players, which can be filled
-    # with survey participants as they arrive
-    game = game_from_config(_cfg, show_logs=_cfg.get("show_logs", False))
+    return {
+        "prolific_id": req.prolific_id,
+        "tutorial_done": bool(row[0]),
+        "game_assigned": bool(row[1]),
+    }
 
-    # Assign game ids to each player
-    for idx, player in enumerate(game.players):
-        player.id = idx
 
-    # Add game to survey games
-    waiting_games[game.game_id] = game
-    waiting_game_created_at[game.game_id] = asyncio.get_event_loop().time()
+## ---------------------------------------------------------------------------------------------------------------------
+## Admin panel
+## ---------------------------------------------------------------------------------------------------------------------
 
-    # Add players to routing dict
-    for player in game.players:
-        if player.type == "human":
-            player_to_game[id(player.ws)] = game.game_id
+
+def _check_admin(x_admin_password: str = Header(None)):
+    if not ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=403, detail="Admin panel disabled (ADMIN_PASSWORD not set)"
+        )
+    if x_admin_password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page():
+    html_path = Path(__file__).parent / "admin.html"
+    return HTMLResponse(content=html_path.read_text())
+
+
+@app.get("/api/admin/status")
+async def admin_status(x_admin_password: str = Header(None)):
+    _check_admin(x_admin_password)
+
+    # Schedule summary
+    sched_info = [
+        {
+            "note": slot.config.get("game", {}).get("note") or slot.config.get("note"),
+            "num_humans": slot.num_humans,
+            "max_waiting_time": slot.max_waiting_time,
+        }
+        for slot in schedule
+    ]
+
+    # Waiting queue
+    queue_info = [
+        {"name": p.name, "prolific_id": getattr(p, "identifier", None)}
+        for p in study_participants
+    ]
+
+    # Active games
+    games_info = [
+        {
+            "game_id": game_id,
+            "num_players": len(game.players),
+            "round": getattr(game, "round", None),
+        }
+        for game_id, game in active_games.items()
+    ]
+
+    # DB stats
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*), SUM(tutorial_done), SUM(game_assigned) FROM participants"
+        ) as cur:
+            row = await cur.fetchone()
+    db_stats = {
+        "total": row[0] or 0,
+        "tutorial_done": row[1] or 0,
+        "game_assigned": row[2] or 0,
+    }
+
+    return {
+        "schedule": sched_info,
+        "queue": queue_info,
+        "active_games": games_info,
+        "db_stats": db_stats,
+    }
+
+
+@app.post("/api/admin/reload")
+def admin_reload(x_admin_password: str = Header(None)):
+    _check_admin(x_admin_password)
+    global schedule
+    new_slots = build_schedule()
+    added = len(new_slots)
+    schedule = new_slots
+    server_log.info(f"Admin reloaded schedule: {added} slots")
+    return {
+        "message": f"Schedule replaced: {added} slot{'s' if added != 1 else ''} loaded"
+    }
 
 
 ## ---------------------------------------------------------------------------------------------------------------------

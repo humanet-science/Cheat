@@ -81,7 +81,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 			</div>)}
 
 			<div className="text-2xl mt-6 mb-2 text-white drop-shadow-lg whitespace-nowrap">
-				{revealedCards.wasLying && revealedCards.accused === state.your_info.id ? "You pick" : revealedCards.wasLying ? `${revealedCards.accused_name} picks` : revealedCards.caller === state.your_info.id ? 'You pick' : `${revealedCards.caller_name} picks`} up the
+a				{revealedCards.wasLying && revealedCards.accused === state.your_info.id ? "You pick" : revealedCards.wasLying ? `${revealedCards.accused_name} picks` : revealedCards.caller === state.your_info.id ? 'You pick' : `${revealedCards.caller_name} picks`} up the
 					pile.
 			</div>
 
@@ -109,8 +109,7 @@ export function GameOverOverlay({
 																	totalHumans,
 																	setPlayAnnouncements,
 																	experimentalMode,
-																	empiricaPlayer = null,
-																	empiricaExperimentOver,
+																	experimentOver,
 																	hasClickedNextRound,
 																	setHasClickedNextRound,
 																	onFinish,
@@ -136,7 +135,7 @@ export function GameOverOverlay({
 			<div className={`${experimentalMode ? '' : 'flex'}  gap-4`}>
 
 				{/* Next round option if not in experimental mode or if experiment has not yet finished */}
-				{((!experimentalMode) || (experimentalMode && !empiricaExperimentOver)) && (<div className="flex flex-col items-center gap-2">
+				{((!experimentalMode) || (experimentalMode && !experimentOver)) && (<div className="flex flex-col items-center gap-2">
 					<button
 						disabled={hasClickedNextRound}
 						onClick={() => {
@@ -166,7 +165,7 @@ export function GameOverOverlay({
 				</div>)}
 
 				{/* In Experimental mode: if experiment finished, set finish and mark player complete */}
-				{experimentalMode && empiricaExperimentOver && (<button
+				{experimentalMode && experimentOver && (<button
 					onClick={onFinish}
 					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
 				>

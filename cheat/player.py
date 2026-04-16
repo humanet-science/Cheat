@@ -1,7 +1,6 @@
 # Get the logger
 import logging
 import pickle
-
 from dataclasses import dataclass
 from typing import Callable, List
 
@@ -92,7 +91,7 @@ class HumanPlayer(Player):
         ws: WebSocket = None,
         display_name: str | None = None,
         display_type: str | None = None,
-        empirica_id: int | None = None,
+        identifier: int | None = None,
     ):
         super().__init__(
             id=id,
@@ -104,16 +103,18 @@ class HumanPlayer(Player):
             ws=ws,
             connected=ws is not None,
         )
-        self.empirica_id = empirica_id
+        self.identifier = identifier
 
     def __dict__(self):
-        return dict(id=self.id,
-                    name=self.name,
-                    avatar=self.avatar,
-                    type=self.type,
-                    empirica_id=self.empirica_id,
-                    display_name=self.display_name,
-                    display_type=self.display_type)
+        return dict(
+            id=self.id,
+            name=self.name,
+            avatar=self.avatar,
+            type=self.type,
+            identifier=self.identifier,
+            display_name=self.display_name,
+            display_type=self.display_type,
+        )
 
     def write_info(self, path) -> None:
         with open(
