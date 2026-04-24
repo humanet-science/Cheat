@@ -29,7 +29,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 2,
 	title: "Playing Cards",
-	description: "On your turn, select 1–3 cards and declare any rank you like except Ace (i.e. 2-10 or 'J', 'Q', 'K') – you don't need to tell the truth. " + "If you play Aces, you must lie.",
+	description: "On your turn, select 1–3 cards and declare any rank you like except Ace (i.e. 2-10 or J, Q, K) – you don't need to tell the truth. " + "If you play Aces, you must lie.",
 	task: {
 		type: 'play_cards',
 		description: 'In the game above, select some cards, declare a rank, and play them to continue.',
@@ -797,6 +797,7 @@ export default function Tutorial({onClose, allowSkip = true}) {
 							containerWidth={containerSize.width}  // Pass container size
 							containerHeight={containerSize.height}
 							tutorialScale={0.7}
+							disableReconnect={true}
 							showDealAnimation={false}
 						/>
 					</div>)}</div>

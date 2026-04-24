@@ -3,6 +3,7 @@ import copy
 import json
 import os
 import random
+import secrets
 import traceback
 
 # Package imports
@@ -63,6 +64,12 @@ OUT_PATH_CLEANUP_DELAY = 1800
 
 # Admin panel password — set ADMIN_PASSWORD in .env; no default so it fails closed
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+# WebSocket health / reconnection tuning — exposed as module-level constants so tests
+# can patch them without waiting real wall-clock time.
+PING_INTERVAL_SECONDS: float = 5.0
+PING_TIMEOUT_SECONDS: float = 5.0
+RECONNECT_GRACE_SECONDS: float = 30.0
 
 
 async def init_db():
@@ -213,7 +220,7 @@ waiting_game_created_at: dict[str, float] = {}  # {game_id: timestamp}
 
 # Dictionary of game creators. Only the people who open a room can cancel the game, and when they cancel the game
 # the room is closed and removed from the server to prevent 'zombie' games from accumulating
-game_creators: dict[str, str] = {}  # {player_id: game_id}
+game_creators: dict[str, str] = {}  # {player.session_token: game_id}
 
 # Active games currently playing
 active_games: dict[str, CheatGame] = {}  # {game_id: CheatGame instance}
@@ -228,7 +235,12 @@ schedule: deque[GameSlot] = deque()
 study_participants: deque[HumanPlayer] = deque()
 
 # WebSocket-to-Game dictionary for routing messages
-player_to_game: dict[int, str] = {}  # {websocket: game_id} for routing messages
+player_to_game: dict[
+    int, str
+] = {}  # {player.session_token: game_id} for routing messages
+
+# Pending reconnection slots: session token -> {player, game_id, task}
+reconnection_slots: dict[str, dict] = {}
 
 # Maps game_id -> out_path for survey saving (persists after game ends)
 game_out_paths: dict[str, str] = {}
@@ -286,8 +298,8 @@ def new_game(
 
     # Store a link to the human players in the dictionary, if not already present
     for player in human_players:
-        if player.ws and id(player.ws) not in player_to_game.keys():
-            player_to_game[id(player.ws)] = game.game_id
+        if player.session_token and player.session_token not in player_to_game:
+            player_to_game[player.session_token] = game.game_id
 
     # Write metadata to folder
     if game.out_path is not None:
@@ -366,7 +378,7 @@ async def start_study_slot(slot: GameSlot):
 
         for player in game.players:
             if player.type == "human":
-                player_to_game[id(player.ws)] = game.game_id
+                player_to_game[player.session_token] = game.game_id
 
         active_games[game.game_id] = game
         if game.out_path is not None:
@@ -448,8 +460,8 @@ async def run_game(_game: CheatGame):
 
         # Remove player mappings
         for player in _game.players:
-            if id(player.ws) in player_to_game:
-                player_to_game.pop(id(player.ws))
+            if player.session_token in player_to_game:
+                player_to_game.pop(player.session_token)
 
 
 async def game_manager():
@@ -475,7 +487,7 @@ async def game_manager():
                             )
                         except Exception:
                             pass
-                        game_creators.pop(id(p.ws), None)
+                        game_creators.pop(p.session_token, None)
                 server_log.info(f"Expired waiting game {game_id} after 1 hour.")
 
             # Try to start game
@@ -508,15 +520,59 @@ async def game_manager():
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     player = None
+    _ping_task = None
 
     try:
         # Wait for player join info
         data = await ws.receive_json()
 
+        # Reconnecting player: swap the old websocket for this new one and resume.
+        if data["type"] == "reconnect":
+            token = data.get("token")
+            slot = reconnection_slots.pop(token, None) if token else None
+            if slot:
+                slot["task"].cancel()
+                old_player = slot["player"]
+                game_id = slot["game_id"]
+                old_player.ws = ws
+                old_player.connected = True
+                old_player.session_token = token
+                player = old_player
+                player_to_game[player.session_token] = game_id
+                _game = active_games.get(game_id)
+                if _game:
+                    await old_player.send_message(
+                        {
+                            "type": "reconnect_confirmed",
+                            **old_player.get_info(),
+                            **_game.get_info(),
+                        }
+                    )
+
+                    await _game.send_state_to_all()
+
+                    # Send catch-up only when it's the reconnecting player's turn and the pile has not been cleared,
+                    # since they need context to act. Otherwise they will see the next play naturally.
+                    # if _game.turn == old_player.id and _game.pile_plays:
+                    await old_player.send_message(
+                        {
+                            "type": "catch_up",
+                            "pile_plays": _game.pile_plays,
+                        }
+                    )
+
+                    ws_log.info(
+                        f"Player {old_player.name} reconnected to game {game_id}"
+                    )
+            else:
+                await ws.send_json({"type": "reconnect_failed"})
+                return
+            # Fall through to ping loop + message loop so the connection stays alive.
+
         # If a new player wants to join, create Player instance and append to relevant queue.
         # The queue may be the queue for a quick-pairing match, or, if a game key is provided, for a
         # specific game.
-        if data["type"] in ["player_join", "create_game", "study_join"]:
+        elif data["type"] in ["player_join", "create_game", "study_join"]:
             player = HumanPlayer(
                 id=None,
                 ws=ws,
@@ -526,6 +582,8 @@ async def websocket_endpoint(ws: WebSocket):
                 name=data["name"],
                 avatar=data["avatar"],
             )
+            player.session_token = secrets.token_urlsafe(16)
+            await ws.send_json({"type": "session_token", "token": player.session_token})
 
         # Player wants to create a new game: in this case, a new game with the requested configuration
         # is created, the creating player added, and the remaining player slots filled with bots or empty (placeholder)
@@ -548,12 +606,12 @@ async def websocket_endpoint(ws: WebSocket):
             )
 
             # Add the game to waiting games
-            player_to_game[id(ws)] = game.game_id
+            player_to_game[player.session_token] = game.game_id
             waiting_games[game.game_id] = game
             waiting_game_created_at[game.game_id] = asyncio.get_event_loop().time()
 
             # Name the player as the game creator: only they can terminate the game
-            game_creators[id(ws)] = game.game_id
+            game_creators[player.session_token] = game.game_id
 
             # Broadcast the game key to frontend so it can be shared with others
             await ws.send_json({"type": "game_created", "key": game.game_id})
@@ -608,7 +666,8 @@ async def websocket_endpoint(ws: WebSocket):
 
                             # Now insert the real player into the placeholder
                             _game.players[idx] = player
-                            player_to_game[id(ws)] = _game.game_id
+                            player.logger = _game.player_logger
+                            player_to_game[player.session_token] = _game.game_id
                             ws_log.info(
                                 f"Player {player.name} joined game {data['game_key']}."
                             )
@@ -674,32 +733,69 @@ async def websocket_endpoint(ws: WebSocket):
                     f"Prolific: {data.get('prolific_id')}"
                 )
 
+        # Ping loop: detect dead connections by sending a ping every 10s and
+        # expecting a pong within 5s. Closes the WebSocket if none arrives,
+        # which triggers the existing disconnect/bot-replacement logic in finally.
+        _pong_received = asyncio.Event()
+        _pong_received.set()
+
+        async def _ping_loop():
+            while True:
+                await asyncio.sleep(PING_INTERVAL_SECONDS)
+                _pong_received.clear()
+                try:
+                    await asyncio.wait_for(
+                        ws.send_json({"type": "ping"}), timeout=PING_TIMEOUT_SECONDS
+                    )
+                except Exception:
+                    return
+                try:
+                    await asyncio.wait_for(
+                        _pong_received.wait(), timeout=PING_TIMEOUT_SECONDS
+                    )
+                except asyncio.TimeoutError:
+                    ws_log.warning(
+                        f"Ping timeout for {player.name if player else 'unknown'}, closing connection"
+                    )
+                    try:
+                        await ws.close(code=1001)
+                    except Exception:
+                        pass
+                    return
+
+        _ping_task = asyncio.create_task(_ping_loop())
+
         # Keep connection alive and listen for messages
         while True:
             try:
                 message = await asyncio.wait_for(ws.receive_json(), timeout=1.0)
 
+                if message["type"] == "pong":
+                    _pong_received.set()
+                    continue
+
                 # Player has left the queue. If the player is the creator of the game, the game is removed from the
                 # list of games and is terminated for all players waiting to join that game. The game key is deleted
                 # and will no longer be valid.
                 # This does not occur if a non-creating player leaves the queue.
-                if message["type"] == "exit_queue":
+                elif message["type"] == "exit_queue":
                     # Game creator has left the waiting queue: exit game and notify all waiting players
                     # Also remove the game directory, if it was created, as well as all other players
-                    if id(player.ws) in game_creators.keys():
+                    if player.session_token in game_creators:
                         # Get the game and remove from all lists
-                        _game_id = game_creators[id(player.ws)]
+                        _game_id = game_creators[player.session_token]
                         _game = waiting_games.pop(_game_id)
-                        game_creators.pop(id(player.ws))
+                        game_creators.pop(player.session_token)
                         for p in _game.players:
-                            if id(p.ws) in player_to_game:
-                                player_to_game.pop(id(p.ws))
+                            if p.session_token in player_to_game:
+                                player_to_game.pop(p.session_token)
 
                             # Inform frontend
                             await p.send_message(
                                 {
                                     "type": "game_cancelled",
-                                    "is_creator": id(p.ws) == id(player.ws),
+                                    "is_creator": p.session_token
+                                    == player.session_token,
                                 }
                             )
 
@@ -712,12 +808,12 @@ async def websocket_endpoint(ws: WebSocket):
                         ws_log.info(f"{player.name} cancelled game {_game_id}.")
 
                     # Non-creating player has left the waiting queue for a specific game
-                    elif id(player.ws) in player_to_game:
-                        _game = waiting_games[player_to_game[id(player.ws)]]
+                    elif player.session_token in player_to_game:
+                        _game = waiting_games[player_to_game[player.session_token]]
                         for p in _game.players:
-                            if id(p.ws) == id(player.ws):
+                            if p.session_token == player.session_token:
                                 p.connected = False
-                                player_to_game.pop(id(player.ws))
+                                player_to_game.pop(player.session_token)
                                 await player.ws.send_json({"type": "quit_confirmed"})
                                 p.ws = None
                                 break
@@ -757,11 +853,11 @@ async def websocket_endpoint(ws: WebSocket):
                 elif message["type"] == "quit":
                     player.connected = False
                     ws_log.info(
-                        f"Player {player.name} quit game {player_to_game[id(ws)]}"
+                        f"Player {player.name} quit game {player_to_game[player.session_token]}"
                     )
 
                     # Check if game should end
-                    game_id = player_to_game[id(ws)]
+                    game_id = player_to_game[player.session_token]
                     if game_id in active_games:
                         game = active_games[game_id]
                         human_players = [p for p in game.players if p.type == "human"]
@@ -776,15 +872,15 @@ async def websocket_endpoint(ws: WebSocket):
                         else:
                             await game.replace_player_with_bot(player)
 
-                        player_to_game.pop(id(ws))
+                        player_to_game.pop(player.session_token)
 
                     # Send confirmation
                     await ws.send_json({"type": "quit_confirmed"})
                     ws_log.info(f"Quit confirmed")
 
                 # Route the message to the correct game
-                elif id(ws) in player_to_game:
-                    game_id = player_to_game[id(ws)]
+                elif player.session_token in player_to_game:
+                    game_id = player_to_game[player.session_token]
                     if game_id in active_games:
                         game = active_games[game_id]
                         await game.handle_message(player, message)
@@ -802,10 +898,21 @@ async def websocket_endpoint(ws: WebSocket):
 
     except WebSocketDisconnect:
         ws_log.info(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
+    except RuntimeError as e:
+        # Starlette raises RuntimeError("WebSocket is not connected") when receive_json
+        # is called after the socket has already been closed (e.g. by the ping loop).
+        # Treat this identically to a clean disconnect so the finally block runs normally.
+        ws_log.info(
+            f"WebSocket closed unexpectedly for {player.name if player else 'Unknown'}: {e}"
+        )
     except Exception as e:
         ws_log.error(f"WebSocket error: {e}")
         traceback.print_exc()
     finally:
+        # Cancel the ping task — but do this AFTER populating reconnection_slots so a fast
+        # reconnect attempt doesn't arrive during the await and find an empty slot.
+        # All synchronous cleanup runs first (no awaits), then we await the ping task.
+
         # Cleanup: mark player as disconnected and remove from mappings
         if player:
             player.connected = False
@@ -819,31 +926,58 @@ async def websocket_endpoint(ws: WebSocket):
                         break
 
             # Mark as disconnected in active game if present
-            if id(ws) in player_to_game:
-                game_id = player_to_game[id(ws)]
+            if player.session_token in player_to_game:
+                game_id = player_to_game[player.session_token]
                 if game_id in active_games:
                     _game = active_games[game_id]
                     for p in _game.players:
-                        if p is player:
+                        if p.session_token == player.session_token:
                             p.connected = False
                             server_log.info(
                                 f"Marked {p.name} as disconnected in game {game_id}"
                             )
                             break
 
-                    # If this is the last or only human player, just end the game
-                    human_players = [p for p in _game.players if p.type == "human"]
-                    if all(not p.connected for p in human_players):
-                        ws_log.info(f"All humans disconnected from game {game_id}.")
-                        await _game.handle_message(player, {"type": "quit"})
-                        _game.game_over = True
+                    # Always give a grace period so the player can reconnect.
+                    # After the grace period, end the game if all humans are gone
+                    # (single-player or everyone left), otherwise replace with a bot.
+                    token = getattr(player, "session_token", None)
 
-                    # Replace player with bot if some humans still left
-                    else:
-                        await _game.replace_player_with_bot(player)
+                    async def _delayed_replace(
+                        _p=player, _g=_game, _t=token, _gid=game_id
+                    ):
+                        await asyncio.sleep(RECONNECT_GRACE_SECONDS)
+                        if _p.connected:
+                            return
+                        still_connected = [
+                            p for p in _g.players if p.type == "human" and p.connected
+                        ]
+                        if not still_connected:
+                            ws_log.info(
+                                f"All humans disconnected from game {_gid}, ending game."
+                            )
+                            await _g.handle_message(_p, {"type": "quit"})
+                            _g.game_over = True
+                        else:
+                            server_log.info(
+                                f"Grace period expired for {_p.name}, replacing with bot"
+                            )
+                            await _g.replace_player_with_bot(_p)
+                        reconnection_slots.pop(_t, None)
+
+                    task = asyncio.create_task(_delayed_replace())
+                    if token:
+                        reconnection_slots[token] = {
+                            "player": player,
+                            "game_id": game_id,
+                            "task": task,
+                        }
+                    server_log.info(
+                        f"Marked {player.name} as disconnected in game {game_id}, grace period started"
+                    )
 
                 # Remove from player_to_game mapping
-                player_to_game.pop(id(ws))
+                player_to_game.pop(player.session_token)
 
             # If player was in the study queue, remove them
             if player in study_participants:
@@ -852,8 +986,17 @@ async def websocket_endpoint(ws: WebSocket):
 
             # If player was a game_creator, remove from dictionary but keep the game they created for one hour
             # (so people can still join using the key)
-            if id(player.ws) in game_creators.keys():
-                game_creators.pop(id(player.ws))
+            if player.session_token in game_creators.keys():
+                game_creators.pop(player.session_token)
+
+        # Cancel ping task now that reconnection_slots is populated (avoids the race where
+        # a fast reconnect arrives during this await and finds an empty slot).
+        if _ping_task is not None:
+            _ping_task.cancel()
+            try:
+                await _ping_task
+            except asyncio.CancelledError:
+                pass
 
 
 ## ---------------------------------------------------------------------------------------------------------------------

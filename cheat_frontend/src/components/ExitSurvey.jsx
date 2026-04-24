@@ -84,7 +84,7 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Exit Survey</h3>
                         <p className="mt-1 text-sm text-gray-500">
                             We are trying to improve the game and would be grateful for your feedback.
-                            Please answer all questions. If a question does not apply (e.g. due to early time-out), write 'N/A'.
+                            Please answer all questions. If a question does not apply, write 'N/A'.
                         </p>
                     </div>
 

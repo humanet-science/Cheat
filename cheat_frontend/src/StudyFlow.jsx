@@ -76,7 +76,7 @@ function ProlificGate({ onId }) {
                 </div>
 
                 <p className="text-2xl text-center font-bold text-gray-700 mb-4">
-                    Thank you for participating!
+                    Welcome!
                 </p>
                 <p className="text-lg text-justify hyphens-auto text-gray-700 mb-6">
                     This experiment is part of a research project conducted by the{" "}
@@ -149,11 +149,25 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
             const msg = JSON.parse(event.data);
             console.log("StudyFlow received:", msg);
 
+            if (msg.type === "ping") {
+                ws.send(JSON.stringify({type: "pong"}));
+                return;
+            }
+
+            if (msg.type === "session_token") {
+                localStorage.setItem("cheat_session_token", msg.token);
+                return;
+            }
+
             if (msg.type === "queue_joined") {
                 if (msg.max_wait_seconds) setMaxWaitSeconds(msg.max_wait_seconds);
                 setPhase("waiting");
             } else if (msg.type === "new_round") {
-                ws.onmessage = null;
+                // Buffer any messages that arrive between now and CheatGame setting up its
+                // onmessage handler. The server can immediately send cards_played etc.
+                const buffer = [];
+                ws._initialBuffer = buffer;
+                ws.onmessage = (e2) => buffer.push(JSON.parse(e2.data));
                 ws.onerror = null;
                 ws.onclose = null;
                 if (prolificId !== "admin") {

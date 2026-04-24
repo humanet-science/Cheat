@@ -1,4 +1,5 @@
 # Get the logger
+import asyncio
 import logging
 import pickle
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ class Player:
     type: str = "human"
     display_type: str | None = None
     connected: bool = True
+    session_token: str = None
     input_function: Callable = None
     logger: logging.Logger = None
 
@@ -77,9 +79,15 @@ class Player:
         """Send a message to the player's websocket"""
         if self.connected and self.ws and hasattr(self, "ws"):
             try:
-                await self.ws.send_json(message)
+                await asyncio.wait_for(self.ws.send_json(message), timeout=5.0)
+            except asyncio.TimeoutError:
+                self.logger.warning(
+                    f"Send timeout for player {self.id}, marking disconnected"
+                )
+                self.connected = False
             except Exception as e:
                 self.logger.error(f"Error sending to player {self.id}: {e}")
+                self.connected = False
 
 
 class HumanPlayer(Player):

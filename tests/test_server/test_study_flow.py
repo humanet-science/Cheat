@@ -296,6 +296,8 @@ class TestOutPathTracking:
         """game_out_paths entry is removed after OUT_PATH_CLEANUP_DELAY seconds."""
         original_delay = server.OUT_PATH_CLEANUP_DELAY
         server.OUT_PATH_CLEANUP_DELAY = 0
+        original_grace = server.RECONNECT_GRACE_SECONDS
+        server.RECONNECT_GRACE_SECONDS = 0.5
 
         try:
             server.schedule.append(make_slot(num_humans=2, out_dir=tmp_path))
@@ -331,6 +333,7 @@ class TestOutPathTracking:
 
         finally:
             server.OUT_PATH_CLEANUP_DELAY = original_delay
+            server.RECONNECT_GRACE_SECONDS = original_grace
 
         for t in (t1, t2):
             t.cancel()

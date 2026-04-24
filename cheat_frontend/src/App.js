@@ -26,6 +26,10 @@ function App() {
     const [prolificId, setProlificId] = useState(null);
 
     const handleGameStart = (socket, initialGameData) => {
+
+        socket._initialBuffer = [];
+        socket.onmessage = (e) => socket._initialBuffer.push(JSON.parse(e.data));
+
         if (initialGameData.type === "new_round") {
             const { type, ...gameState } = initialGameData;
             setGameConfig({

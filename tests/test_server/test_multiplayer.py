@@ -202,6 +202,9 @@ class TestMultiplayerDisconnection:
         self, clean_server_state, running_game_manager
     ):
         """Test that game continues when one player disconnects but others remain."""
+        # Shorten grace period so bot replacement happens within the test timeout
+        original_grace = server.RECONNECT_GRACE_SECONDS
+        server.RECONNECT_GRACE_SECONDS = 0.5
 
         ws1 = MockWebSocket()
         ws2 = MockWebSocket()
@@ -258,7 +261,7 @@ class TestMultiplayerDisconnection:
             assert len(server.active_games) == 1
             game_id = list(server.active_games.keys())[0]
             game = server.active_games[game_id]
-            assert len(list(server.player_to_game.keys())) == 3
+            assert len(server.player_to_game) == 3
 
             # Get player references
             human_players = [p for p in game.players if p.type == "human"]
@@ -270,10 +273,10 @@ class TestMultiplayerDisconnection:
             assert player2.connected == True
             assert player3.connected == True
 
-            # Player 1 disconnects
+            # Player 1 disconnects; wait for grace period (0.5s) + bot replacement
             ws1.close()
-            await asyncio.sleep(1.0)
-            assert len(list(server.player_to_game.keys())) == 2
+            await asyncio.sleep(1.5)
+            assert len(server.player_to_game) == 2
 
             # Player 1 should be replaced with a bot (not disconnected from game)
             # Game should still be active
@@ -290,6 +293,7 @@ class TestMultiplayerDisconnection:
             assert player3.connected == True
 
         finally:
+            server.RECONNECT_GRACE_SECONDS = original_grace
             ws1.close()
             ws2.close()
             ws3.close()
@@ -327,6 +331,8 @@ class TestMultiplayerDisconnection:
         self, clean_server_state, running_game_manager
     ):
         """Test that game ends when all human players disconnect."""
+        original_grace = server.RECONNECT_GRACE_SECONDS
+        server.RECONNECT_GRACE_SECONDS = 0.5
 
         ws1 = MockWebSocket()
         ws2 = MockWebSocket()
@@ -389,10 +395,10 @@ class TestMultiplayerDisconnection:
             assert game_id not in server.active_games
 
             # All mappings should be cleaned
-            assert id(ws1) not in server.player_to_game
-            assert id(ws2) not in server.player_to_game
+            assert len(server.player_to_game) == 0
 
         finally:
+            server.RECONNECT_GRACE_SECONDS = original_grace
             if handler1_task and not handler1_task.done():
                 handler1_task.cancel()
                 try:
@@ -566,87 +572,93 @@ class TestMultiplayerStateManagement:
         self, clean_server_state, running_game_manager
     ):
         """Test no state leaks across multiple multiplayer game cycles."""
+        original_grace = server.RECONNECT_GRACE_SECONDS
+        server.RECONNECT_GRACE_SECONDS = 0.5
 
-        for cycle in range(2):
-            ws1 = MockWebSocket()
-            ws2 = MockWebSocket()
-            handler1_task = None
-            handler2_task = None
+        try:
+            for cycle in range(2):
+                ws1 = MockWebSocket()
+                ws2 = MockWebSocket()
+                handler1_task = None
+                handler2_task = None
 
-            try:
-                # Players join
-                ws1.queue_message(
-                    {
-                        "type": "player_join",
-                        "name": f"Player1_C{cycle}",
-                        "avatar": "avatar1",
-                        "num_players": 3,
-                        "game_mode": "multiplayer",
-                    }
-                )
+                try:
+                    # Players join
+                    ws1.queue_message(
+                        {
+                            "type": "player_join",
+                            "name": f"Player1_C{cycle}",
+                            "avatar": "avatar1",
+                            "num_players": 3,
+                            "game_mode": "multiplayer",
+                        }
+                    )
 
-                ws2.queue_message(
-                    {
-                        "type": "player_join",
-                        "name": f"Player2_C{cycle}",
-                        "avatar": "avatar2",
-                        "num_players": 3,
-                        "game_mode": "multiplayer",
-                    }
-                )
+                    ws2.queue_message(
+                        {
+                            "type": "player_join",
+                            "name": f"Player2_C{cycle}",
+                            "avatar": "avatar2",
+                            "num_players": 3,
+                            "game_mode": "multiplayer",
+                        }
+                    )
 
-                handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
-                handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
-                await asyncio.sleep(0.5)
+                    handler1_task = asyncio.create_task(server.websocket_endpoint(ws1))
+                    handler2_task = asyncio.create_task(server.websocket_endpoint(ws2))
+                    await asyncio.sleep(0.5)
 
-                # Wait for game to start
-                max_wait = 3.5
-                elapsed = 0.0
+                    # Wait for game to start
+                    max_wait = 3.5
+                    elapsed = 0.0
 
-                while elapsed < max_wait and len(server.active_games) == 0:
-                    await asyncio.sleep(0.2)
-                    elapsed += 0.2
+                    while elapsed < max_wait and len(server.active_games) == 0:
+                        await asyncio.sleep(0.2)
+                        elapsed += 0.2
 
-                assert len(server.active_games) == 1
-                game_id = list(server.active_games.keys())[0]
+                    assert len(server.active_games) == 1
+                    game_id = list(server.active_games.keys())[0]
 
-                # Both disconnect
-                ws1.close()
-                ws2.close()
+                    # Both disconnect
+                    ws1.close()
+                    ws2.close()
 
-                # Wait for cleanup
-                max_cleanup_wait = 3.0
-                elapsed = 0.0
+                    # Wait for cleanup
+                    max_cleanup_wait = 3.0
+                    elapsed = 0.0
 
-                while elapsed < max_cleanup_wait and game_id in server.active_games:
-                    await asyncio.sleep(0.2)
-                    elapsed += 0.2
+                    while elapsed < max_cleanup_wait and game_id in server.active_games:
+                        await asyncio.sleep(0.2)
+                        elapsed += 0.2
 
-                # Verify cleanup
-                assert len(server.active_games) == 0
-                assert len(server.player_to_game) == 0
-                assert len(server.waiting_queues[3]["multiplayer"]) == 0
+                    # Verify cleanup
+                    assert len(server.active_games) == 0
+                    assert len(server.player_to_game) == 0
+                    assert len(server.waiting_queues[3]["multiplayer"]) == 0
 
-            finally:
-                if handler1_task and not handler1_task.done():
-                    handler1_task.cancel()
-                    try:
-                        await handler1_task
-                    except asyncio.CancelledError:
-                        pass
+                finally:
+                    if handler1_task and not handler1_task.done():
+                        handler1_task.cancel()
+                        try:
+                            await handler1_task
+                        except asyncio.CancelledError:
+                            pass
 
-                if handler2_task and not handler2_task.done():
-                    handler2_task.cancel()
-                    try:
-                        await handler2_task
-                    except asyncio.CancelledError:
-                        pass
+                    if handler2_task and not handler2_task.done():
+                        handler2_task.cancel()
+                        try:
+                            await handler2_task
+                        except asyncio.CancelledError:
+                            pass
 
-                # Delay between cycles
-                await asyncio.sleep(1.5)
+                    # Delay between cycles
+                    await asyncio.sleep(1.5)
 
-        # Final verification
-        assert len(server.active_games) == 0
-        assert len(server.waiting_games) == 0
-        assert len(server.player_to_game) == 0
-        assert len(server.game_creators) == 0
+            # Final verification
+            assert len(server.active_games) == 0
+            assert len(server.waiting_games) == 0
+            assert len(server.player_to_game) == 0
+            assert len(server.game_creators) == 0
+
+        finally:
+            server.RECONNECT_GRACE_SECONDS = original_grace

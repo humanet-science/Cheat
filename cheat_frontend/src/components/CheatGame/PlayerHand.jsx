@@ -149,6 +149,84 @@ export default function PlayerHand({
 					<div
 						className="max-w-2xl mb-[4%] sm:mb-0 relative z-10 flex items-center gap-2 sm:gap-4 transition-all duration-500">
 
+
+						{/* Rank declaration button */}
+						{isMyTurn && !hasActed && showRankInput && (
+							<div
+								className="max-w-2xl relative z-10 flex flex-row items-center gap-2 sm:gap-4 transition-all duration-500 ">
+								<input
+									type="text"
+									placeholder="Declare rank (e.g. 7)"
+									value={declaredRank}
+									onChange={(e) => {
+										setDeclaredRank(e.target.value.toUpperCase())
+									}}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter') {
+											e.preventDefault();
+											// Only play if cards are actually selected AND rank is valid
+											if (selectedCards.length > 0) {
+												play();
+											}
+										}
+									}}
+									className={`
+																min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
+																transition-all duration-300 transform focus:outline-none
+																${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400 animate-pulse-glow'}
+														`}
+								/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
+								<button
+									onClick={play}
+									className={`
+														absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8]
+														${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 shadow-lg'}
+												`}
+								>
+									<img
+										src="/icons/arrow_up.svg"
+										alt="Arrow up"
+										className="w-4 h-4 m-1"
+										style={{
+											filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
+										}}
+									/>
+								</button>)}
+							</div>
+						)
+						}
+
+						{/* Play button */}
+						<div className="sm:w-auto flex items-center gap-2 justify-center">
+							{isMyTurn && !hasActed && !showRankInput && (
+								<div
+									className="pop-in flex-1 sm:flex-initial items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap relative">
+
+									<button
+										onClick={play}
+										disabled={selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)}
+										className={`
+																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
+																						${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
+																				`}
+									>
+										Play
+									</button>
+								</div>)}
+
+
+							{/* Call Bluff button */}
+							{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
+								<div className="pop-in flex-1 sm:flex-initial items-center gap-4">
+									<button
+										onClick={callBluff}
+										className="bg-red-600 hover:bg-red-700 transition-all duration-300 transform hover:scale-105 active:scale-95 text-white font-bold py-2 px-4 rounded-xl"
+									>
+										Call!
+									</button>
+								</div>)}
+						</div>
+
 						{/* Message input */}
 						{!allowedMessages ? (
 							<div className="justify-center flex w-full sm:w-auto items-center gap-3 animate-fadeIn relative">
@@ -198,83 +276,8 @@ export default function PlayerHand({
 							</div>
 						</div>)}
 
-						{/* Play button */}
-						<div className="sm:w-auto flex items-center gap-2 justify-center">
-							{isMyTurn && !hasActed && !showRankInput && (
-								<div
-									className="flex-1 sm:flex-initial items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap relative">
-
-									<button
-										onClick={play}
-										disabled={selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)}
-										className={`
-																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
-																						${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
-																				`}
-									>
-										Play
-									</button>
-								</div>)}
-
-
-							{/* Call Bluff button */}
-							{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
-								<div className="pop-in flex-1 sm:flex-initial items-center gap-4">
-									<button
-										onClick={callBluff}
-										className="bg-red-600 hover:bg-red-700 transition-all duration-300 transform hover:scale-105 active:scale-95 text-white font-bold py-2 px-4 rounded-xl"
-									>
-										Call!
-									</button>
-								</div>)}
-						</div>
 					</div>
 
-					{/* Rank declaration button */}
-					{isMyTurn && !hasActed && showRankInput && (
-						<div
-							className="max-w-2xl relative z-10 flex flex-row items-center gap-2 sm:gap-4 transition-all duration-500">
-							<input
-								type="text"
-								placeholder="Declare rank (e.g. 7)"
-								value={declaredRank}
-								onChange={(e) => {
-									setDeclaredRank(e.target.value.toUpperCase())
-								}}
-								onKeyDown={(e) => {
-									if (e.key === 'Enter') {
-										e.preventDefault();
-										// Only play if cards are actually selected AND rank is valid
-										if (selectedCards.length > 0) {
-											play();
-										}
-									}
-								}}
-								className={`
-																min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
-																transition-all duration-300 transform focus:outline-none
-																${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400'}
-														`}
-							/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
-							<button
-								onClick={play}
-								className={`
-														absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8]
-														${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 shadow-lg'}
-												`}
-							>
-								<img
-									src="/icons/arrow_up.svg"
-									alt="Arrow up"
-									className="w-4 h-4 m-1"
-									style={{
-										filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
-									}}
-								/>
-							</button>)}
-						</div>
-					)
-					}
 				</div>
 			</div>
 		</div>

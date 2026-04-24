@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 /** Animates the card reveal on top the pile (i.e. the result of a call)
  *
@@ -81,7 +81,7 @@ export function CardRevealOverlay({revealedCards, parseCard, state}) {
 			</div>)}
 
 			<div className="text-2xl mt-6 mb-2 text-white drop-shadow-lg whitespace-nowrap">
-a				{revealedCards.wasLying && revealedCards.accused === state.your_info.id ? "You pick" : revealedCards.wasLying ? `${revealedCards.accused_name} picks` : revealedCards.caller === state.your_info.id ? 'You pick' : `${revealedCards.caller_name} picks`} up the
+				{revealedCards.wasLying && revealedCards.accused === state.your_info.id ? "You pick" : revealedCards.wasLying ? `${revealedCards.accused_name} picks` : revealedCards.caller === state.your_info.id ? 'You pick' : `${revealedCards.caller_name} picks`} up the
 					pile.
 			</div>
 
@@ -184,6 +184,65 @@ export function GameOverOverlay({
 			</div>
 		</div>
 	</div>)
+}
+
+export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, showReconnected}) {
+	// Delay showing the spinner badge so instant reconnects don't cause a flash,
+	// but the transparent click-blocker appears immediately (isReconnecting is set
+	// at the very start of the reconnect attempt).
+	const [showSpinner, setShowSpinner] = useState(false);
+	useEffect(() => {
+		if (!isReconnecting) { setShowSpinner(false); return; }
+		const t = setTimeout(() => setShowSpinner(true), 600);
+		return () => clearTimeout(t);
+	}, [isReconnecting]);
+
+	if (!connectionDropped && !isReconnecting && !showReconnected) return null;
+
+	if (showReconnected) {
+		return (
+			<div className="fixed bottom-4 right-4 z-[70] flex items-center gap-2 bg-green-600 bg-opacity-95 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+				<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+					<path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+				</svg>
+				Reconnected
+			</div>
+		);
+	}
+
+	if (isReconnecting) {
+		return (
+			<>
+				{/* Transparent blocker: appears immediately so the user can't play while offline */}
+				<div className="fixed inset-0 z-[69]" />
+				{showSpinner && (
+					<div className="fixed bottom-4 right-4 z-[70] flex items-center gap-2 bg-gray-900 bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+						<svg className="animate-spin w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24">
+							<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+							<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+						</svg>
+						Reconnecting...
+					</div>
+				)}
+			</>
+		);
+	}
+
+	return (
+		<div className="fixed inset-0 flex items-center justify-center z-[70] bg-black bg-opacity-60 backdrop-blur-sm">
+			<div className="text-center bg-white rounded-2xl p-8 shadow-2xl">
+				<div className="text-5xl mb-4">⚠️</div>
+				<div className="text-2xl font-bold text-gray-900 mb-3">Connection lost</div>
+				<div className="text-lg text-gray-600 mb-6">Please contact the experimenter.</div>
+				<button
+					onClick={() => { window.location.href = '/'; }}
+					className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg text-lg"
+				>
+					Home
+				</button>
+			</div>
+		</div>
+	);
 }
 
 export function GameStartOverlay({showLetsGo}) {

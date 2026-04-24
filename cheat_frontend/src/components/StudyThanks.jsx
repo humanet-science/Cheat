@@ -6,7 +6,10 @@ export default function StudyThanks({ timedOut = false }) {
         <div className="min-h-screen flex items-center justify-center px-4">
             <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-lg space-y-5">
                 <h1 className="text-2xl font-bold text-gray-500">
-                    Thank you for participating!
+                    {timedOut
+                      ? "Thank you for showing up!"
+                      : "Thank you for participating!"
+                    }
                 </h1>
                 <p className="text-gray-600">
                     {timedOut
@@ -22,7 +25,7 @@ export default function StudyThanks({ timedOut = false }) {
                     Complete on Prolific
                 </a>
                 <p className="text-gray-600">
-                    If you enjoyed the game, you can continue playing for free at{" "}
+                    If you are curious about the game, you can continue playing for free at{" "}
                     <a
                         href="https://game.humanet.science"
                         target="_blank"

@@ -1,7 +1,7 @@
 # This configuration specifies the base game configuration and should not be updated. Instead, create a new yaml
 # config that overwrites certain keys of this file and run the game from it.
 # Random seed for reproducibility
-seed: 42
+seed: ~
 
 # Whether to show console logs
 show_logs: True
@@ -41,25 +41,25 @@ players:
   - type: RandomBot
     name: Beep Boop
     avatar: 🍕
-    verbosity: 0.6
+    verbosity: 0.2
     p_call: 0.2
     p_lie: 0.6
   - type: SmartBot
     name: His Botness
     avatar: 🧜‍♂️
-    verbosity: 0.6
+    verbosity: 0.1
   - type: SmartBot
     name: ChattyBot
     avatar: 🐭
-    verbosity: 0.9
+    verbosity: 0.3
   - type: SmartBot
     name: B0Tanical
     avatar: 🌼
-    verbosity: 0.6
+    verbosity: 0.2
   - type: RandomBot
     name: BOTtled Up
     avatar: 🍾
-    verbosity: 0.2
+    verbosity: 0.1
     p_call: 0.5
     p_lie: 0.5
 

@@ -14,6 +14,10 @@ import cheat.server as server
 
 
 def _clear_server_state():
+    # Cancel any pending grace-period tasks before clearing slots
+    for slot in server.reconnection_slots.values():
+        slot["task"].cancel()
+    server.reconnection_slots.clear()
     server.active_games.clear()
     server.waiting_games.clear()
     server.waiting_game_created_at.clear()

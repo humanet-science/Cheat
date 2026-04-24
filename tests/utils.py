@@ -72,8 +72,18 @@ class MockWebSocket:
         """Get all sent messages of a specific type."""
         return [msg for msg in self.sent_messages if msg.get("type") == msg_type]
 
-    def close(self):
-        """Mark websocket as closed and immediately interrupt any in-progress receive."""
+    def get_session_token(self):
+        """Return the session token sent by the server for this connection."""
+        msgs = self.get_sent_messages_of_type("session_token")
+        return msgs[0]["token"] if msgs else None
+
+    def close(self, code=None):
+        """Mark websocket as closed and immediately interrupt any in-progress receive.
+
+        Accepts an optional code argument so the server's `await ws.close(code=1001)` call
+        (which invokes this synchronously before awaiting the None return value) correctly
+        marks the socket closed before the ping loop's timeout exception is caught.
+        """
         self.closed = True
         if self._close_event is not None:
             self._close_event.set()

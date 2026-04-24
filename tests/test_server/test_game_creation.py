@@ -57,9 +57,10 @@ class TestGameCreation:
             assert game_key in server.waiting_games
 
             # Creator should be marked as game creator and mapped to correct game
-            assert id(ws_creator) in server.game_creators
-            assert server.game_creators[id(ws_creator)] == game_key
-            assert list(server.player_to_game.keys()) == [id(ws_creator)]
+            creator_token = ws_creator.get_session_token()
+            assert creator_token in server.game_creators
+            assert server.game_creators[creator_token] == game_key
+            assert list(server.player_to_game.keys()) == [creator_token]
 
             # Game should have 2 human slots (1 filled, 1 empty)
             game = server.waiting_games[game_key]
@@ -140,7 +141,10 @@ class TestGameCreation:
                 p for p in game.players if p.type == "human" and p.connected
             ]
             assert len(connected_humans) == 2
-            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner)}
+            assert set(server.player_to_game.keys()) == {
+                ws_creator.get_session_token(),
+                ws_joiner.get_session_token(),
+            }
 
             player_names = {p.name for p in connected_humans}
             assert "Creator" in player_names
@@ -338,10 +342,11 @@ class TestGameCreatorCancellation:
 
             # Verify game exists
             assert game_key in server.waiting_games
-            assert id(ws_creator) in server.game_creators
+            creator_token = ws_creator.get_session_token()
+            assert creator_token in server.game_creators
 
             # Verify only game creator in player_to_game
-            assert list(server.player_to_game.keys()) == [id(ws_creator)]
+            assert list(server.player_to_game.keys()) == [creator_token]
 
             # Creator exits queue
             ws_creator.queue_message({"type": "exit_queue"})
@@ -351,7 +356,7 @@ class TestGameCreatorCancellation:
             assert game_key not in server.waiting_games
 
             # Creator should be removed from game_creators
-            assert id(ws_creator) not in server.game_creators
+            assert creator_token not in server.game_creators
             assert server.player_to_game == {}
 
             # Creator should receive game_cancelled message
@@ -408,7 +413,10 @@ class TestGameCreatorCancellation:
             joiner_task = asyncio.create_task(server.websocket_endpoint(ws_joiner))
             await asyncio.sleep(0.5)
 
-            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner)}
+            assert set(server.player_to_game.keys()) == {
+                ws_creator.get_session_token(),
+                ws_joiner.get_session_token(),
+            }
 
             # Creator exits queue (cancels game)
             ws_creator.queue_message({"type": "exit_queue"})
@@ -478,16 +486,17 @@ class TestGameCreatorCancellation:
 
             # Verify initial state
             assert game_key in server.waiting_games
-            assert id(ws_creator) in server.game_creators
-            assert id(ws_creator) in server.player_to_game
+            creator_token = ws_creator.get_session_token()
+            assert creator_token in server.game_creators
+            assert creator_token in server.player_to_game
 
             # Creator's websocket disconnects abruptly (no exit_queue message)
             ws_creator.close()
             await asyncio.sleep(0.5)
 
             # Creator should be removed from game_creators and player_to_game
-            assert id(ws_creator) not in server.game_creators
-            assert id(ws_creator) not in server.player_to_game
+            assert creator_token not in server.game_creators
+            assert creator_token not in server.player_to_game
 
             # But the game should still be in waiting_games so others can join with the key
             assert game_key in server.waiting_games
@@ -577,7 +586,10 @@ class TestNonCreatorLeaving:
             assert len(connected_before) == 2
 
             # Check they are in player_to_server
-            assert set(server.player_to_game) == {id(ws_creator), id(ws_joiner)}
+            assert set(server.player_to_game) == {
+                ws_creator.get_session_token(),
+                ws_joiner.get_session_token(),
+            }
 
             # Joiner exits queue
             ws_joiner.queue_message({"type": "exit_queue"})
@@ -585,7 +597,9 @@ class TestNonCreatorLeaving:
 
             # Game should still exist
             assert game_key in server.waiting_games
-            assert list(server.player_to_game.keys()) == [id(ws_creator)]
+            assert list(server.player_to_game.keys()) == [
+                ws_creator.get_session_token()
+            ]
 
             # Joiner should be disconnected but creator still connected
             connected_after = [
@@ -681,9 +695,9 @@ class TestNonCreatorLeaving:
             connected = [p for p in game.players if p.type == "human" and p.connected]
             assert len(connected) == 3
             assert set(server.player_to_game.keys()) == {
-                id(ws_creator),
-                id(ws_joiner1),
-                id(ws_joiner2),
+                ws_creator.get_session_token(),
+                ws_joiner1.get_session_token(),
+                ws_joiner2.get_session_token(),
             }
 
             # Joiner1 leaves
@@ -693,7 +707,10 @@ class TestNonCreatorLeaving:
             connected = [p for p in game.players if p.type == "human" and p.connected]
             assert len(connected) == 2
             assert game_key in server.waiting_games, "Game should still exist"
-            assert set(server.player_to_game.keys()) == {id(ws_creator), id(ws_joiner2)}
+            assert set(server.player_to_game.keys()) == {
+                ws_creator.get_session_token(),
+                ws_joiner2.get_session_token(),
+            }
 
             # Joiner2 leaves
             ws_joiner2.queue_message({"type": "exit_queue"})
@@ -705,7 +722,7 @@ class TestNonCreatorLeaving:
             assert (
                 game_key in server.waiting_games
             ), "Game should still exist with only creator"
-            assert set(server.player_to_game.keys()) == {id(ws_creator)}
+            assert set(server.player_to_game.keys()) == {ws_creator.get_session_token()}
 
         finally:
             ws_creator.close()
