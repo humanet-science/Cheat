@@ -471,7 +471,8 @@ const WelcomePage = ({onGameStart}) => {
                                     {/* Avatar Selection */}
                                     <AvatarSelection
                                         selectedAvatar={selectedAvatar}
-                                        setSelectedAvatar={setSelectedAvatar}/>
+                                        setSelectedAvatar={setSelectedAvatar}
+                                        random_shuffle={true}/>
                                 </div>
                                 <div>
                                     {/* Quick Pairing Tab */}
@@ -664,7 +665,8 @@ const WelcomePage = ({onGameStart}) => {
                                     {/* Avatar Selection */}
                                     <AvatarSelection
                                         selectedAvatar={selectedAvatar}
-                                        setSelectedAvatar={setSelectedAvatar}/>
+                                        setSelectedAvatar={setSelectedAvatar}
+                                        random_shuffle={true}/>
                                 </div>
                                 <div>
                                     {/* Terms and Conditions Checkbox */}

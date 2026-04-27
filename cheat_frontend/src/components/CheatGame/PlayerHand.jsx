@@ -201,7 +201,7 @@ export default function PlayerHand({
 						<div className="sm:w-auto flex items-center gap-2 justify-center">
 							{isMyTurn && !hasActed && !showRankInput && (
 								<div
-									className="pop-in flex-1 sm:flex-initial items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap relative">
+									className="pop-in flex-1 sm:flex-initial items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap relative ">
 
 									<button
 										onClick={play}
