@@ -979,17 +979,24 @@ export default function CheatGame({
 					}
 				});
 			} else {
-				// Regular messages - create new and remove after timeout
-				const newMessage = {
-					id: Math.random(), playerId, message, position, is_play_announcement, is_connection_timer: false, rank: rank
-				};
-
-				setStatusMessages(prev => [...prev, newMessage]);
+				const newMessageId = Math.random();
+				setStatusMessages(prev => {
+					// Push existing messages for this player upward
+					const updated = prev.map(m =>
+						!m.is_connection_timer && m.playerId === playerId
+							? { ...m, position: { ...m.position, y: m.position.y - 40 } }
+							: m
+					);
+					return [...updated, {
+						id: newMessageId, playerId, message, position,
+						is_play_announcement, is_connection_timer: false, rank: rank
+					}];
+				});
 
 				// Remove after animation
 				const duration = is_play_announcement ? 6000 : 3000;
 				setTimeout(() => {
-					setStatusMessages(prev => prev.filter(msg => msg.id !== newMessage.id));
+					setStatusMessages(prev => prev.filter(msg => msg.id !== newMessageId));
 					setSpeakingPlayers(prev => {
 						const newSet = new Set(prev);
 						newSet.delete(playerId);

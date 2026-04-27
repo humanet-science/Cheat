@@ -63,6 +63,7 @@ export default function StatusMessage({statusMessages, tutorialScale = null}) {
 				left: tutorialScale ? `${msg.position.x / tutorialScale}px` : `${msg.position.x}px`,
 				top: tutorialScale ? `${msg.position.y / tutorialScale}px` : `${msg.position.y}px`,
 				'--float-distance': `-${floatPercentage}%`,
+				transition: 'top 0.3s ease',
 			}}
 		>
 			<div className="text-white font-semibold break-words text-center" style={{maxWidth: 'min(400px, 25vw)'}}>
