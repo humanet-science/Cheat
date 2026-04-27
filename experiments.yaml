@@ -97,6 +97,9 @@ treatments:
     # Default is 15 minutes
     max_waiting_time: 10
 
+    # Player timeout
+    timeout: 90
+
   # Six humans, with two displayed as bots
   - game:
       experimental_mode: True
@@ -142,3 +145,6 @@ treatments:
     # After this time, players will be shown the completion code and can submit.
     # Default is 15 minutes
     max_waiting_time: 10
+
+    # Player timeout
+    timeout: 90
