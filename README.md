@@ -96,17 +96,3 @@ In all cases, replace `your_api_key_here` with your key, and `<NAME_OF_API_KEY>`
 > The API key should ideally be specific to your virtual environment. Make sure to NEVER reveal the API secret, e.g. by
 > pushing the virtual environment to a Github repo, or by publishing it online. Make sure that your virtual environment folder
 > is not included in your git VCS so that it won't be accidentally pushed.
-
-## Empirica
-To install, run
-```console
-curl -fsS https://install.empirica.dev | sh
-```
-Then navigate to both the `cheat_empirica/server` and the `cheat_empirica/client` folders, and in each run
-```console
-npm install
-```
-Thereafter, you can start the empirica server from the `cheat_empirica` folder by running
-```commandline
-empirica
-```

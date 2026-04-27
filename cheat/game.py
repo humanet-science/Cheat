@@ -33,6 +33,7 @@ class CheatGame:
         round: int = 1,
         game_id: str = None,
         predefined_messages: list = None,
+        timeout: int = None
     ):
         """CheatGame that can be played for multiple rounds.
 
@@ -48,6 +49,9 @@ class CheatGame:
             is reached, the game quits.
         :param round: starting round number
         :param game_id: unique game id. If None, a random UUID identifier is created
+        :param predefined_messages: list of predefined messages. If not None, players can only broadcast these messages.
+            If None, the message box is visible from the frontend, from which players can send any message they like
+        :param timeout: idle timeout. Backend will wait this many seconds before disconnecting a non-responsive player
         """
 
         # Set up the players
@@ -60,6 +64,9 @@ class CheatGame:
 
         # Single or multipayer mode
         self.game_mode = game_mode
+
+        # Timeout
+        self.timeout = timeout
 
         # Queue of current messages
         self.message_queue = message_queue
@@ -77,6 +84,10 @@ class CheatGame:
 
         # Cards currently on the table
         self.pile = []
+
+        # Ordered log of plays contributing to the current pile; reset after each pickup / new round.
+        # Each entry: {player_id, card_count, declared_rank}
+        self.pile_plays: list = []
 
         # Ranks that have been discarded
         self.discarded_ranks = []
@@ -166,6 +177,7 @@ class CheatGame:
             p.hand = []
         self.deal_cards()
         self.pile = []
+        self.pile_plays = []
         self.discarded_ranks = []
         self.turn = random.randint(
             0, len(self.players) - 1
@@ -232,6 +244,13 @@ class CheatGame:
         for c in cards_played:
             player.hand.remove(c)
         self.pile.extend([str_to_Card(c) for c in cards_played])
+        self.pile_plays.append(
+            {
+                "player_id": player.id,
+                "card_count": len(cards_played),
+                "declared_rank": self.current_rank,
+            }
+        )
         player.sort_hand()
         self.log(
             GameAction(
@@ -289,8 +308,9 @@ class CheatGame:
                 )
             )
 
-        # Clear the pile
+        # Clear the pile and its play log
         self.pile.clear()
+        self.pile_plays = []
 
         # Regardless of the result, a new rank begins
         self.current_rank = None
@@ -403,6 +423,8 @@ class CheatGame:
     def get_info(self) -> dict:
         """Produce a dictionary that can be broadcast to the frontend"""
         return {
+            "game_id": self.game_id,
+            "current_round": self.round,
             "current_player": self.turn,
             "current_player_name": self.players[self.turn].name,
             "current_rank": self.current_rank,
@@ -475,7 +497,7 @@ class CheatGame:
 
         msg_was_broadcast = False
         for player in _query_players:
-            if player.type == "bot":
+            if player.type in ["bot", "LLM"]:
                 msg = player.broadcast_message(self, message_type)
                 msg_was_broadcast = msg is not None
                 if msg is not None:
@@ -611,9 +633,9 @@ class CheatGame:
             {
                 "type": "bluff_called",
                 "caller": player.id,
-                "caller_name": player.name,
+                "caller_name": player.display_name,
                 "accused": self.players[last_player].id,
-                "accused_name": self.players[last_player].name,
+                "accused_name": self.players[last_player].display_name,
                 "declared_rank": declared_rank,
                 "actual_cards": [str(c) for c in cards_played],
                 "was_lying": was_lying,
@@ -677,11 +699,16 @@ class CheatGame:
                 # Get new input: need to allow for the possibility that a player left during their
                 # turn and was replaced by a bot
                 data = None
+                idle_ticks = 0
                 while data is None:
                     try:
                         data = await asyncio.wait_for(
                             self.message_queue.get(), timeout=0.5
                         )
+                        if data and data.get("type") == "turn_acknowledged":
+                            idle_ticks = 0
+                            data = None
+                            continue
                     except asyncio.TimeoutError:
                         # Check if player was replaced by a bot while we were waiting
                         current_player = self.players[
@@ -692,6 +719,36 @@ class CheatGame:
                                 f"Player {self.turn} was replaced by bot, continuing"
                             )
                             break  # Exit the waiting loop, will handle as bot on next iteration
+
+                        # Re-send the current state every 30s in case a player's client
+                        # missed it (silent message loss or frontend processing error)
+                        idle_ticks += 1
+                        if idle_ticks // 2 % 15 == 0:  # 30 × 0.5s timeout = every 15s
+                            current_player.logger.debug(
+                                f"Waited {idle_ticks // 2}s for {current_player.display_name}; resending state"
+                            )
+                            await self.send_state_to_all()
+
+                        # If a disconnect time out has been specified, send a warning after 1/3 of the timeout has
+                        # elapsed, and disconnect thereafter
+                        if self.timeout is not None:
+                            elapsed = idle_ticks // 2
+                            if idle_ticks % 2 == 0 and elapsed == self.timeout // 3:
+                                self.logger.warning(
+                                    f"Waited {elapsed}s for {current_player.display_name}; first reminder"
+                                )
+                                await current_player.send_message(
+                                    {"type": "timeout_reminder", "time_lapsed": elapsed, "time_remaining": self.timeout - elapsed}
+                                )
+                            elif idle_ticks % 2 == 0 and elapsed >= self.timeout:
+                                self.logger.warning(
+                                    f"Disconnecting player {current_player.display_name} after {elapsed}s timeout"
+                                )
+                                current_player.timed_out = True
+                                await current_player.send_message({"type": "quit_confirmed"})
+                                await current_player.ws.close()
+
+
                         continue  # Still human, keep waiting
 
                 # If player was replaced, skip to next iteration where it will be handled as bot
@@ -766,7 +823,7 @@ class CheatGame:
                 "type": "human_message",
                 "sender_id": player.id,
                 "sender_name": player.name,
-                "message": f"{player.name} has left the game.",
+                "message": f"{player.display_name} has left the game.",
                 "num_players": len(self.players),
             }
         )
@@ -785,14 +842,16 @@ class CheatGame:
         bot = RandomBot(
             id=player.id,  # Keep the same ID
             name=bot_name,
+            display_name=f"{player.display_name}_bot",
             avatar=player.avatar,  # Keep the same avatar
             p_call=0.3,
             p_lie=0.3,
             verbosity=0.2,
         )
 
-        # Transfer the hand
+        # Transfer the hand and logger
         bot.hand = player.hand.copy()
+        bot.logger = self.player_logger
 
         # Replace in the players list
         self.players[player.id] = bot
@@ -811,7 +870,7 @@ class CheatGame:
             {
                 "type": "bot_message",
                 "sender_id": bot.id,
-                "message": f"🤖 {bot_name} has taken over for {player.name}",
+                "message": f"🤖 {bot.display_name} has taken over for {player.display_name}",
                 **self.get_info(),
             }
         )
@@ -837,11 +896,12 @@ class CheatGame:
         timeout = 30 if self.game_mode == "multiplayer" else 30000000
         start_time = asyncio.get_event_loop().time()
 
-        human_players = [p for p in self.players if p.type == "human"]
-
         while True:
             elapsed = asyncio.get_event_loop().time() - start_time
             remaining = timeout - elapsed
+
+            # Recompute each iteration so bot substitutions don't skew the threshold.
+            human_players = [p for p in self.players if p.type == "human"]
 
             # Broadcast countdown every second
             current_second = int(remaining)
@@ -889,7 +949,6 @@ class CheatGame:
                         if (player.id not in self._new_round_confirmations) and (
                             player.type == "human"
                         ):
-                            player.connected = False
                             try:
                                 await player.send_message({"type": "quit_confirmed"})
                                 await player.ws.close()
@@ -898,21 +957,19 @@ class CheatGame:
                                 self.logger.error(
                                     f"Error closing WebSocket for {player.name}: {e}"
                                 )
+                            player.connected = False
                     break
+
+            # _delayed_replace sets game_over if all players are gone past the grace period.
+            # Exit here rather than short-circuiting immediately on disconnect, so players
+            # have the full reconnect window before we give up.
+            if self.game_over:
+                return
 
             # Check if all humans confirmed (early exit)
             if len(self._new_round_confirmations) >= len(human_players):
                 self.logger.info("All players confirmed, starting immediately")
                 break
-
-            # Check if any humans are still connected
-            connected_humans = [
-                p for p in self.players if p.type == "human" and p.connected
-            ]
-            if not connected_humans:
-                self.logger.info("No humans connected, ending game")
-                self.game_over = True
-                return
 
             # Sleep briefly and check again
             await asyncio.sleep(0.1)

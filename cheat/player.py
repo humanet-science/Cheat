@@ -1,7 +1,7 @@
 # Get the logger
+import asyncio
 import logging
 import pickle
-
 from dataclasses import dataclass
 from typing import Callable, List
 
@@ -24,6 +24,8 @@ class Player:
     type: str = "human"
     display_type: str | None = None
     connected: bool = True
+    timed_out: bool = False
+    session_token: str = None
     input_function: Callable = None
     logger: logging.Logger = None
 
@@ -78,9 +80,15 @@ class Player:
         """Send a message to the player's websocket"""
         if self.connected and self.ws and hasattr(self, "ws"):
             try:
-                await self.ws.send_json(message)
+                await asyncio.wait_for(self.ws.send_json(message), timeout=5.0)
+            except asyncio.TimeoutError:
+                self.logger.warning(
+                    f"Send timeout for player {self.id}, marking disconnected"
+                )
+                self.connected = False
             except Exception as e:
                 self.logger.error(f"Error sending to player {self.id}: {e}")
+                self.connected = False
 
 
 class HumanPlayer(Player):
@@ -92,7 +100,7 @@ class HumanPlayer(Player):
         ws: WebSocket = None,
         display_name: str | None = None,
         display_type: str | None = None,
-        empirica_id: int | None = None,
+        identifier: int | None = None,
     ):
         super().__init__(
             id=id,
@@ -104,16 +112,18 @@ class HumanPlayer(Player):
             ws=ws,
             connected=ws is not None,
         )
-        self.empirica_id = empirica_id
+        self.identifier = identifier
 
     def __dict__(self):
-        return dict(id=self.id,
-                    name=self.name,
-                    avatar=self.avatar,
-                    type=self.type,
-                    empirica_id=self.empirica_id,
-                    display_name=self.display_name,
-                    display_type=self.display_type)
+        return dict(
+            id=self.id,
+            name=self.name,
+            avatar=self.avatar,
+            type=self.type,
+            identifier=self.identifier,
+            display_name=self.display_name,
+            display_type=self.display_type,
+        )
 
     def write_info(self, path) -> None:
         with open(

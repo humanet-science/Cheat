@@ -1,7 +1,7 @@
 # This configuration specifies the base game configuration and should not be updated. Instead, create a new yaml
 # config that overwrites certain keys of this file and run the game from it.
 # Random seed for reproducibility
-seed: 42
+seed: ~
 
 # Whether to show console logs
 show_logs: True
@@ -15,6 +15,12 @@ min_human_players:
 
 # Maximum number of parallel games server can handle
 max_num_active_games: 50
+
+# Study queue settings (Empirica-free flow)
+# study_min_players: minimum humans needed to start a game (set to 1 to test solo)
+# study_num_players: total players including bots (must be >= study_min_players)
+study_min_players: 4
+study_num_players: 6
 
 # Basic game settings, passed to CheatGame
 game:
@@ -32,34 +38,35 @@ players:
 #    model_kwargs:
 #      model: deepseek-chat
 #      stream: False
+#    verbosity: 0.2
   - type: RandomBot
     name: Beep Boop
     avatar: 🍕
-    verbosity: 0.6
+    verbosity: 0.2
     p_call: 0.2
     p_lie: 0.6
   - type: SmartBot
     name: His Botness
     avatar: 🧜‍♂️
-    verbosity: 0.6
+    verbosity: 0.1
   - type: SmartBot
     name: ChattyBot
     avatar: 🐭
-    verbosity: 0.9
+    verbosity: 0.3
   - type: SmartBot
     name: B0Tanical
     avatar: 🌼
-    verbosity: 0.6
+    verbosity: 0.2
   - type: RandomBot
     name: BOTtled Up
     avatar: 🍾
-    verbosity: 0.2
+    verbosity: 0.1
     p_call: 0.5
     p_lie: 0.5
 
-# Settings specifically for the experimental mode
-experiment:
-  predefined_messages: ~
+# Predefined messages: if a list of messages is passed, only these messages can be sent between the players.
+# If none, they can use the message box to send arbitrary messages
+predefined_messages: ~
 #    - "No way!"
 #    - "That's some BS"
 #    - "Flip that"
@@ -68,6 +75,10 @@ experiment:
 #    - "Damn"
 #    - "Gosh"
 #    - "Nice"
+
+# Timeout: If a player does not make a move (when it's their turn) for this number of seconds, their websocket is
+# closed
+timeout: ~
 
 # Default system prompt for LLMs; this will be formatted with the LLM player id and number of players in the game
 default_system_prompt: >

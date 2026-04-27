@@ -170,6 +170,16 @@ const WelcomePage = ({onGameStart}) => {
             const msg = JSON.parse(event.data);
             console.log("WelcomePage received:", msg);
 
+            if (msg.type === "ping") {
+                ws.send(JSON.stringify({type: "pong"}));
+                return;
+            }
+
+            if (msg.type === "session_token") {
+                localStorage.setItem("cheat_session_token", msg.token);
+                return;
+            }
+
             // Game commencing
             if (msg.type === 'new_round') {
                 console.log("Game starting! Passing to CheatGame...");
@@ -285,12 +295,12 @@ const WelcomePage = ({onGameStart}) => {
 
         // Move the logo up and add subtitles
         const movingTimer = setTimeout(() => {
-            setAnimationPhase('moving');
+            setAnimationPhase(prev => prev === 'drawing' ? 'moving' : prev);
         }, 2000)
 
         // Add the subtitles
         const subtitleTimer = setTimeout(() => {
-            setAnimationPhase('buttons-visible');
+            setAnimationPhase(prev => prev === 'moving' ? 'buttons-visible' : prev);
         }, 3000);
 
         return () => {
@@ -461,7 +471,8 @@ const WelcomePage = ({onGameStart}) => {
                                     {/* Avatar Selection */}
                                     <AvatarSelection
                                         selectedAvatar={selectedAvatar}
-                                        setSelectedAvatar={setSelectedAvatar}/>
+                                        setSelectedAvatar={setSelectedAvatar}
+                                        random_shuffle={true}/>
                                 </div>
                                 <div>
                                     {/* Quick Pairing Tab */}
@@ -654,7 +665,8 @@ const WelcomePage = ({onGameStart}) => {
                                     {/* Avatar Selection */}
                                     <AvatarSelection
                                         selectedAvatar={selectedAvatar}
-                                        setSelectedAvatar={setSelectedAvatar}/>
+                                        setSelectedAvatar={setSelectedAvatar}
+                                        random_shuffle={true}/>
                                 </div>
                                 <div>
                                     {/* Terms and Conditions Checkbox */}

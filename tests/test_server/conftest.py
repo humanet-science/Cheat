@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+from collections import deque
 
 import pytest
 
@@ -12,28 +13,46 @@ sys.path.insert(
 import cheat.server as server
 
 
+def _clear_server_state():
+    # Cancel any pending grace-period tasks before clearing slots
+    for slot in server.reconnection_slots.values():
+        slot["task"].cancel()
+    server.reconnection_slots.clear()
+    server.active_games.clear()
+    server.waiting_games.clear()
+    server.waiting_game_created_at.clear()
+    server.player_to_game.clear()
+    server.game_creators.clear()
+    server.game_out_paths.clear()
+    server.study_participants.clear()
+    server.schedule.clear()
+    for num_players in server.waiting_queues:
+        for mode in server.waiting_queues[num_players]:
+            server.waiting_queues[num_players][mode].clear()
+
+
 @pytest.fixture(scope="function")
-def clean_server_state():
-    """Fixture to ensure clean server state before and after tests."""
-    # Before test: clear state
-    server.active_games.clear()
-    server.waiting_games.clear()
-    server.player_to_game.clear()
-    server.game_creators.clear()
-    for num_players in server.waiting_queues:
-        for mode in server.waiting_queues[num_players]:
-            server.waiting_queues[num_players][mode].clear()
-
+def clean_server_state(tmp_path):
+    """Fixture to ensure clean server state before and after each test."""
+    _clear_server_state()
+    # Redirect DB to a writable temp path and initialise it. TestClient-based tests
+    # may not trigger the lifespan (and thus init_db), so we do it explicitly here.
+    original_db_path = server.DB_PATH
+    server.DB_PATH = tmp_path / "participants_test.db"
+    asyncio.run(server.init_db())
     yield
+    _clear_server_state()
+    server.DB_PATH = original_db_path
 
-    # After test: clear state again
-    server.active_games.clear()
-    server.waiting_games.clear()
-    server.player_to_game.clear()
-    server.game_creators.clear()
-    for num_players in server.waiting_queues:
-        for mode in server.waiting_queues[num_players]:
-            server.waiting_queues[num_players][mode].clear()
+
+@pytest.fixture(scope="function")
+async def clean_db(tmp_path):
+    """Fixture that points the participant DB at a fresh temp file and initialises it."""
+    original_path = server.DB_PATH
+    server.DB_PATH = tmp_path / "participants_test.db"
+    await server.init_db()
+    yield
+    server.DB_PATH = original_path
 
 
 @pytest.fixture(scope="function")

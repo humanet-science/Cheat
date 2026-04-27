@@ -8,10 +8,11 @@ import React from "react";
  */
 export default function CardFlyAnimation({animatingCards, tableCenter}) {
 	if (!animatingCards) return null;
+	const center = animatingCards.frozenCenter ?? tableCenter;
 	return (<div className="absolute z-20 pointer-events-none"
 							 style={{
-								 left: `calc(50% + ${tableCenter.x}px)`,
-								 top: `calc(50% + ${tableCenter.y}px)`,
+								 left: `calc(50% + ${center.x}px)`,
+								 top: `calc(50% + ${center.y}px)`,
 								 transform: "translate(-50%, -50%)"
 							 }}>
 		{animatingCards.cards.map((card, i) => (<div

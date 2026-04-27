@@ -29,7 +29,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 2,
 	title: "Playing Cards",
-	description: "On your turn, select 1–3 cards and declare any rank you like except Ace (i.e. 2-10 or 'J', 'Q', 'K') – you don't need to tell the truth. " + "If you play Aces, you must lie.",
+	description: "On your turn, select 1–3 cards and declare any rank you like except Ace (i.e. 2-10 or J, Q, K) – you don't need to tell the truth. " + "If you play Aces, you must lie.",
 	task: {
 		type: 'play_cards',
 		description: 'In the game above, select some cards, declare a rank, and play them to continue.',
@@ -197,12 +197,63 @@ const TUTORIAL_SLIDES = [{
 	}]
 }, {
 	id: 6,
+	title: "Lying is Allowed",
+	description: "It's your turn again. If you think the previous player was lying, you can call their play. " + "Or, you can select cards to continue playing the same rank. "
+	+ "Remember: the rank doesn't change until the pile is cleared, so you will automatically declare the current rank.",
+	task: {
+		type: 'play_cards',
+		description: "Select some cards and click 'Play'.",
+		validate: (state) => state.hasPlayedCards // Check if user has played
+	},
+	messages: [{
+		type: "cards_played",
+		your_info: {
+			id: 0, name: "You", cardCount: 10, avatar: "🎮", hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"]
+		},
+		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
+			your_info: {
+				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+			}
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+			your_info: {
+				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
+			}
+		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
+		declared_rank: "",
+		cards: ["A♦", "6♥"],
+		card_count: 2,
+		hands: [10, 10, 7, 9, 10],
+		current_player: 4,
+		num_players: 5,
+	}, {
+		type: "state",
+		your_info: {
+			id: 0, name: "You", cardCount: 10, avatar: "🎮", hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"]
+		},
+		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
+			your_info: {
+				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+			}
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+			your_info: {
+				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
+			}
+		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
+		experimental_mode: false,
+		hands: [10, 10, 7, 10, 10],
+		current_player: 0,
+		current_rank: null,
+		num_players: 5,
+	}]
+}, {
+	id: 7,
 	title: "Calling Bluff",
-	description: "It's your turn again. You can select cards to play the same rank. " + "Or, if you think the previous player is lying, you can call their play.",
+	description: "Alternatively, if you think the previous player was lying, you can call their play.",
 	task: {
 		type: 'bluff_called',
 		description: "Click the 'Call' button to see what happens.",
-		validate: (state) => state.hasCalledBluff // Check if user has played
+		validate: (state) => state.hasCalledBluff, // Check if user has played
+		autoAdvance: true, // Advance immediately so the bluff overlay only shows once (on slide 8)
 	},
 	messages: [{
 		type: "state",
@@ -264,32 +315,15 @@ const TUTORIAL_SLIDES = [{
 		num_players: 5,
 	}]
 }, {
-	id: 7,
+	id: 8,
 	title: "Successful Bluff Call",
-	description: "When you successfully call a bluff, they pick up the pile and it's your turn. You can then declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn.",
+	description: "When you successfully call a bluff, they pick up the pile and it's your turn. You can now declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn.",
+	task: {
+		type: 'play_cards',
+		description: "Continue your turn.",
+		validate: (state) => state.hasPlayedCards // Check if user has played
+	},
 	messages: [{
-		type: "bluff_called",
-		caller: 0,
-		caller_name: "You",
-		accused: 4,
-		accused_name: "Player 4",
-		declared_rank: "K",
-		actual_cards: ["A♦", "6♥"],
-		was_lying: true,
-		current_player: 0,
-		your_info: {
-			id: 0, name: "You", cardCount: 10, avatar: "🎮", hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"]
-		},
-		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
-			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
-			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
-			your_info: {
-				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
-			}
-		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}}]
-	}, {
 		type: "state",
 		your_info: {
 			id: 0, name: "You", cardCount: 10, avatar: "🎮", hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"]
@@ -310,7 +344,7 @@ const TUTORIAL_SLIDES = [{
 		num_players: 5,
 	}]
 }, {
-	id: 8,
+	id: 9,
 	title: "Discarding four of a kind",
 	description: "Four of a kind are automatically discarded – except the Aces! You can only get rid of those by lying.",
 	messages: [{
@@ -336,7 +370,7 @@ const TUTORIAL_SLIDES = [{
 		type: "discard", result: "Player 2 discards 6.", your_info: {id: 0}
 	}]
 }, {
-	id: 9,
+	id: 10,
 	title: "Messaging",
 	description: "You can broadcast messages using the Message box, and you can warn the others when someone's cards are running low by clicking on their avatar.",
 	task: {
@@ -371,14 +405,14 @@ const TUTORIAL_SLIDES = [{
 		num_players: 5
 	}]
 }, {
-	id: 10,
+	id: 11,
 	title: "Help",
 	description: "The rules, and more information about our lab, are available in the menu, from where you can also exit the game. Have fun!",
-	empirica_description: "The rules, and more information about our lab, are available in the menu. Have fun!",
+	experiment_description: "The rules, and more information about our lab, are available in the menu. Have fun!",
 	messages: [{}]
 }];
 
-export default function Tutorial({onClose, isEmpirica = false}) {
+export default function Tutorial({onClose, allowSkip = true}) {
 	const [currentSlide, setCurrentSlide] = useState(0);
 	const [mockSocket, setMockSocket] = useState(null);
 	const [currentRound, setCurrentRound] = useState(null);
@@ -402,6 +436,9 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 	// Track task completion
 	const [taskCompleted, setTaskCompleted] = useState(false);
 
+	// Ref so the task-completion effect can call nextSlide without a stale closure
+	const nextSlideRef = useRef(null);
+
 	// Reset when slide changes
 	useEffect(() => {
 		setTaskCompleted(false);
@@ -415,7 +452,11 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 		const slide = TUTORIAL_SLIDES[currentSlide];
 
 		if (slide.task && slide.task.validate(tutorialState)) {
-			setTaskCompleted(true);
+			if (slide.task.autoAdvance) {
+				nextSlideRef.current?.();
+			} else {
+				setTaskCompleted(true);
+			}
 		}
 	}, [tutorialState, currentSlide]);
 
@@ -656,6 +697,9 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 		}
 	};
 
+	// Keep ref in sync so the task-completion effect always calls the latest closure
+	nextSlideRef.current = nextSlide;
+
 	const prevSlide = () => {
 		if (currentSlide > 0) {
 			setIsTransitioning(true);
@@ -697,12 +741,11 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 	const slide = TUTORIAL_SLIDES[currentSlide];
 
 	return (<div
-		className={`fixed inset-0  ${!isEmpirica ? 'z-50' : ''} flex items-center justify-center p-4 transition-all transform-gpu duration-1000 ${(isOpening || isOpen) && !isEmpirica ? 'bg-opacity-40 backdrop-blur-lg bg-black' : ''}`}
+		className={`fixed inset-0 z-50 flex items-center justify-center p-[2%] transition-all transform-gpu duration-1000 ${(isOpening || isOpen) ? 'bg-opacity-40 backdrop-blur-lg bg-black' : ''}`}
 	>
 
-		{/* Close button */}
-		{/* isEmpirica && currentSlide !== TUTORIAL_SLIDES.length - 1 */}
-		{(1 != 1) ? <></> : <button
+		{/* Close button: always shown if allowSkip, otherwise only on last slide */}
+		{(!allowSkip && currentSlide !== TUTORIAL_SLIDES.length - 1) ? <></> : <button
 			onClick={handleClose}
 			className={`absolute top-5 right-5 text-gray-500 hover:text-gray-700 transition-all duration-300 z-10 ${showText ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
 		>
@@ -723,7 +766,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 
 		{/* Outer div, containing Game preview box (75%) and explanations (25%) */}
 		<div
-			className={`relative duration-500 h-full max-w-6xl w-full rounded-2xl ${isOpen && !isEmpirica ? 'shadow-2xl' : ''} ${isClosing ? 'opacity-0' : ''} ${!isEmpirica ? 'bg-gradient-to-br from-green-900 to-blue-900' : ''} mx-4 overflow-hidden flex flex-col`}
+			className={`relative duration-500 h-full max-w-6xl w-full rounded-2xl ${isOpen ? 'shadow-2xl' : ''} ${isClosing ? 'opacity-0' : ''} bg-gradient-to-br from-green-900 to-blue-900 mx-4 overflow-hidden flex flex-col`}
 		>
 
 			{/* Game Preview: 75%; top-aligned */}
@@ -745,7 +788,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 					>
 						<CheatGame
 							socket={mockSocket}
-							gameConfig={{numPlayers: 5, experimentalMode: isEmpirica, predefinedMessages: null, selfId: 0,}}
+							gameConfig={{numPlayers: 5, predefinedMessages: null, selfId: 0,}}
 							currentRound={currentRound}
 							onUpdateRound={updateRoundState}
 							onExitGame={() => {
@@ -754,6 +797,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 							containerWidth={containerSize.width}  // Pass container size
 							containerHeight={containerSize.height}
 							tutorialScale={0.7}
+							disableReconnect={true}
 							showDealAnimation={false}
 						/>
 					</div>)}</div>
@@ -775,7 +819,7 @@ export default function Tutorial({onClose, isEmpirica = false}) {
 				>
 					<h2 className="text-gray-50 text-2xl sm:text-3xl font-bold mb-2 whitespace-nowrap">{slide.title}</h2>
 					<p className="text-gray-300 text-lg mb-6">
-						{slide.empirica_description ? slide.empirica_description : slide.description}
+						{slide.experiment_description ? slide.experiment_description : slide.description}
 						{slide.task && (<span className="text-yellow-400"> {slide.task.description}</span>)}
 					</p>
 				</div>

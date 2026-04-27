@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cheat Game Admin</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Menlo', monospace;
+            background: #0f1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        /* Login */
+        #login-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .login-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 32px;
+            width: 320px;
+            text-align: center;
+        }
+
+        .login-box h1 {
+            font-size: 22px;
+            color: #58a6ff;
+            margin-bottom: 4px;
+        }
+
+        .login-box p {
+            color: #8b949e;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 9px 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .login-box input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+
+        #login-error {
+            height: 16px;
+            font-size: 12px;
+            color: #f85149;
+            margin-top: 6px;
+        }
+
+        /* Dashboard */
+        #dashboard {
+            display: none;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #58a6ff;
+        }
+
+        .last-updated {
+            font-size: 11px;
+            color: #484f58;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin: 14px 0 20px;
+        }
+
+        #flash {
+            font-size: 12px;
+            color: #3fb950;
+            height: 16px;
+        }
+
+        /* Buttons */
+        button {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: background 0.15s;
+        }
+
+        button:hover {
+            background: #30363d;
+        }
+
+        button.primary {
+            background: #1f6feb;
+            border-color: #1f6feb;
+            color: #fff;
+        }
+
+        button.primary:hover {
+            background: #388bfd;
+        }
+
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 700px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1rem;
+        }
+
+        th {
+            color: #484f58;
+            padding: 4px 8px 6px;
+            text-align: left;
+            border-bottom: 1px solid #21262d;
+            font-weight: normal;
+        }
+
+        td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #161b22;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .empty {
+            color: #484f58;
+            font-style: italic;
+            font-size: 0.8rem;
+        }
+
+        .mono {
+            font-family: inherit;
+            font-size: 10px;
+            color: #8b949e;
+        }
+
+        /* Stats */
+        .stat-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-num {
+            font-size: 28px;
+            font-weight: bold;
+            color: #c9d1d9;
+            line-height: 1;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: #484f58;
+            margin-top: 2px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 1px 10px;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .badge-blue {
+            background: #1f3a5f;
+            color: #58a6ff;
+        }
+
+        .badge-green {
+            background: #1a3a2a;
+            color: #3fb950;
+        }
+
+        .badge-yellow {
+            background: #3a2a00;
+            color: #d29922;
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-section">
+    <div class="login-box">
+        <h1>🃏 Admin</h1>
+        <p>Cheat Game server dashboard</p>
+        <input type="password" id="pw-input" placeholder="Password"/>
+        <button class="primary" onclick="doLogin()" style="width:100%">Sign in</button>
+        <div id="login-error"></div>
+    </div>
+</div>
+
+<div id="dashboard">
+    <div class="header">
+        <h1>🃏 Cheat Game Admin</h1>
+        <span class="last-updated" id="last-updated"></span>
+    </div>
+    <div class="toolbar">
+        <button class="primary" onclick="reloadSchedule()">↻ Reload Schedule</button>
+        <button onclick="fetchStatus()">⟳ Refresh now</button>
+        <span id="flash"></span>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <h2>Schedule <span id="sched-badge"></span></h2>
+            <div id="sched-content"></div>
+        </div>
+        <div class="card">
+            <h2>Participants DB</h2>
+            <div id="db-content"></div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <h2>Waiting Queue <span id="queue-badge"></span></h2>
+            <div id="queue-content"></div>
+        </div>
+        <div class="card">
+            <h2>Active Games <span id="games-badge"></span></h2>
+            <div id="games-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+	let password = sessionStorage.getItem('admin_pw') || '';
+	let refreshTimer = null;
+
+	// Try auto-login if password cached
+	if (password) fetchStatus(true);
+
+	document.getElementById('pw-input').addEventListener('keydown', e => {
+		if (e.key === 'Enter') doLogin();
+	});
+
+	function doLogin() {
+		password = document.getElementById('pw-input').value.trim();
+		document.getElementById('login-error').textContent = '';
+		fetchStatus(true);
+	}
+
+	async function apiFetch(path, opts = {}) {
+		return fetch(path, {...opts, headers: {'X-Admin-Password': password, ...(opts.headers || {})}});
+	}
+
+	async function fetchStatus(isLogin = false) {
+		let res;
+		try {
+			res = await apiFetch('/api/admin/status');
+		} catch (e) {
+			flash('Network error', 'red');
+			return;
+		}
+
+		if (res.status === 401) {
+			if (isLogin) document.getElementById('login-error').textContent = 'Wrong password';
+			else {
+				sessionStorage.removeItem('admin_pw');
+				location.reload();
+			}
+			return;
+		}
+		if (isLogin) {
+			sessionStorage.setItem('admin_pw', password);
+			document.getElementById('login-section').style.display = 'none';
+			document.getElementById('dashboard').style.display = 'block';
+			startAutoRefresh();
+		}
+		const data = await res.json();
+		render(data);
+	}
+
+	function startAutoRefresh() {
+		if (refreshTimer) clearInterval(refreshTimer);
+		refreshTimer = setInterval(fetchStatus, 5000);
+	}
+
+	function render(d) {
+		document.getElementById('last-updated').textContent =
+			'Updated ' + new Date().toLocaleTimeString();
+
+		// Schedule
+		const slots = d.schedule;
+		document.getElementById('sched-badge').innerHTML = badge(slots.length, 'blue');
+		let sh = `<div class="stat-row"><div class="stat-box"><div class="stat-num">${slots.length}</div><div class="stat-lbl">slots remaining</div></div></div>`;
+		if (slots.length > 0) {
+			sh += '<table><tr><th>Note</th><th>Humans</th><th>Wait</th></tr>';
+			// Deduplicate for compact display
+			const counts = {};
+			slots.forEach(s => {
+				const k = `${s.note}|${s.num_humans}|${s.max_waiting_time}`;
+				counts[k] = (counts[k] || 0) + 1;
+			});
+			Object.entries(counts).forEach(([k, n]) => {
+				const [note, nh, mwt] = k.split('|');
+				sh += `<tr><td>${note}</td><td>${nh}</td><td>${Math.round(mwt / 60)}m</td>`;
+				if (n > 1) sh += `<td style="color:#484f58">×${n}</td>`;
+				sh += '</tr>';
+			});
+			sh += '</table>';
+		}
+		document.getElementById('sched-content').innerHTML = sh;
+
+		// DB stats
+		const db = d.db_stats;
+		document.getElementById('db-content').innerHTML = `
+    <table>
+      <tr><th>Metric</th><th></th></tr>
+      <tr><td>Total registered</td><td><b>${db.total}</b></td></tr>
+      <tr><td>Tutorial complete</td><td><b>${db.tutorial_done}</b></td></tr>
+      <tr><td>Game assigned</td><td><b>${db.game_assigned}</b></td></tr>
+    </table>`;
+
+		// Queue
+		const q = d.queue;
+		document.getElementById('queue-badge').innerHTML = badge(q.length, q.length > 0 ? 'yellow' : 'blue');
+		document.getElementById('queue-content').innerHTML = q.length === 0
+			? '<span class="empty">No participants waiting</span>'
+			: `<table><tr><th>#</th><th>Name</th><th>Prolific ID</th></tr>${
+				q.map((p, i) => `<tr><td style="color:#484f58">${i + 1}</td><td>${esc(p.name)}</td><td class="mono">${esc(p.prolific_id || '—')}</td></tr>`).join('')
+			}</table>`;
+
+		// Active games
+		const games = d.active_games;
+		document.getElementById('games-badge').innerHTML = badge(games.length, games.length > 0 ? 'green' : 'blue');
+		document.getElementById('games-content').innerHTML = games.length === 0
+			? '<span class="empty">No active games</span>'
+			: `<table><tr><th>Game ID</th><th>Players</th><th>Round</th></tr>${
+				games.map(g => `<tr><td class="mono">${esc(g.game_id)}</td><td>${g.num_players}</td><td>${g.round ?? '—'}</td></tr>`).join('')
+			}</table>`;
+	}
+
+	async function reloadSchedule() {
+		const res = await apiFetch('/api/admin/reload', {method: 'POST'});
+		const data = await res.json();
+		flash(data.message || 'Reloaded');
+		await fetchStatus();
+	}
+
+	function flash(msg, color = 'green') {
+		const el = document.getElementById('flash');
+		el.style.color = color === 'red' ? '#f85149' : '#3fb950';
+		el.textContent = msg;
+		setTimeout(() => {
+			el.textContent = '';
+		}, 3000);
+	}
+
+	function badge(n, color) {
+		return `<span class="badge badge-${color}">${n}</span>`;
+	}
+
+	function esc(s) {
+		return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	}
+</script>
+</body>
+</html>

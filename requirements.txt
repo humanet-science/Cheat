@@ -1,3 +1,4 @@
+aiosqlite
 colorlog
 coverage
 dotenv

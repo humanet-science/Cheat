@@ -8,7 +8,8 @@ const LoadingWindow = ({
                            isGameCreator = false,
                            totalSlots = null,
                            showCancel = true,
-                           zValue=50
+                           zValue=50,
+                           secondsLeft = null,
                        }) => {
     const [cardAnimationPhase, setCardAnimationPhase] = useState('top-pause');
     const [waitingDots, setWaitingDots] = useState('');
@@ -166,10 +167,17 @@ const LoadingWindow = ({
 
             {/* Waiting Text */}
             <div
-                className={`text-white text-lg ${totalSlots && joinedHumans > 1 ? '' : 'mb-6'} flex items-center justify-center gap-1`}>
+                className={`text-white text-lg ${(totalSlots && joinedHumans > 1) || secondsLeft !== null ? '' : 'mb-6'} flex items-center justify-center gap-1`}>
                 <span>Waiting for others to join</span>
                 <span className="w-8 text-left">{waitingDots}</span>
             </div>
+
+            {/* Countdown */}
+            {secondsLeft !== null && (
+                <div className="text-gray-300 text-sm mb-6">
+                    Timeout in: {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                </div>
+            )}
 
             {/* Number of slots filled */}
             {totalSlots && joinedHumans > 1 && (

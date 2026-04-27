@@ -17,6 +17,7 @@ class MockWebSocket:
         self.sent_messages = []
         self.accepted = False
         self.closed = False
+        self._close_event: asyncio.Event | None = None
 
     async def accept(self):
         self.accepted = True
@@ -34,9 +35,32 @@ class MockWebSocket:
         if self.messages_to_receive:
             return self.messages_to_receive.popleft()
 
-        # Otherwise, simulate waiting with timeout to keep connection alive
-        # This is what the real websocket_endpoint expects
-        await asyncio.sleep(0.5)
+        # Lazily create the close event (must be inside an event loop)
+        if self._close_event is None:
+            self._close_event = asyncio.Event()
+
+        # Race between idle timeout and close() being called. Using asyncio.wait
+        # lets close() immediately interrupt the sleep via the event, eliminating
+        # the race condition where the test asserts state before the server's
+        # disconnect handler has had a chance to run.
+        timeout_task = asyncio.create_task(asyncio.sleep(0.5))
+        close_task = asyncio.create_task(self._close_event.wait())
+        try:
+            done, pending = await asyncio.wait(
+                {timeout_task, close_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        except asyncio.CancelledError:
+            timeout_task.cancel()
+            close_task.cancel()
+            raise
+
+        for t in pending:
+            t.cancel()
+
+        if self.closed:
+            raise WebSocketDisconnect()
+
         raise asyncio.TimeoutError()
 
     async def send_json(self, message):
@@ -48,9 +72,21 @@ class MockWebSocket:
         """Get all sent messages of a specific type."""
         return [msg for msg in self.sent_messages if msg.get("type") == msg_type]
 
-    def close(self):
-        """Mark websocket as closed."""
+    def get_session_token(self):
+        """Return the session token sent by the server for this connection."""
+        msgs = self.get_sent_messages_of_type("session_token")
+        return msgs[0]["token"] if msgs else None
+
+    def close(self, code=None):
+        """Mark websocket as closed and immediately interrupt any in-progress receive.
+
+        Accepts an optional code argument so the server's `await ws.close(code=1001)` call
+        (which invokes this synchronously before awaiting the None return value) correctly
+        marks the socket closed before the ping loop's timeout exception is caught.
+        """
         self.closed = True
+        if self._close_event is not None:
+            self._close_event.set()
 
 
 class MockGame:
