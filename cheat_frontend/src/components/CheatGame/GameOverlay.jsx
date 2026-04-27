@@ -230,10 +230,10 @@ export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, sho
 
 	return (
 		<div className="fixed inset-0 flex items-center justify-center z-[70] bg-black bg-opacity-60 backdrop-blur-sm">
-			<div className="text-center bg-white rounded-2xl p-8 shadow-2xl">
+			<div className="text-center bg-white rounded-2xl p-8 shadow-2xl max-w-[90%]">
 				<div className="text-5xl mb-4">⚠️</div>
 				<div className="text-2xl font-bold text-gray-900 mb-3">Connection lost</div>
-				<div className="text-lg text-gray-600 mb-6">Please contact the experimenter.</div>
+				<div className="text-lg text-gray-600 mb-6">We are sorry, your connection to the game server has been lost. Please contact the administrator.</div>
 				<button
 					onClick={() => { window.location.href = '/'; }}
 					className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg text-lg"
@@ -245,13 +245,67 @@ export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, sho
 	);
 }
 
+export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
+	const [countdown, setCountdown] = useState(null);
+	const [showHint, setShowHint] = useState(false);
+
+	useEffect(() => {
+		if (timeoutRemaining === null) {
+			setCountdown(null);
+			setShowHint(false);
+			return;
+		}
+		setCountdown(timeoutRemaining);
+		setShowHint(true);
+		const t = setInterval(() => setCountdown(c => c > 1 ? c - 1 : 0), 1000);
+		return () => clearInterval(t);
+	}, [timeoutRemaining]);
+
+	if (countdown === null) return null;
+
+	return (
+		<>
+			{showHint && (
+				<div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[70]">
+					<div className="bg-white rounded-2xl p-6 max-w-sm mx-4 relative pt-10">
+						<button
+							onClick={() => setShowHint(false)}
+							className="absolute top-1 right-1 text-gray-500 hover:text-gray-700 transition-colors z-10"
+						>
+							<svg className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
+								fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+						<h2 className="text-2xl font-bold text-gray-800 mb-3">Are you stuck?</h2>
+						<p className="text-gray-600">
+							{pileSize > 0
+								? "It's your turn. You can either call the previous play or select some cards and play to continue the same rank."
+								: "It's your turn to play. Select 1–3 cards from your hand and declare a rank to continue."}
+						</p>
+						<p className="text-gray-400 text-sm mt-2">Make a move before the timer ends to stay in the game. If you need help,
+						consult the rules from the game menu.</p>
+					</div>
+				</div>
+			)}
+			<div className={`fixed bottom-4 right-4 z-[70] flex items-center gap-2 ${countdown > 15 ? 'bg-gray-900' : 'bg-red-500'} bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg`}>
+				<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+					<circle cx="12" cy="12" r="9" />
+					<path strokeLinecap="round" d="M12 7v5l3 3" />
+				</svg>
+				{countdown}s remaining
+			</div>
+		</>
+	);
+}
+
 export function GameStartOverlay({showLetsGo}) {
 	if (!showLetsGo) return null
 	return (
 		(<div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
 			<div
 				className="animate-fadeIn text-center bg-opacity-80 backdrop-blur-sm rounded-2xl
-					p-6 border-2 border-white border-opacity-20 shadow-2xl"
+					p-6 border-2 border-white border-opacity-20 shadow-2xl max-w-[75%]"
 				style={{
 					animation: 'fadeInOut 2.5s ease-in-out',
 				}}

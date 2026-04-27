@@ -33,6 +33,7 @@ class CheatGame:
         round: int = 1,
         game_id: str = None,
         predefined_messages: list = None,
+        timeout: int = None
     ):
         """CheatGame that can be played for multiple rounds.
 
@@ -48,6 +49,9 @@ class CheatGame:
             is reached, the game quits.
         :param round: starting round number
         :param game_id: unique game id. If None, a random UUID identifier is created
+        :param predefined_messages: list of predefined messages. If not None, players can only broadcast these messages.
+            If None, the message box is visible from the frontend, from which players can send any message they like
+        :param timeout: idle timeout. Backend will wait this many seconds before disconnecting a non-responsive player
         """
 
         # Set up the players
@@ -60,6 +64,9 @@ class CheatGame:
 
         # Single or multipayer mode
         self.game_mode = game_mode
+
+        # Timeout
+        self.timeout = timeout
 
         # Queue of current messages
         self.message_queue = message_queue
@@ -490,7 +497,7 @@ class CheatGame:
 
         msg_was_broadcast = False
         for player in _query_players:
-            if player.type == "bot":
+            if player.type in ["bot", "LLM"]:
                 msg = player.broadcast_message(self, message_type)
                 msg_was_broadcast = msg is not None
                 if msg is not None:
@@ -698,6 +705,10 @@ class CheatGame:
                         data = await asyncio.wait_for(
                             self.message_queue.get(), timeout=0.5
                         )
+                        if data and data.get("type") == "turn_acknowledged":
+                            idle_ticks = 0
+                            data = None
+                            continue
                     except asyncio.TimeoutError:
                         # Check if player was replaced by a bot while we were waiting
                         current_player = self.players[
@@ -712,11 +723,31 @@ class CheatGame:
                         # Re-send the current state every 30s in case a player's client
                         # missed it (silent message loss or frontend processing error)
                         idle_ticks += 1
-                        if idle_ticks % 30 == 0:  # 30 × 0.5s timeout = every 15s
-                            self.logger.warning(
-                                f"Waiting 30s for {current_player.name} — resending state"
+                        if idle_ticks // 2 % 15 == 0:  # 30 × 0.5s timeout = every 15s
+                            current_player.logger.debug(
+                                f"Waited {idle_ticks // 2}s for {current_player.display_name}; resending state"
                             )
                             await self.send_state_to_all()
+
+                        # If a disconnect time out has been specified, send a warning after 1/3 of the timeout has
+                        # elapsed, and disconnect thereafter
+                        if self.timeout is not None:
+                            elapsed = idle_ticks // 2
+                            if idle_ticks % 2 == 0 and elapsed == self.timeout // 3:
+                                self.logger.warning(
+                                    f"Waited {elapsed}s for {current_player.display_name}; first reminder"
+                                )
+                                await current_player.send_message(
+                                    {"type": "timeout_reminder", "time_lapsed": elapsed, "time_remaining": self.timeout - elapsed}
+                                )
+                            elif idle_ticks % 2 == 0 and elapsed >= self.timeout:
+                                self.logger.warning(
+                                    f"Disconnecting player {current_player.display_name} after {elapsed}s timeout"
+                                )
+                                current_player.timed_out = True
+                                await current_player.send_message({"type": "quit_confirmed"})
+                                await current_player.ws.close()
+
 
                         continue  # Still human, keep waiting
 

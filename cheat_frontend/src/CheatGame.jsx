@@ -9,7 +9,7 @@ import DiscardAnimation from "./components/CheatGame/Animations/Discard";
 import {CardDeal, useCardDealAnimation} from './components/CheatGame/Animations/CardDeal';
 
 // Components
-import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay} from "./components/CheatGame/GameOverlay";
+import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay, TimeoutWarningOverlay} from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
@@ -112,6 +112,9 @@ export default function CheatGame({
 	const [isReconnecting, setIsReconnecting] = useState(false);
 	const [showReconnected, setShowReconnected] = useState(false);
 
+	// Idle timeout warning (seconds remaining when server sent the reminder)
+	const [timeoutRemaining, setTimeoutRemaining] = useState(null);
+
 	// Active socket (may be replaced on reconnect)
 	const [activeSocket, setActiveSocket] = useState(socket);
 	useEffect(() => { setActiveSocket(socket); }, [socket]);
@@ -125,6 +128,7 @@ export default function CheatGame({
 	const lastPingRef = useRef(Date.now());
 	const pingWatchdogRef = useRef(null);
 	const reconnectingRef = useRef(false); // guard against double-triggering reconnect
+	const serverErrorRef = useRef(false);  // set on server_error to permanently suppress reconnect
 	// Incremented whenever the action queue is forcibly cleared (reconnect). Any
 	// processActionQueue call that started before the clear sees a stale generation
 	// and skips its removeProcessed() / recursive call so it can't corrupt the new queue.
@@ -206,6 +210,7 @@ export default function CheatGame({
 	// This handles the case where wifi is still off during early retries.
 	const attemptReconnect = useCallback(async () => {
 		if (reconnectingRef.current) return;
+		if (serverErrorRef.current) return;
 		reconnectingRef.current = true;
 
 		const token = sessionTokenRef.current;
@@ -476,7 +481,22 @@ export default function CheatGame({
 						removeAllConnectionTimers();
 					}
 				}
+				if (msg.type === "server_error") {
+					serverErrorRef.current = true;
+					setConnectionDropped(true);
+					setIsReconnecting(false);
+				}
+				if (msg.type === "timeout_reminder") {
+					setTimeoutRemaining(msg.time_remaining);
+				}
+				if (msg.type === "player_reconnecting") {
+					addStatusMessage(msg.player_id, "Reconnecting...", false, true);
+				}
+				if (msg.type === "player_reconnect_resolved") {
+					removeConnectionTimer(msg.player_id);
+				}
 				if (msg.type === "quit_confirmed") {
+					setTimeoutRemaining(null);
 					removeConnectionTimer(state.your_info.id);
 					if (experimentalMode) {
 						setExperimentOver(true);
@@ -800,6 +820,8 @@ export default function CheatGame({
 			return;
 		}
 
+		setTimeoutRemaining(null);
+
 		// Broadcast the play to the backend
 		activeSocket?.send(JSON.stringify({
 			type: "cards_played",
@@ -876,6 +898,13 @@ export default function CheatGame({
 		}
 	}, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
+	// Notify backend the moment the player can see their turn, so the idle timer starts from now
+	useEffect(() => {
+		if (isMyTurn) {
+			activeSocketRef.current?.send(JSON.stringify({type: 'turn_acknowledged'}));
+		}
+	}, [isMyTurn]);
+
 	// Floating message bubbles
 	useEffect(() => {
 		statusMessages.forEach(msg => {
@@ -906,6 +935,7 @@ export default function CheatGame({
 	};
 
 	const callBluff = () => {
+		setTimeoutRemaining(null);
 		activeSocket?.send(JSON.stringify({type: "bluff_called"}));
 		setHasActed(true);
 	};
@@ -1112,6 +1142,7 @@ export default function CheatGame({
 
 				{/* Connection dropped overlay */}
 				{!disableReconnect && <ConnectionDroppedOverlay connectionDropped={connectionDropped} isReconnecting={isReconnecting} showReconnected={showReconnected} />}
+				<TimeoutWarningOverlay timeoutRemaining={timeoutRemaining} pileSize={pileCards.length} />
 
 				{/* Banner when game begins */}
 				<GameStartOverlay

@@ -147,7 +147,7 @@ export default function PlayerHand({
 
 					{/* Communication and Play controls */}
 					<div
-						className="max-w-2xl mb-[4%] sm:mb-0 relative z-10 flex items-center gap-2 sm:gap-4 transition-all duration-500">
+						className="max-w-2xl mb-[4%] sm:mb-0 relative z-10 flex flex-col sm:flex-row items-center gap-2 sm:gap-4 transition-all duration-500">
 
 
 						{/* Rank declaration button */}
@@ -196,7 +196,8 @@ export default function PlayerHand({
 						)
 						}
 
-						{/* Play button */}
+						{/* Play button + message: always in a row together */}
+						<div className="flex items-center gap-2 sm:gap-4 justify-center">
 						<div className="sm:w-auto flex items-center gap-2 justify-center">
 							{isMyTurn && !hasActed && !showRankInput && (
 								<div
@@ -234,7 +235,8 @@ export default function PlayerHand({
 									type="text"
 									placeholder="Send a message..."
 									value={messageInput}
-									onChange={(e) => setMessageInput(e.target.value)}
+									onChange={(e) =>
+										setMessageInput(e.target.value)}
 									onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
 									className={`w-48 sm:w-56 md:w-80 px-1 py-1 rounded-xl backdrop-blur-lg bg-white bg-opacity-30 text-gray-950 text-center font-medium text-lg
 																				transition-all duration-500 focus:outline-none focus:bg-opacity-80 ${messageInput ? 'bg-opacity-80' : 'bg-opacity-30'}`}
@@ -275,6 +277,8 @@ export default function PlayerHand({
 								</button>))}
 							</div>
 						</div>)}
+
+						</div>{/* end play+message row */}
 
 					</div>
 

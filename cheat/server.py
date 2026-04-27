@@ -282,6 +282,7 @@ def new_game(
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
         predefined_messages=game_config.get("predefined_messages", None),
+        timeout=game_config.get("timeout", None)
     )
 
     # Set the system prompt for all LLM players, if not specified from the config
@@ -550,6 +551,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
 
                     await _game.send_state_to_all()
+                    await _game.broadcast_to_all({"type": "player_reconnect_resolved", "player_id": old_player.id})
 
                     # Send catch-up only when it's the reconnecting player's turn and the pile has not been cleared,
                     # since they need context to act. Otherwise they will see the next play naturally.
@@ -908,6 +910,10 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as e:
         ws_log.error(f"WebSocket error: {e}")
         traceback.print_exc()
+        try:
+            await ws.send_json({"type": "server_error"})
+        except Exception:
+            pass
     finally:
         # Cancel the ping task — but do this AFTER populating reconnection_slots so a fast
         # reconnect attempt doesn't arrive during the await and find an empty slot.
@@ -946,7 +952,8 @@ async def websocket_endpoint(ws: WebSocket):
                     async def _delayed_replace(
                         _p=player, _g=_game, _t=token, _gid=game_id
                     ):
-                        await asyncio.sleep(RECONNECT_GRACE_SECONDS)
+                        grace = 0 if getattr(_p, 'timed_out', False) else RECONNECT_GRACE_SECONDS
+                        await asyncio.sleep(grace)
                         if _p.connected:
                             return
                         still_connected = [
@@ -959,9 +966,11 @@ async def websocket_endpoint(ws: WebSocket):
                             await _g.handle_message(_p, {"type": "quit"})
                             _g.game_over = True
                         else:
-                            server_log.info(
-                                f"Grace period expired for {_p.name}, replacing with bot"
-                            )
+                            if grace > 0:
+                                server_log.info(
+                                    f"Grace period expired for {_p.name}, replacing with bot"
+                                )
+                            await _g.broadcast_to_all({"type": "player_reconnect_resolved", "player_id": _p.id})
                             await _g.replace_player_with_bot(_p)
                         reconnection_slots.pop(_t, None)
 
@@ -975,6 +984,12 @@ async def websocket_endpoint(ws: WebSocket):
                     server_log.info(
                         f"Marked {player.name} as disconnected in game {game_id}, grace period started"
                     )
+
+                    if not getattr(player, 'timed_out', False):
+                        await _game.broadcast_to_all({
+                            "type": "player_reconnecting",
+                            "player_id": player.id,
+                        })
 
                 # Remove from player_to_game mapping
                 player_to_game.pop(player.session_token)

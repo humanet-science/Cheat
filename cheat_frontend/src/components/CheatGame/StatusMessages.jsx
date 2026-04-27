@@ -65,8 +65,10 @@ export default function StatusMessage({statusMessages, tutorialScale = null}) {
 				'--float-distance': `-${floatPercentage}%`,
 			}}
 		>
-			<div className="text-white font-semibold whitespace-nowrap">
-				{msg.message}
+			<div className="text-white font-semibold break-words text-center" style={{maxWidth: 'min(400px, 25vw)'}}>
+				{msg.is_connection_timer && msg.message === 'Reconnecting...'
+					? <span className="inline-flex items-center whitespace-nowrap">Reconnecting<span className="dot-bounce"><span>.</span><span>.</span><span>.</span></span></span>
+					: msg.message}
 			</div>
 		</div>})}
 	</div>, gameRoot);

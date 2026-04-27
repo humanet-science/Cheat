@@ -9,6 +9,8 @@ from cheat.action import GameAction
 from cheat.card import RANKS, SUITS, WORD_TO_RANK, WORD_TO_SUIT, Card, str_to_Card
 from cheat.player import Player
 
+from .bot_messages import generate_comment
+
 SUPPORTED_CLIENTS = ["open_ai", "gemini", "deepseek"]
 
 
@@ -269,6 +271,7 @@ class LLM_Player(Player):
         avatar: str | None = None,
         system_prompt: str | None = None,
         speaker_types: dict | None = None,
+        verbosity: float = 0.2,
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
         display_type: str | None = None,
         model_kwargs: dict = {},
@@ -286,6 +289,7 @@ class LLM_Player(Player):
         self.kind = kind
         self.model_kwargs = model_kwargs
         self.speaker_types = speaker_types
+        self.verbosity = verbosity
 
     def __dict__(self):
         return dict(
@@ -466,4 +470,5 @@ class LLM_Player(Player):
 
     def broadcast_message(self, game, type: str = None, *_, **__):
         """Broadcast an opinion based on the state of play"""
-        pass
+        return generate_comment(game, type, verbosity=self.verbosity, id=self.id)
+

@@ -24,6 +24,7 @@ class Player:
     type: str = "human"
     display_type: str | None = None
     connected: bool = True
+    timed_out: bool = False
     session_token: str = None
     input_function: Callable = None
     logger: logging.Logger = None

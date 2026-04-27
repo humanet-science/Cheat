@@ -1,8 +1,11 @@
 import asyncio
 import logging
+import yaml
+import os
 
 from cheat.game import CheatGame
 from cheat.player import get_player
+from cheat.bots.LLM import LLM_Player
 
 """ General utility functions"""
 
@@ -33,11 +36,24 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
     game = CheatGame(
         players=game_players,
         message_queue=asyncio.Queue(),  # Set up a new queue: each game maintains its own queue
-        predefined_messages=config["experiment"].get("predefined_messages", [])
+        predefined_messages=config.get("predefined_messages", [])
         if config["game"].get("experimental_mode", False)
         else [],
+        timeout=config.get("timeout"),
         **config["game"]
     )
+
+    # Set the system prompt for all LLM players, if not specified from the config
+    for i, player in enumerate(game.players):
+        # Format the LLM default prompt
+        if isinstance(player, LLM_Player):
+            if player.system_prompt is None:
+                player.system_prompt = config["default_system_prompt"].format(
+                    N_players=game.num_players,
+                    player_id=player.id,
+                    player_id_before=(player.id - 1) % game.num_players,
+                    player_id_after=(player.id + 1) % game.num_players,
+                )
 
     # Turn off logging, if specified
     if not show_logs:
