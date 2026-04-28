@@ -90,7 +90,7 @@ treatments:
     num_games: 4
 
     # Number of rounds per game
-    num_rounds: 1
+    num_rounds: 2
 
     # Max waiting time (in minutes)
     # After this time, players will be shown the completion code and can submit.
@@ -139,7 +139,7 @@ treatments:
     num_games: 4
 
     # Number of rounds per game
-    num_rounds: 1
+    num_rounds: 2
 
     # Max waiting time (in minutes)
     # After this time, players will be shown the completion code and can submit.

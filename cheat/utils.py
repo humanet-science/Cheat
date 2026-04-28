@@ -1,11 +1,12 @@
 import asyncio
 import logging
-import yaml
 import os
 
+import yaml
+
+from cheat.bots.LLM import LLM_Player
 from cheat.game import CheatGame
 from cheat.player import get_player
-from cheat.bots.LLM import LLM_Player
 
 """ General utility functions"""
 
@@ -27,6 +28,9 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
         else:
             # Player_config is actually an initialised player
             game_players.append(player_config)
+
+            # Convert the config entry back to a dictionary so we can store it
+            config["players"][idx] = player_config.__dict__()
 
         # Set the player id, if not already done
         if game_players[-1].id is None:
@@ -59,5 +63,11 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
     if not show_logs:
         game.logger.setLevel(logging.WARN)
         game.player_logger.setLevel(logging.WARN)
+
+    # Write metadata to folder
+    if game.out_path is not None:
+        file_path = os.path.join(game.out_path, "game_config.yaml")
+        with open(file_path, "w") as f:
+            yaml.dump(config, f)
 
     return game

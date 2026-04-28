@@ -130,9 +130,7 @@ def build_schedule() -> deque:
 
         # Normalise: top-level predefined_messages → experiment.predefined_messages
         if "predefined_messages" in treatment:
-            cfg.setdefault("experiment", {})["predefined_messages"] = treatment.get(
-                "predefined_messages"
-            )
+            cfg["predefined_messages"] = treatment.get("predefined_messages")
 
         # max_waiting_time is in minutes in the yaml; convert to seconds here
         max_waiting_time = treatment.get("max_waiting_time", 15) * 60
@@ -141,7 +139,6 @@ def build_schedule() -> deque:
         for key in (
             "num_games",
             "num_rounds",
-            "predefined_messages",
             "max_waiting_time",
         ):
             cfg.pop(key, None)
@@ -282,7 +279,7 @@ def new_game(
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
         predefined_messages=game_config.get("predefined_messages", None),
-        timeout=game_config.get("timeout", None)
+        timeout=game_config.get("timeout", None),
     )
 
     # Set the system prompt for all LLM players, if not specified from the config
@@ -375,17 +372,23 @@ async def start_study_slot(slot: GameSlot):
                     player_id_after=(idx + 1) % len(cfg["players"]),
                 )
 
+        # Set up the game from the config
         game = game_from_config(cfg, show_logs=cfg.get("show_logs", False))
 
+        # Assign each human player a session token so they can reconnect should the connection drop
         for player in game.players:
             if player.type == "human":
                 player_to_game[player.session_token] = game.game_id
 
+        # Save the game outpath to the dictionary
         active_games[game.game_id] = game
         if game.out_path is not None:
             game_out_paths[game.game_id] = game.out_path
+
+        # Start the task
         asyncio.create_task(run_game(game))
         server_log.info(f"Started study game {game.game_id}.")
+
     except Exception as e:
         server_log.error(f"Error starting study slot: {e}")
         traceback.print_exc()
@@ -551,7 +554,12 @@ async def websocket_endpoint(ws: WebSocket):
                     )
 
                     await _game.send_state_to_all()
-                    await _game.broadcast_to_all({"type": "player_reconnect_resolved", "player_id": old_player.id})
+                    await _game.broadcast_to_all(
+                        {
+                            "type": "player_reconnect_resolved",
+                            "player_id": old_player.id,
+                        }
+                    )
 
                     # Send catch-up only when it's the reconnecting player's turn and the pile has not been cleared,
                     # since they need context to act. Otherwise they will see the next play naturally.
@@ -952,7 +960,11 @@ async def websocket_endpoint(ws: WebSocket):
                     async def _delayed_replace(
                         _p=player, _g=_game, _t=token, _gid=game_id
                     ):
-                        grace = 0 if getattr(_p, 'timed_out', False) else RECONNECT_GRACE_SECONDS
+                        grace = (
+                            0
+                            if getattr(_p, "timed_out", False)
+                            else RECONNECT_GRACE_SECONDS
+                        )
                         await asyncio.sleep(grace)
                         if _p.connected:
                             return
@@ -970,7 +982,12 @@ async def websocket_endpoint(ws: WebSocket):
                                 server_log.info(
                                     f"Grace period expired for {_p.name}, replacing with bot"
                                 )
-                            await _g.broadcast_to_all({"type": "player_reconnect_resolved", "player_id": _p.id})
+                            await _g.broadcast_to_all(
+                                {
+                                    "type": "player_reconnect_resolved",
+                                    "player_id": _p.id,
+                                }
+                            )
                             await _g.replace_player_with_bot(_p)
                         reconnection_slots.pop(_t, None)
 
@@ -985,11 +1002,13 @@ async def websocket_endpoint(ws: WebSocket):
                         f"Marked {player.name} as disconnected in game {game_id}, grace period started"
                     )
 
-                    if not getattr(player, 'timed_out', False):
-                        await _game.broadcast_to_all({
-                            "type": "player_reconnecting",
-                            "player_id": player.id,
-                        })
+                    if not getattr(player, "timed_out", False):
+                        await _game.broadcast_to_all(
+                            {
+                                "type": "player_reconnecting",
+                                "player_id": player.id,
+                            }
+                        )
 
                 # Remove from player_to_game mapping
                 player_to_game.pop(player.session_token)
