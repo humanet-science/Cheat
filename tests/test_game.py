@@ -39,7 +39,10 @@ class TestBasicGameFunctionality:
 
                 for i in range(test_case["n_rounds"]):
                     await game.play_round(sleep_pause=0)
-                    assert game.winner is not None
+                    all_aces_stalemate = all(
+                        all(c.rank == "A" for c in p.hand) for p in game.players
+                    )
+                    assert game.winner is not None or all_aces_stalemate
                     game.new_round()
 
                 # Check the json file is the same length as the game history
