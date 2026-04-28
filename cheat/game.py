@@ -33,7 +33,7 @@ class CheatGame:
         round: int = 1,
         game_id: str = None,
         predefined_messages: list = None,
-        timeout: int = None
+        timeout: int = None,
     ):
         """CheatGame that can be played for multiple rounds.
 
@@ -738,16 +738,21 @@ class CheatGame:
                                     f"Waited {elapsed}s for {current_player.display_name}; first reminder"
                                 )
                                 await current_player.send_message(
-                                    {"type": "timeout_reminder", "time_lapsed": elapsed, "time_remaining": self.timeout - elapsed}
+                                    {
+                                        "type": "timeout_reminder",
+                                        "time_lapsed": elapsed,
+                                        "time_remaining": self.timeout - elapsed,
+                                    }
                                 )
                             elif idle_ticks % 2 == 0 and elapsed >= self.timeout:
                                 self.logger.warning(
                                     f"Disconnecting player {current_player.display_name} after {elapsed}s timeout"
                                 )
                                 current_player.timed_out = True
-                                await current_player.send_message({"type": "quit_confirmed"})
+                                await current_player.send_message(
+                                    {"type": "quit_confirmed"}
+                                )
                                 await current_player.ws.close()
-
 
                         continue  # Still human, keep waiting
 
@@ -842,7 +847,9 @@ class CheatGame:
         bot = RandomBot(
             id=player.id,  # Keep the same ID
             name=bot_name,
-            display_name=f"{player.display_name}_bot",
+            display_name=f"{player.display_name}_bot"
+            if player.display_type != "bot"
+            else player.display_name,
             avatar=player.avatar,  # Keep the same avatar
             p_call=0.3,
             p_lie=0.3,
@@ -865,15 +872,16 @@ class CheatGame:
                 data=dict(bot_name=bot.name),
             )
         )
-        # Broadcast bot introduction
-        await self.broadcast_to_all(
-            {
-                "type": "bot_message",
-                "sender_id": bot.id,
-                "message": f"🤖 {bot.display_name} has taken over for {player.display_name}",
-                **self.get_info(),
-            }
-        )
+        # Broadcast bot introduction if display type of previous player was not a bot
+        if player.display_type != "bot":
+            await self.broadcast_to_all(
+                {
+                    "type": "bot_message",
+                    "sender_id": bot.id,
+                    "message": f"🤖 {bot.display_name} has taken over for {player.display_name}",
+                    **self.get_info(),
+                }
+            )
 
         # Send updated game state to all players
         await self.send_state_to_all()
