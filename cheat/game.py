@@ -706,9 +706,22 @@ class CheatGame:
                             self.message_queue.get(), timeout=0.5
                         )
                         if data and data.get("type") == "turn_acknowledged":
+                            # Log this so that we can calculate the duration the players take
+                            self.log(
+                                GameAction(
+                                    type="turn_acknowledged",
+                                    player_id=current_player.id,
+                                    timestamp=datetime.now(),
+                                    data=None,
+                                )
+                            )
+
+                            # Reset the ticks so the countdown starts from the moment the player
+                            # is able to make a decision
                             idle_ticks = 0
                             data = None
                             continue
+
                     except asyncio.TimeoutError:
                         # Check if player was replaced by a bot while we were waiting
                         current_player = self.players[

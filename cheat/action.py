@@ -100,7 +100,7 @@ class GameAction:
             return f"Game is over."
 
         # LLM responses for debugging purposes only
-        elif self.type in ["LLM_response", "invalid_LLM_response"]:
+        elif self.type in ["LLM_response", "invalid_LLM_response", "turn_acknowledged"]:
             return ""
 
         return f"Action type: {self.type}, player: {self.player_id}; data: {self.data}"
