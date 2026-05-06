@@ -844,7 +844,7 @@ export default function Tutorial({onClose, allowSkip = true}) {
 				</button>}
 
 				{/* Next button */}
-				{(currentSlide === TUTORIAL_SLIDES.length - 1) ? <></> : <button
+				<button
 					onClick={nextSlide}
 					disabled={slide.task && !taskCompleted}
 					className={`absolute top-1/2 right-5 transition-colors z-10 ${slide.task && !taskCompleted ? 'opacity-0' : ''}`}
@@ -862,7 +862,7 @@ export default function Tutorial({onClose, allowSkip = true}) {
 							d="M9 5l7 7-7 7"
 						/>
 					</svg>
-				</button>}
+				</button>
 
 				<div className="absolute bottom-0 flex mb-3 gap-2 justify-center">
 					{TUTORIAL_SLIDES.map((_, index) => (<div
