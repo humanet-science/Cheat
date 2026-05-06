@@ -38,7 +38,7 @@ const sampleCards = [
     { rank: "10", suit: "♥", isRed: true },
 ];
 
-function ProlificGate({ onId }) {
+function ProlificGate({ onId, loading = false, error = null }) {
     const [value, setValue] = useState("");
 
     return (
@@ -90,7 +90,7 @@ function ProlificGate({ onId }) {
                     To continue, please enter your Prolific ID:
                 </p>
 
-                <form onSubmit={(e) => { e.preventDefault(); if (value.trim()) onId(value.trim()); }}>
+                <form onSubmit={(e) => { e.preventDefault(); if (value.trim() && !loading) onId(value.trim()); }}>
                     <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mt-4 sm:px-0 px-6">
                         <input
                             type="text"
@@ -101,16 +101,20 @@ function ProlificGate({ onId }) {
                             autoFocus
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
+                            disabled={loading}
                         />
                         <button
                             type="submit"
-                            disabled={!value.trim()}
+                            disabled={!value.trim() || loading}
                             className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
                                 text-white whitespace-nowrap font-bold py-3 px-6 rounded-lg transition-colors text-lg"
                         >
-                            Submit
+                            {loading ? "Checking..." : "Submit"}
                         </button>
                     </div>
+                    {error && (
+                        <p className="text-red-600 text-sm mt-3">{error}</p>
+                    )}
                 </form>
             </div>
         </div>
@@ -121,6 +125,8 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
     const [prolificId, setProlificId] = useState(null);
     const [phase, setPhase] = useState("prolific"); // 'prolific' | 'tutorial' | 'setup' | 'waiting' | 'no_games' | 'already_participated'
     const [allowSkip, setAllowSkip] = useState(false);
+    const [prolificLoading, setProlificLoading] = useState(false);
+    const [prolificError, setProlificError] = useState(null);
     const [playerName, setPlayerName] = useState("");
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [socket, setSocket] = useState(null);
@@ -218,22 +224,34 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
 
     if (phase === "prolific") {
         return (
-            <ProlificGate onId={async (id) => {
-                setProlificId(id);
-                onProlificId(id);
-                if (id === "admin") {
-                    setAllowSkip(true);
-                    setPhase("tutorial");
-                } else {
-                    const status = await postParticipant({ prolific_id: id });
-                    if (status.game_assigned) {
-                        setPhase("already_participated");
-                    } else {
-                        setAllowSkip(status.tutorial_done);
+            <ProlificGate
+                loading={prolificLoading}
+                error={prolificError}
+                onId={async (id) => {
+                    setProlificId(id);
+                    onProlificId(id);
+                    if (id === "admin") {
+                        setAllowSkip(true);
                         setPhase("tutorial");
+                    } else {
+                        setProlificLoading(true);
+                        setProlificError(null);
+                        try {
+                            const status = await postParticipant({ prolific_id: id });
+                            if (status.game_assigned) {
+                                setPhase("already_participated");
+                            } else {
+                                setAllowSkip(status.tutorial_done);
+                                setPhase("tutorial");
+                            }
+                        } catch (err) {
+                            setProlificError("Could not reach the server. Please check your connection and try again.");
+                        } finally {
+                            setProlificLoading(false);
+                        }
                     }
-                }
-            }} />
+                }}
+            />
         );
     }
 
