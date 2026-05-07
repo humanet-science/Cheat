@@ -5,6 +5,7 @@ const TUTORIAL_SLIDES = [{
 	id: 1,
 	title: "Welcome to Cheat!",
 	description: "The goal is simple: get rid of all your cards. Cards are played face down, so you can lie about what you’re playing!",
+	experiment_description: "You will be playing with bots and humans. The goal is simple: get rid of all your cards. Cards are played face down, so you can lie about what you’re playing!",
 	messages: [{
 		type: "state",
 		your_info: {
@@ -32,7 +33,7 @@ const TUTORIAL_SLIDES = [{
 	description: "On your turn, select 1–3 cards and declare any rank you like except Ace (i.e. 2-10 or J, Q, K) – you don't need to tell the truth. " + "If you play Aces, you must lie.",
 	task: {
 		type: 'play_cards',
-		description: 'In the game above, select some cards, declare a rank, and play them to continue.',
+		description: 'To proceed, select some cards in the game above, declare a rank, and play them.',
 		validate: (state) => state.hasPlayedCards // Check if user has played
 	},
 	messages: [{
@@ -202,7 +203,7 @@ const TUTORIAL_SLIDES = [{
 	+ "Remember: the rank doesn't change until the pile is cleared, so you will automatically declare the current rank.",
 	task: {
 		type: 'play_cards',
-		description: "Select some cards and click 'Play'.",
+		description: "To proceed, select some cards and click 'Play'.",
 		validate: (state) => state.hasPlayedCards // Check if user has played
 	},
 	messages: [{
@@ -317,10 +318,10 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 8,
 	title: "Successful Bluff Call",
-	description: "When you successfully call a bluff, they pick up the pile and it's your turn. You can now declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn.",
+	description: "When you successfully call a bluff, they pick up the pile and it's your turn. You can now declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn. But when you successfully call a bluff, they pick up the pile and it's your turn again.",
 	task: {
 		type: 'play_cards',
-		description: "Continue your turn.",
+		description: "Continue your turn by picking cards and declaring a new rank.",
 		validate: (state) => state.hasPlayedCards // Check if user has played
 	},
 	messages: [{

@@ -700,6 +700,7 @@ class CheatGame:
                 # turn and was replaced by a bot
                 data = None
                 idle_ticks = 0
+                turn_acknowledged = False
                 while data is None:
                     try:
                         data = await asyncio.wait_for(
@@ -716,9 +717,10 @@ class CheatGame:
                                 )
                             )
 
-                            # Reset the ticks so the countdown starts from the moment the player
-                            # is able to make a decision
+                            # Start the idle countdown from the moment the player
+                            # has acknowledged their turn (i.e. the UI is ready)
                             idle_ticks = 0
+                            turn_acknowledged = True
                             data = None
                             continue
 
@@ -742,9 +744,10 @@ class CheatGame:
                             )
                             await self.send_state_to_all()
 
-                        # If a disconnect time out has been specified, send a warning after 1/3 of the timeout has
-                        # elapsed, and disconnect thereafter
-                        if self.timeout is not None:
+                        # Only enforce the idle timeout once the player has acknowledged their
+                        # turn — avoids penalising players for animation/network delay between
+                        # turns ending and their UI becoming interactive.
+                        if self.timeout is not None and turn_acknowledged:
                             elapsed = idle_ticks // 2
                             if idle_ticks % 2 == 0 and elapsed == self.timeout // 3:
                                 self.logger.warning(

@@ -256,7 +256,6 @@ export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 			return;
 		}
 		setCountdown(timeoutRemaining);
-		setShowHint(true);
 		const t = setInterval(() => setCountdown(c => c > 1 ? c - 1 : 0), 1000);
 		return () => clearInterval(t);
 	}, [timeoutRemaining]);
@@ -288,12 +287,22 @@ export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 					</div>
 				</div>
 			)}
-			<div className={`fixed bottom-4 right-4 z-[70] flex items-center gap-2 ${countdown > 15 ? 'bg-gray-900' : 'bg-red-500'} bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg`}>
-				<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-					<circle cx="12" cy="12" r="9" />
-					<path strokeLinecap="round" d="M12 7v5l3 3" />
-				</svg>
-				{countdown}s remaining
+			<div className="fixed bottom-4 right-4 z-[70] flex flex-col items-end gap-2">
+				{!showHint && (
+					<button
+						onClick={() => setShowHint(true)}
+						className="bg-gray-900 bg-opacity-90 hover:bg-opacity-100 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg transition-all"
+					>
+						Need help?
+					</button>
+				)}
+				<div className={`flex items-center gap-2 ${countdown > 15 ? 'bg-gray-900' : 'bg-red-500'} bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg`}>
+					<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+						<circle cx="12" cy="12" r="9" />
+						<path strokeLinecap="round" d="M12 7v5l3 3" />
+					</svg>
+					{countdown}s remaining
+				</div>
 			</div>
 		</>
 	);

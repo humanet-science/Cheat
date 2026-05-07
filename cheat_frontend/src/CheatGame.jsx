@@ -1192,6 +1192,7 @@ export default function CheatGame({
 					setMessageInput={setMessageInput}
 					playerPositions={playerPositionsRef.current}
 					yourId={selfId}
+					yourName={state.your_info.true_name}
 					pileCards={pileCards}
 					callBluff={callBluff}
 					isDealingCards={isDealingCards}

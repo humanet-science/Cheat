@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import {CARD_DEAL_INTERVAL, CARD_FLIGHT_TIME} from "../../utils/constants";
 
 /**
@@ -44,10 +44,32 @@ export default function PlayerHand({
 																		 setMessageInput,
 																		 playerPositions,
 																		 yourId,
+																		 yourName,
 																		 pileCards,
 																		 callBluff,
 																		 isDealingCards,
 																	 }) {
+
+	const [reminderMessage, setReminderMessage] = useState(null);
+	const reminderTimerRef = useRef(null);
+
+	const triggerReminder = (message) => {
+		setReminderMessage(message);
+		clearTimeout(reminderTimerRef.current);
+		reminderTimerRef.current = setTimeout(() => setReminderMessage(null), 2500);
+	};
+
+	const handlePlayClick = () => {
+		if (selectedCards.length === 0) {
+			triggerReminder("Select cards from your hand");
+			return;
+		}
+		if (showRankInput && !declaredRank) {
+			triggerReminder("Declare a rank");
+			return;
+		}
+		play();
+	};
 
 
 	return (<div
@@ -65,7 +87,7 @@ export default function PlayerHand({
 			<div className="w-full">
 				<div className="text-center mb-[1%]">
 					<div className="text-lg font-semibold">
-						<span className="ml-3 text-yellow-400">{isMyTurn ? 'Your Turn' : ''}</span>
+						<span className={`ml-3 ${isMyTurn ? 'text-yellow-400' : 'text-white'}`}>{isMyTurn ? 'Your Turn' : `${yourName ? yourName : 'You'}`}</span>
 					</div>
 				</div>
 
@@ -164,24 +186,18 @@ export default function PlayerHand({
 									onKeyDown={(e) => {
 										if (e.key === 'Enter') {
 											e.preventDefault();
-											// Only play if cards are actually selected AND rank is valid
-											if (selectedCards.length > 0) {
-												play();
-											}
+											handlePlayClick();
 										}
 									}}
 									className={`
-																min-w-fit whitespace-nowrap relative px-1 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
+																min-w-fit whitespace-nowrap relative px-4 py-1 rounded-xl border-2 bg-blue-900 text-white text-center font-bold
 																transition-all duration-300 transform focus:outline-none
 																${rankError ? 'animate-wiggle border-red-500 bg-red-500 scale-105' : 'border-yellow-400 animate-pulse-glow'}
 														`}
-								/> {!(selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)) && (
+								/>
 								<button
-									onClick={play}
-									className={`
-														absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8]
-														${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 shadow-lg'}
-												`}
+									onClick={handlePlayClick}
+									className="absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8] bg-green-600 hover:bg-green-500 shadow-lg"
 								>
 									<img
 										src="/icons/arrow_up.svg"
@@ -191,7 +207,7 @@ export default function PlayerHand({
 											filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
 										}}
 									/>
-								</button>)}
+								</button>
 							</div>
 						)
 						}
@@ -204,11 +220,10 @@ export default function PlayerHand({
 									className="pop-in flex-1 sm:flex-initial items-center gap-4 animate-fadeIn min-w-fit whitespace-nowrap relative ">
 
 									<button
-										onClick={play}
-										disabled={selectedCards.length === 0 || selectedCards.length > 3 || (isNewRound && !declaredRank)}
+										onClick={handlePlayClick}
+										disabled={selectedCards.length > 3 || (isNewRound && !declaredRank)}
 										className={`
-																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform
-																						${selectedCards.length === 0 || (isNewRound && !declaredRank) ? 'bg-gray-600 cursor-not-allowed scale-95' : 'bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
+																						px-4 py-2 rounded-xl font-bold text-white transition-all duration-300 transform bg-green-600 hover:bg-green-500 hover:scale-105 active:scale-95 shadow-lg'}
 																				`}
 									>
 										Play
@@ -285,5 +300,11 @@ export default function PlayerHand({
 				</div>
 			</div>
 		</div>
+
+		{reminderMessage && (
+			<div className="whitespace-nowrap fixed top-0 right-1/2 translate-x-1/2 -translate-y-full z-[60] bg-gray-900 bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg pointer-events-none">
+				{reminderMessage}
+			</div>
+		)}
 	</div>)
 }

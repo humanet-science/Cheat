@@ -163,7 +163,7 @@ class SmartBot(BotPlayer):
         self.populate_player_repr(game)
 
         # Initial probabilities
-        p_lie, p_call = 0.3, 0.3
+        p_lie, p_call = 0.5, 0.5
 
         if len(game.pile) == 0:
             # Do not declare a rank self doesn't hold, because the chance of being caught is high with no potential
