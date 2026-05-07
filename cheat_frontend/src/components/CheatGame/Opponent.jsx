@@ -34,7 +34,7 @@ export function OpponentIcons({
 							{/* Move arc higher to accommodate larger text */}
 							<path id={`nameArc-${opp.id}`} d="M 40,60 A 25,20 0 1,1 160,60" fill="transparent"/>
 						</defs>
-						<text className="text-s md:text-sm lg:text-lg fill-white font-semibold">
+						<text className={`text-s md:text-sm lg:text-lg ${state.current_player === opp.id ? 'fill-yellow-400' : 'fill-white'} font-semibold`}>
 							<textPath href={`#nameArc-${opp.id}`} startOffset="50%" textAnchor="middle">
 								{opp.name.length > 15 ? `${opp.name.substring(0, 15)}...` : opp.name}
 							</textPath>
