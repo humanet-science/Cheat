@@ -53,6 +53,9 @@ treatments:
     # Default is 15 minutes
     max_waiting_time: 10
 
+    # Player timeout
+    timeout: 90
+
   # Four humans, two bots
   - game:
       experimental_mode: True
