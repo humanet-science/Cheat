@@ -371,7 +371,7 @@ export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 				{!showHint && (
 					<button
 						onClick={() => setShowHint(true)}
-						className="bg-gray-900 bg-opacity-90 hover:bg-opacity-100 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg transition-all"
+						className="bg-green-600 hover:bg-green-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg transition-all"
 					>
 						Need help?
 					</button>

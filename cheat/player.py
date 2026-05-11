@@ -25,6 +25,7 @@ class Player:
     display_type: str | None = None
     connected: bool = True
     timed_out: bool = False
+    turn_acknowledged: bool = False
     session_token: str = None
     input_function: Callable = None
     logger: logging.Logger = None

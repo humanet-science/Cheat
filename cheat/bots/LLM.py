@@ -271,7 +271,7 @@ class LLM_Player(Player):
         avatar: str | None = None,
         system_prompt: str | None = None,
         speaker_types: dict | None = None,
-        verbosity: float = 0.2,
+        verbosity: float = 0.3,
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
         display_type: str | None = None,
         model_kwargs: dict = {},

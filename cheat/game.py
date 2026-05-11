@@ -178,6 +178,7 @@ class CheatGame:
         random.shuffle(self.deck)
         for p in self.players:
             p.hand = []
+            p.turn_acknowledged = False
         self.deal_cards()
         self.pile = []
         self.pile_plays = []
@@ -565,6 +566,19 @@ class CheatGame:
                 }
             )
 
+        elif data.get("type") == "turn_acknowledged":
+            # Set directly on player rather than queuing, so the outer game loop
+            # cannot consume it before the inner waiting loop checks it.
+            self.log(
+                GameAction(
+                    type="turn_acknowledged",
+                    player_id=player.id,
+                    timestamp=datetime.now(),
+                    data=None,
+                )
+            )
+            player.turn_acknowledged = True
+
         elif data.get("type") == "quit":
             await self.broadcast_to_all(
                 {"type": "game_ended", "reason": "player_quit", "player_id": player.id}
@@ -714,31 +728,22 @@ class CheatGame:
                 # turn and was replaced by a bot
                 data = None
                 idle_ticks = 0
-                turn_acknowledged = False
+                # Initialise from the flag in case the message arrived before this
+                # loop started (e.g. consumed by the outer queue read above).
+                turn_acknowledged = getattr(current_player, 'turn_acknowledged', False)
+                current_player.turn_acknowledged = False
                 while data is None:
                     try:
                         data = await asyncio.wait_for(
                             self.message_queue.get(), timeout=0.5
                         )
-                        if data and data.get("type") == "turn_acknowledged":
-                            # Log this so that we can calculate the duration the players take
-                            self.log(
-                                GameAction(
-                                    type="turn_acknowledged",
-                                    player_id=current_player.id,
-                                    timestamp=datetime.now(),
-                                    data=None,
-                                )
-                            )
-
-                            # Start the idle countdown from the moment the player
-                            # has acknowledged their turn (i.e. the UI is ready)
-                            idle_ticks = 0
-                            turn_acknowledged = True
-                            data = None
-                            continue
 
                     except asyncio.TimeoutError:
+                        # Pick up acknowledgement that arrived via handle_message flag
+                        if not turn_acknowledged and getattr(current_player, 'turn_acknowledged', False):
+                            current_player.turn_acknowledged = False
+                            idle_ticks = 0
+                            turn_acknowledged = True
                         # Check if player was replaced by a bot while we were waiting
                         current_player = self.players[
                             self.turn
