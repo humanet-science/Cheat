@@ -373,6 +373,11 @@ async def start_study_slot(slot: GameSlot):
                 )
 
         # Set up the game from the config
+        num_human_players = sum(1 for p in cfg["players"] if isinstance(p, HumanPlayer))
+        if "game_mode" not in cfg["game"]:
+            cfg["game"]["game_mode"] = (
+                "multiplayer" if num_human_players > 1 else "single"
+            )
         game = game_from_config(cfg, show_logs=cfg.get("show_logs", False))
 
         # Assign each human player a session token so they can reconnect should the connection drop
@@ -428,16 +433,15 @@ async def run_game(_game: CheatGame):
                     f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}"
                 )
 
-        # Notify all connected human players that the game is over
+        # Notify connected human players the game is over
+        msg_type = "study_complete" if _game.experimental_mode else "quit_confirmed"
         for player in _game.players:
             if player.type == "human" and player.connected and player.ws:
                 try:
-                    await player.ws.send_json({"type": "quit_confirmed"})
-                    server_log.info(f"Sent quit_confirmed to {player.name}")
+                    await player.ws.send_json({"type": msg_type})
+                    server_log.info(f"Sent {msg_type} to {player.name}")
                 except Exception as e:
-                    server_log.error(
-                        f"Error sending quit_confirmed to {player.name}: {e}"
-                    )
+                    server_log.error(f"Error sending {msg_type} to {player.name}: {e}")
 
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")
@@ -544,12 +548,20 @@ async def websocket_endpoint(ws: WebSocket):
                 slot["task"].cancel()
                 old_player = slot["player"]
                 game_id = slot["game_id"]
+                _game = active_games.get(game_id)
+                if not _game:
+                    ws_log.info(
+                        f"Reconnect for {old_player.name}: game {game_id} already ended"
+                    )
+                    await ws.send_json(
+                        {"type": "server_error", "message": "Game has ended"}
+                    )
+                    return
                 old_player.ws = ws
                 old_player.connected = True
                 old_player.session_token = token
                 player = old_player
                 player_to_game[player.session_token] = game_id
-                _game = active_games.get(game_id)
                 if _game:
                     await old_player.send_message(
                         {
@@ -974,10 +986,22 @@ async def websocket_endpoint(ws: WebSocket):
                         await asyncio.sleep(grace)
                         if _p.connected:
                             return
+                        if _g.players[_p.id] is not _p:
+                            reconnection_slots.pop(_t, None)
+                            return  # already replaced by another path
                         still_connected = [
                             p for p in _g.players if p.type == "human" and p.connected
                         ]
-                        if not still_connected:
+                        # Don't end the game if another player is still within their grace period
+                        still_in_grace = [
+                            p
+                            for p in _g.players
+                            if p.type == "human"
+                            and not p.connected
+                            and getattr(p, "session_token", None) in reconnection_slots
+                            and getattr(p, "session_token", None) != _t
+                        ]
+                        if not still_connected and not still_in_grace:
                             ws_log.info(
                                 f"All humans disconnected from game {_gid}, ending game."
                             )
@@ -998,7 +1022,7 @@ async def websocket_endpoint(ws: WebSocket):
                         reconnection_slots.pop(_t, None)
 
                     task = asyncio.create_task(_delayed_replace())
-                    if token:
+                    if token and not getattr(player, "timed_out", False):
                         reconnection_slots[token] = {
                             "player": player,
                             "game_id": game_id,

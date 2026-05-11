@@ -145,6 +145,10 @@ edge_cases:
     expected: (None, None, [])
     name: nonsense
 
+  - input: "Error"
+    expected: (None, None, [])
+    name: error
+
   - input: "Play something with no cards or declaration"
     expected: ("play", None, [])
     name: play_rest_empty

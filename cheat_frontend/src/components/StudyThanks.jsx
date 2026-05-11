@@ -17,7 +17,7 @@ export default function StudyThanks({ timedOut = false }) {
                         : "Your responses have been recorded. Click below to complete the study on Prolific:"}
                 </p>
                 <a
-                    href="https://app.prolific.com/submissions/complete?cc=CACBLBNZ"
+                    href="https://app.prolific.com/submissions/complete?cc=C14CO8HZ"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"

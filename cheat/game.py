@@ -110,6 +110,9 @@ class CheatGame:
 
         # Check if game is over: this terminates the game entirely
         self.game_over = False
+        self._replacing: set = (
+            set()
+        )  # player IDs currently being replaced, guards against concurrent calls
 
         # Create a folder for the game results
         _date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -720,7 +723,13 @@ class CheatGame:
 
             # Get the current player
             current_player = self.players[self.turn]
-            self.logger.info(
+
+            # Back off while _delayed_replace is pending — avoids a 2 Hz spin in the logs
+            if current_player.type == "human" and not current_player.connected:
+                await asyncio.sleep(1.0)
+                continue
+
+            self.logger.debug(
                 f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})"
             )
 
@@ -732,7 +741,7 @@ class CheatGame:
                 idle_ticks = 0
                 # Initialise from the flag in case the message arrived before this
                 # loop started (e.g. consumed by the outer queue read above).
-                turn_acknowledged = getattr(current_player, 'turn_acknowledged', False)
+                turn_acknowledged = getattr(current_player, "turn_acknowledged", False)
                 current_player.turn_acknowledged = False
                 while data is None:
                     try:
@@ -742,7 +751,9 @@ class CheatGame:
 
                     except asyncio.TimeoutError:
                         # Pick up acknowledgement that arrived via handle_message flag
-                        if not turn_acknowledged and getattr(current_player, 'turn_acknowledged', False):
+                        if not turn_acknowledged and getattr(
+                            current_player, "turn_acknowledged", False
+                        ):
                             current_player.turn_acknowledged = False
                             idle_ticks = 0
                             turn_acknowledged = True
@@ -771,6 +782,9 @@ class CheatGame:
                         # Only enforce the idle timeout once the player has acknowledged their
                         # turn — avoids penalising players for animation/network delay between
                         # turns ending and their UI becoming interactive.
+                        if not current_player.connected:
+                            break  # player already disconnected naturally; _delayed_replace handles the rest
+
                         if self.timeout is not None and turn_acknowledged:
                             elapsed = idle_ticks // 2
                             if idle_ticks % 2 == 0 and elapsed == self.timeout // 3:
@@ -789,15 +803,19 @@ class CheatGame:
                                     f"Disconnecting player {current_player.display_name} after {elapsed}s timeout"
                                 )
                                 current_player.timed_out = True
-                                await current_player.send_message(
-                                    {"type": "quit_confirmed"}
-                                )
-                                await current_player.ws.close()
+                                try:
+                                    await current_player.send_message(
+                                        {"type": "quit_confirmed"}
+                                    )
+                                    await current_player.ws.close()
+                                except Exception:
+                                    pass
+                                break  # one-shot: stop waiting, let _delayed_replace handle cleanup
 
                         continue  # Still human, keep waiting
 
-                # If player was replaced, skip to next iteration where it will be handled as bot
-                if current_player.type != "human":
+                # If player was replaced or timed out, skip to next iteration
+                if current_player.type != "human" or data is None:
                     continue
 
                 # Card has been played
@@ -856,16 +874,10 @@ class CheatGame:
     async def replace_player_with_bot(self, player):
         """Replace a disconnected player with a bot in multiplayer games"""
 
-        # Broadcast that the player is leaving
-        await self.broadcast_to_all(
-            {
-                "type": "human_message",
-                "sender_id": player.id,
-                "sender_name": player.name,
-                "message": f"{player.display_name} has left the game.",
-                "num_players": len(self.players),
-            }
-        )
+        if player.id in self._replacing or self.players[player.id] is not player:
+            return
+        self._replacing.add(player.id)
+
         self.log(
             GameAction(
                 type="player_exit",
@@ -896,6 +908,7 @@ class CheatGame:
 
         # Replace in the players list
         self.players[player.id] = bot
+        self._replacing.discard(player.id)
 
         self.logger.info(f"Created bot {bot_name} with {len(bot.hand)} cards")
         self.log(
@@ -910,9 +923,9 @@ class CheatGame:
         if player.display_type != "bot":
             await self.broadcast_to_all(
                 {
-                    "type": "bot_message",
+                    "type": "human_message",
                     "sender_id": bot.id,
-                    "message": f"🤖 {bot.display_name} has taken over for {player.display_name}",
+                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!",
                     **self.get_info(),
                 }
             )
@@ -935,7 +948,13 @@ class CheatGame:
         # Start a timer: 30 seconds to start a new round in multiplayer mode
         # Wait for at least one confirmation
         # TODO: adjust this for the experimental mode?
-        timeout = 30 if self.game_mode == "multiplayer" else 30000000
+        timeout = (
+            30
+            if (self.game_mode == "multiplayer" and self.timeout is None)
+            else self.timeout
+            if (self.game_mode == "multiplayer" and self.timeout is not None)
+            else 30000000
+        )
         start_time = asyncio.get_event_loop().time()
 
         while True:
@@ -992,6 +1011,7 @@ class CheatGame:
                             player.type == "human"
                         ):
                             try:
+                                player.timed_out = True
                                 await player.send_message({"type": "quit_confirmed"})
                                 await player.ws.close()
                                 self.logger.info(f"Closed WebSocket for {player.name}")
