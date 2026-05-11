@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import {CARD_DEAL_INTERVAL, CARD_FLIGHT_TIME} from "../../utils/constants";
+import {CARD_DEAL_INTERVAL, CARD_FLIGHT_TIME, VALID_RANKS} from "../../utils/constants";
 
 /**
  * PlayerHand component displays the user's cards and play controls, as well as the player's message sending
@@ -66,6 +66,14 @@ export default function PlayerHand({
 		}
 		if (showRankInput && !declaredRank) {
 			triggerReminder("Declare a rank");
+			return;
+		}
+		if (showRankInput && declaredRank.toUpperCase() === 'A') {
+			triggerReminder("Aces can't be declared!");
+			return;
+		}
+		if (showRankInput && !VALID_RANKS.includes(declaredRank.toUpperCase())) {
+			triggerReminder("Valid ranks are: 2–9, J, Q, K");
 			return;
 		}
 		play();
