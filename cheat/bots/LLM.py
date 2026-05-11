@@ -85,14 +85,14 @@ def generate_client_input(
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt
                     + f" Remember: {additional_prompts}.",
-                    thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                    thinking_config=types.ThinkingConfig(thinking_level="medium"),
                 ),
                 contents=game_summary,
             )
         else:
             res = dict(
                 config=types.GenerateContentConfig(system_instruction=system_prompt),
-                thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                thinking_config=types.ThinkingConfig(thinking_level="medium"),
                 contents=game_summary,
             )
         return res
