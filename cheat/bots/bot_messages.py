@@ -4,6 +4,7 @@ suspicions = [
     "Flip Flip Flip!",
     "That's some BS",
     "Yeah right",
+    "Oh really?",
     "Lotta liars these days",
 ]
 
@@ -11,6 +12,9 @@ suspicions_confirmed = [
     "Thought so",
     "Knew it",
     "So obvious",
+    "LOL",
+    "Try harder",
+    "Can't fool a bot bro"
 ]
 
 surprise = ["Oh, how surprising!", "Not lying for once", "New strategy eh?"]
@@ -20,7 +24,9 @@ pile_picked_up = [
     "Yikes",
     "Oh dear ...",
     "So many aces ...",
+    "Liars everywhere",
     "Everyone out here lying",
+    "Wtf"
 ]
 
 small_pile_picked_up = ["Worth a shot", "Thought I'd give it a go"]
@@ -30,16 +36,31 @@ taunt_blatant_lie = [
     "Jeez!",
     "So cheeky",
     "Damn son",
+    "Holy moly dude",
+    "Bro",
+    "Dayum",
+    "Gosh",
+    "Golly",
+    "Damn",
+    "What the hell",
     "Classic",
     "I'm not surprised",
+    "So rude",
+    "A bot would never",
 ]
 
 thinking_new_play = [
     "Hm ...",
     "Let's see ...",
+    "Ehm ... "
 ]
 
-thinking_calling = ["Do I believe this?", "Can this be trusted?", "Sure about that?"]
+thinking_calling = ["Do I believe this?",
+                    "Can this be trusted?",
+                    "Hm ...",
+                    "Let's see ... ",
+                    "Ehm ... ",
+                    "Sure about that?"]
 
 
 # Dictionary of message types
