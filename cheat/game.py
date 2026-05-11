@@ -358,7 +358,8 @@ class CheatGame:
                 GameAction(
                     type="stalemate",
                     player_id=None,
-                    timestamp=datetime.now(), data=None
+                    timestamp=datetime.now(),
+                    data=None,
                 )
             )
             await self.broadcast_to_all({"type": "round_over", "winner": None})
@@ -592,8 +593,7 @@ class CheatGame:
         if len(self.players[(player.id - 1) % self.num_players].hand) == 0:
             _winner = self.players[(player.id - 1) % self.num_players]
             await self.broadcast_to_all(
-                {"type": "round_over",
-                 "winner": _winner.display_name}
+                {"type": "round_over", "winner": _winner.display_name}
             )
             self.winner_cleanup(_winner)
             del _winner
@@ -601,11 +601,13 @@ class CheatGame:
         # If alternatively the play leads to the current player winning, the game ends
         elif all([c.rank == declared_rank for c in cards]) and len(player.hand) == 0:
             await self.broadcast_to_all(
-                                    {"type": "round_over",
-                                     "winner": player.display_name,
-                                     "declared_rank": declared_rank,
-                                     "actual_cards": [str(c) for c in cards]}
-                                )
+                {
+                    "type": "round_over",
+                    "winner": player.display_name,
+                    "declared_rank": declared_rank,
+                    "actual_cards": [str(c) for c in cards],
+                }
+            )
             self.winner_cleanup(player)
 
         # Else: broadcast the play
@@ -749,6 +751,9 @@ class CheatGame:
                             )
                             break  # Exit the waiting loop, will handle as bot on next iteration
 
+                        if self.game_over:
+                            return
+
                         # Re-send the current state every 30s in case a player's client
                         # missed it (silent message loss or frontend processing error)
                         idle_ticks += 1
@@ -792,10 +797,11 @@ class CheatGame:
 
                 # Card has been played
                 if data["type"] == "cards_played":
-
                     declared_rank = data["declared_rank"]
                     cards = data["cards"]
-                    await self.play(current_player, declared_rank, [str_to_Card(c) for c in cards])
+                    await self.play(
+                        current_player, declared_rank, [str_to_Card(c) for c in cards]
+                    )
 
                     # Check if this ends the game
                     if self.round_over:
@@ -807,7 +813,6 @@ class CheatGame:
                     await self.call(current_player)
 
             elif current_player.type in ["bot", "LLM"]:
-
                 # Pick an action
                 action = await current_player.choose_action(self)
 
