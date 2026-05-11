@@ -204,10 +204,10 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
     // Countdown timer: fires when waiting phase starts with a known max wait
     useEffect(() => {
         if (phase !== "waiting" || !maxWaitSeconds) return;
-        let remaining = maxWaitSeconds;
-        setSecondsLeft(remaining);
+        const deadline = Date.now() + maxWaitSeconds * 1000;
+        setSecondsLeft(maxWaitSeconds);
         countdownRef.current = setInterval(() => {
-            remaining -= 1;
+            const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
             setSecondsLeft(remaining);
             if (remaining <= 0) {
                 clearInterval(countdownRef.current);

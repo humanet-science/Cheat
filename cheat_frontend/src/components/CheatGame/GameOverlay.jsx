@@ -335,8 +335,12 @@ export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 			setShowHint(false);
 			return;
 		}
+		const deadline = Date.now() + timeoutRemaining * 1000;
 		setCountdown(timeoutRemaining);
-		const t = setInterval(() => setCountdown(c => c > 1 ? c - 1 : 0), 1000);
+		const t = setInterval(() => {
+			const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+			setCountdown(remaining);
+		}, 1000);
 		return () => clearInterval(t);
 	}, [timeoutRemaining]);
 
