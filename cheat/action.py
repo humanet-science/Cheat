@@ -79,6 +79,9 @@ class GameAction:
             player_ref = get_player_ref(self.player_id)
             return f"{player_ref} win{' the round!' if 'You' in player_ref else 's the round!'}"
 
+        elif self.type == "stalemate":
+            return "Game over due to stalemate (all players left holding Aces)"
+
         elif self.type in ["bot_message", "human_message"]:
             player_ref = get_player_ref(self.player_id)
             return f"{player_ref} broadcast{'s' if player_ref.startswith('Player') else ''}: '{self.data}'"

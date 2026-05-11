@@ -102,6 +102,7 @@ export default function CheatGame({
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
 	const [winner, setWinner] = useState(null);
+	const [gameOverDetails, setGameOverDetails] = useState({declaredRank: null, actualCards: null});
 	const [hasClickedNextRound, setHasClickedNextRound] = useState(false);
 
 	// Track experiment over (experimental mode only)
@@ -413,6 +414,7 @@ export default function CheatGame({
 						setConfirmedCount(0);
 						setTotalHumans(0);
 						setWinner(null);
+						setGameOverDetails({declaredRank: null, actualCards: null});
 						setGameOver(false);
 						setHasClickedNextRound(false);
 						removeAllConnectionTimers();
@@ -437,6 +439,7 @@ export default function CheatGame({
 					setConfirmedCount(0);
 					setTotalHumans(0);
 					setWinner(null);
+					setGameOverDetails({declaredRank: null, actualCards: null});
 					setGameOver(false);
 					setHasClickedNextRound(false);
 					removeAllConnectionTimers();
@@ -762,7 +765,11 @@ export default function CheatGame({
 			// Game is over
 		} else if (msg.type === "round_over") {
 
-			setWinner(msg.winner);
+			setWinner(msg.winner ?? null);
+			setGameOverDetails({
+				declaredRank: msg.declared_rank ?? null,
+				actualCards: msg.actual_cards ?? null,
+			});
 			setGameOver(true);
 			setPileCards([]);
 			setState(prevState => ({
@@ -770,11 +777,10 @@ export default function CheatGame({
 			}));
 			setIsMyTurn(false);
 
-			soundManager.play('win');
-			// 🎉 Trigger confetti burst
-			confetti({
-				particleCount: 200, spread: 100, origin: {y: 0.6},
-			});
+			if (msg.winner) {
+				soundManager.play('win');
+				confetti({ particleCount: 200, spread: 100, origin: {y: 0.6} });
+			}
 		}
 
 		// Abort if a reconnect cleared the queue while we were suspended in an await.
@@ -1091,11 +1097,11 @@ export default function CheatGame({
 			{/* Game is over */}
 			<GameOverOverlay
 				gameOver={gameOver}
-				winner={winner} f
+				winner={winner}
+				gameOverDetails={gameOverDetails}
+				parseCard={parseCard}
 				state={state}
 				ws={activeSocket}
-				setGameOver={setGameOver}
-				setWinner={setWinner}
 				setSelectedCards={setSelectedCards}
 				setDeclaredRank={setDeclaredRank}
 				setHasActed={setHasActed}

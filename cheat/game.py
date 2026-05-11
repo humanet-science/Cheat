@@ -77,10 +77,12 @@ class CheatGame:
         # List of allowed messages players can send
         self.predefined_messages = predefined_messages
 
+        # Ranks that have been discarded
+        self.discarded_ranks = []
+
         # Load and shuffle the deck, then deal out the cards
         self.deck = [Card(r, s) for r in RANKS for s in SUITS]
         random.shuffle(self.deck)
-        self.deal_cards()
 
         # Cards currently on the table
         self.pile = []
@@ -88,9 +90,6 @@ class CheatGame:
         # Ordered log of plays contributing to the current pile; reset after each pickup / new round.
         # Each entry: {player_id, card_count, declared_rank}
         self.pile_plays: list = []
-
-        # Ranks that have been discarded
-        self.discarded_ranks = []
 
         # Index of current player
         self.turn = random.randint(0, len(self.players) - 1)
@@ -145,6 +144,10 @@ class CheatGame:
                 ),
             )
         )
+
+        # Deal out cards to the players
+        self.deal_cards()
+
         self.write_action(
             GameAction(
                 type="player_info",
@@ -206,6 +209,9 @@ class CheatGame:
                     player.hand.append(self.deck.pop())
         for player in self.players:
             player.sort_hand()
+
+            # Remove any fours but do not broadcast to frontend
+            _ = self.four_of_a_kind_check(player)
 
     def next_player(self):
         self.turn = (self.turn + 1) % len(self.players)
@@ -344,39 +350,31 @@ class CheatGame:
             return f"Player {player.id} discards {', '.join(discarded_ranks)}."
         return None
 
-    def check_winner(self, player) -> bool:
-        # Declare a winner if all cards on hands can be truthfully discarded in play and it is the player's turn
-        if len(player.hand) == 0 or (
-            all([c.rank == player.hand[0].rank for c in player.hand])
-            and player.hand[0].rank != "A"
-            and self.turn == player.id
-            and (self.current_rank is None or self.current_rank == player.hand[0].rank)
-        ):
-            self.round_over = True
-            self.winner = player.id
+    async def check_for_stalemate(self) -> bool:
+        # Check for a stalemate situation (all players holding Aces)
+        # In this case, nobody wins but the round is still over
+        if all([all([c.rank == "A" for c in p.hand]) for p in self.players]):
             self.log(
                 GameAction(
-                    type="win", player_id=player.id, timestamp=datetime.now(), data=None
+                    type="stalemate",
+                    player_id=None,
+                    timestamp=datetime.now(), data=None
                 )
             )
-            self.logger.info(f"End of round: {player.name} wins!")
-        return self.round_over
-
-    async def check_for_winner(self, player: Player = None) -> bool:
-        """Check if a player has won"""
-
-        # Unique situation: all players left holding Aces
-        if all([all([c.rank == "A" for c in p.hand]) for p in self.players]):
-            await self.broadcast_to_all({"type": "round_over", "winner": "None"})
+            await self.broadcast_to_all({"type": "round_over", "winner": None})
             self.round_over = True
-        else:
-            for p in self.players if player is None else [player]:
-                if self.check_winner(p):
-                    await self.broadcast_to_all(
-                        {"type": "round_over", "winner": p.name}
-                    )
-                    break
         return self.round_over
+
+    def winner_cleanup(self, winner: Player) -> None:
+        # Cleanup if a player has won
+        self.round_over = True
+        self.winner = winner.id
+        self.log(
+            GameAction(
+                type="win", player_id=winner.id, timestamp=datetime.now(), data=None
+            )
+        )
+        self.logger.info(f"End of round: {winner.name} wins!")
 
     def log(self, action: GameAction, **kwargs):
         """Logs a new action to the database. The index of the action is appended to the players list of actions, so
@@ -472,6 +470,9 @@ class CheatGame:
                 {"type": "discard", "result": msg, **self.get_info()}
             )
             await self.send_state_to_all()
+
+        # Check that a stalemate has not been reached: this can only happen after a discard
+        await self.check_for_stalemate()
 
     async def collect_messages(
         self,
@@ -586,23 +587,45 @@ class CheatGame:
             f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
         )
 
-        # Broadcast the play
-        await self.broadcast_to_all(
-            {
-                "type": "cards_played",
-                "cards": [str(c) for c in cards],
-                "declared_rank": declared_rank,
-                "card_count": len(cards),
-                **self.get_info(),
-            }
-        )
+        # If the player forgot to call the previous player, not realising they had no cards left,
+        # that player wins
+        if len(self.players[(player.id - 1) % self.num_players].hand) == 0:
+            _winner = self.players[(player.id - 1) % self.num_players]
+            await self.broadcast_to_all(
+                {"type": "round_over",
+                 "winner": _winner.display_name}
+            )
+            self.winner_cleanup(_winner)
+            del _winner
 
-        # Collect opinions
-        await self.collect_messages(exclude_player_id=player.id)
+        # If alternatively the play leads to the current player winning, the game ends
+        elif all([c.rank == declared_rank for c in cards]) and len(player.hand) == 0:
+            await self.broadcast_to_all(
+                                    {"type": "round_over",
+                                     "winner": player.display_name,
+                                     "declared_rank": declared_rank,
+                                     "actual_cards": [str(c) for c in cards]}
+                                )
+            self.winner_cleanup(player)
 
-        # Move to next player
-        self.next_player()
-        await self.send_state_to_all()
+        # Else: broadcast the play
+        else:
+            await self.broadcast_to_all(
+                {
+                    "type": "cards_played",
+                    "cards": [str(c) for c in cards],
+                    "declared_rank": declared_rank,
+                    "card_count": len(cards),
+                    **self.get_info(),
+                }
+            )
+
+            # Collect opinions
+            await self.collect_messages(exclude_player_id=player.id)
+
+            # Move to next player
+            self.next_player()
+            await self.send_state_to_all()
 
     async def call(self, player: Player) -> bool:
         """Call a play."""
@@ -684,15 +707,6 @@ class CheatGame:
             self.logger.info(
                 f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})"
             )
-
-            # Check if current player has won.
-            await self.check_for_winner(current_player)
-            if self.round_over:
-                await asyncio.sleep(0.1)
-                break
-
-            # Discard any fours
-            await self.check_for_fours()
 
             # Human's turn
             if current_player.type == "human":
@@ -778,39 +792,34 @@ class CheatGame:
 
                 # Card has been played
                 if data["type"] == "cards_played":
-                    # Humans could forget to call the last player's card and miss that they had been lying
-                    await self.check_for_winner(
-                        self.players[(current_player.id - 1) % self.num_players]
-                    )
-                    if self.round_over:
-                        await asyncio.sleep(0.1)
-                        break
 
                     declared_rank = data["declared_rank"]
                     cards = data["cards"]
-                    await self.play(current_player, declared_rank, cards)
+                    await self.play(current_player, declared_rank, [str_to_Card(c) for c in cards])
+
+                    # Check if this ends the game
+                    if self.round_over:
+                        await asyncio.sleep(0.1)
+                        break
 
                 # Calling a bluff
                 elif data["type"] == "bluff_called":
                     await self.call(current_player)
 
             elif current_player.type in ["bot", "LLM"]:
-                # Discard any fours
-                await self.check_for_fours()
 
                 # Pick an action
                 action = await current_player.choose_action(self)
 
                 # Play card
                 if action.type == "play":
-                    # Check for win
-                    round_is_over = await self.check_for_winner(current_player)
-                    if round_is_over:
-                        break
-
                     declared_rank = action.data.get("declared_rank")
                     cards = action.data.get("cards_played")
                     await self.play(current_player, declared_rank, cards)
+
+                    # Check if the game is over
+                    if self.round_over:
+                        break
 
                 # Call previous play
                 elif action.type == "call":
@@ -818,13 +827,12 @@ class CheatGame:
 
                     # If the call was successful, they play
                     if was_lying:
-                        round_is_over = await self.check_for_winner(current_player)
-                        if round_is_over:
-                            break
                         action = await current_player.make_move(self)
                         declared_rank = action.data.get("declared_rank")
                         cards = action.data.get("cards_played")
                         await self.play(current_player, declared_rank, cards)
+                        if self.round_over:
+                            break
 
             # Add a small delay to account for the animations in the frontend: this way the backend is not always
             # too many steps ahead of the frontend
