@@ -92,6 +92,7 @@ def generate_client_input(
         else:
             res = dict(
                 config=types.GenerateContentConfig(system_instruction=system_prompt),
+                thinking_config=types.ThinkingConfig(thinking_level="minimal"),
                 contents=game_summary,
             )
         return res
@@ -471,4 +472,3 @@ class LLM_Player(Player):
     def broadcast_message(self, game, type: str = None, *_, **__):
         """Broadcast an opinion based on the state of play"""
         return generate_comment(game, type, verbosity=self.verbosity, id=self.id)
-
