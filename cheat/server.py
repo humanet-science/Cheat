@@ -442,6 +442,12 @@ async def run_game(_game: CheatGame):
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")
         traceback.print_exc()
+        for player in _game.players:
+            if player.type == "human" and player.connected and player.ws:
+                try:
+                    await player.ws.send_json({"type": "server_error"})
+                except Exception:
+                    pass
     finally:
         # Cleanup
         if _game.game_id in active_games:

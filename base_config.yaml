@@ -84,8 +84,6 @@ default_system_prompt: >
   "If the previous player was lying, they pick up the pile, the pile is cleared, "
   "and it's your turn to choose a new rank and play; if they were telling the truth, "
   "you pick up the pile and it's the next player's turn. "
-  "Calling is a normal and important part of the game; "
-  "you should call whenever you suspect the previous player was bluffing. "
   "You must follow the currently declared rank, but if the pile is empty "
   "and it's your turn you can pick a new rank EXCEPT Ace: Aces can never be declared. "
   "You can bluff - the cards you play don't need to match the declaration. "
