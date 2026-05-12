@@ -13,14 +13,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 11, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 11, 9, 10, 12],
 		current_player: null,
 		current_rank: null,
@@ -43,14 +42,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 11, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 11, 9, 10, 12],
 		current_player: 0,
 		current_rank: null,
@@ -68,14 +66,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 11, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 11, 9, 10, 12],
 		current_player: 1,
 		current_rank: null,
@@ -95,14 +92,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 11, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 11, 9, 10, 12],
 		current_player: 1,
 		current_rank: null,
@@ -124,14 +120,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 9, 10, 12],
 		current_player: 2,
 		current_rank: null,
@@ -143,7 +138,7 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
@@ -163,14 +158,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 12],
 		current_player: 3,
 		current_rank: null,
@@ -182,7 +176,7 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
@@ -213,7 +207,7 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
@@ -233,14 +227,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 10],
 		current_player: 0,
 		current_rank: null,
@@ -263,14 +256,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 9, 12],
 		current_player: 4,
 		current_rank: null,
@@ -282,7 +274,7 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
@@ -302,14 +294,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 10],
 		current_player: 0,
 		current_rank: null,
@@ -331,14 +322,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 12],
 		current_player: 0,
 		current_rank: -1,
@@ -355,14 +345,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 12],
 		current_player: 2,
 		current_rank: null,
@@ -386,14 +375,13 @@ const TUTORIAL_SLIDES = [{
 		},
 		players: [{your_info: {id: 0, name: "You", cardCount: 10, avatar: "🎮"}}, {
 			your_info: {
-				id: 1, name: "Player 1", cardCount: 10, avatar: "🤖"
+				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
 		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
 		}, {your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🦊"}},],
-		experimental_mode: false,
 		hands: [10, 10, 7, 10, 10],
 		current_player: 2,
 		current_rank: null,
@@ -413,7 +401,7 @@ const TUTORIAL_SLIDES = [{
 	messages: [{}]
 }];
 
-export default function Tutorial({onClose, allowSkip = true}) {
+export default function Tutorial({onClose, allowSkip = true, isExperiment= false}) {
 	const [currentSlide, setCurrentSlide] = useState(0);
 	const [mockSocket, setMockSocket] = useState(null);
 	const [currentRound, setCurrentRound] = useState(null);
@@ -532,7 +520,7 @@ export default function Tutorial({onClose, allowSkip = true}) {
 											}
 										}, {
 											your_info: {
-												id: 1, name: "Player 1", cardCount: 11, avatar: "🤖"
+												id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 											}
 										}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
 											your_info: {
@@ -789,7 +777,7 @@ export default function Tutorial({onClose, allowSkip = true}) {
 					>
 						<CheatGame
 							socket={mockSocket}
-							gameConfig={{numPlayers: 5, predefinedMessages: null, selfId: 0,}}
+							gameConfig={{numPlayers: 5, predefinedMessages: null, selfId: 0, experimentalMode: isExperiment}}
 							currentRound={currentRound}
 							onUpdateRound={updateRoundState}
 							onExitGame={() => {

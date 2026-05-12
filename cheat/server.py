@@ -549,6 +549,15 @@ async def websocket_endpoint(ws: WebSocket):
                 slot["task"].cancel()
                 old_player = slot["player"]
                 game_id = slot["game_id"]
+                _game = active_games.get(game_id)
+                if not _game:
+                    ws_log.info(
+                        f"Reconnect for {old_player.name}: game {game_id} already ended"
+                    )
+                    await ws.send_json(
+                        {"type": "server_error", "message": "Game has ended"}
+                    )
+                    return
                 old_player.ws = ws
                 old_player.connected = True
                 old_player.session_token = token

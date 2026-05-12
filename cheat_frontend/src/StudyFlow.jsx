@@ -266,6 +266,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                         }
                         setPhase("setup");
                     }}
+                    isExperiment={true}
                 />
             </div>
         );
