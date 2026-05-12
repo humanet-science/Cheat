@@ -373,6 +373,11 @@ async def start_study_slot(slot: GameSlot):
                 )
 
         # Set up the game from the config
+        num_human_players = sum(1 for p in cfg["players"] if isinstance(p, HumanPlayer))
+        if "game_mode" not in cfg["game"]:
+            cfg["game"]["game_mode"] = (
+                "multiplayer" if num_human_players > 1 else "single"
+            )
         game = game_from_config(cfg, show_logs=cfg.get("show_logs", False))
 
         # Assign each human player a session token so they can reconnect should the connection drop
@@ -974,6 +979,9 @@ async def websocket_endpoint(ws: WebSocket):
                         await asyncio.sleep(grace)
                         if _p.connected:
                             return
+                        if _g.players[_p.id] is not _p:
+                            reconnection_slots.pop(_t, None)
+                            return  # already replaced by another path
                         still_connected = [
                             p for p in _g.players if p.type == "human" and p.connected
                         ]
@@ -998,7 +1006,7 @@ async def websocket_endpoint(ws: WebSocket):
                         reconnection_slots.pop(_t, None)
 
                     task = asyncio.create_task(_delayed_replace())
-                    if token:
+                    if token and not getattr(player, "timed_out", False):
                         reconnection_slots[token] = {
                             "player": player,
                             "game_id": game_id,

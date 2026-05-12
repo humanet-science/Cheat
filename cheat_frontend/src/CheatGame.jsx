@@ -9,7 +9,7 @@ import DiscardAnimation from "./components/CheatGame/Animations/Discard";
 import {CardDeal, useCardDealAnimation} from './components/CheatGame/Animations/CardDeal';
 
 // Components
-import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay, TimeoutWarningOverlay} from "./components/CheatGame/GameOverlay";
+import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay, KickedOutOverlay, TimeoutWarningOverlay} from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
@@ -107,6 +107,7 @@ export default function CheatGame({
 
 	// Track experiment over (experimental mode only)
 	const [experimentOver, setExperimentOver] = useState(false);
+	const [kickedOut, setKickedOut] = useState(false); // kicked mid-turn (experimental mode)
 
 	// Track connection dropped / reconnecting / reconnected flash
 	const [connectionDropped, setConnectionDropped] = useState(false);
@@ -130,6 +131,7 @@ export default function CheatGame({
 	const pingWatchdogRef = useRef(null);
 	const reconnectingRef = useRef(false); // guard against double-triggering reconnect
 	const serverErrorRef = useRef(false);  // set on server_error to permanently suppress reconnect
+	const quitConfirmedRef = useRef(false); // set on quit_confirmed to permanently suppress reconnect
 	// Incremented whenever the action queue is forcibly cleared (reconnect). Any
 	// processActionQueue call that started before the clear sees a stale generation
 	// and skips its removeProcessed() / recursive call so it can't corrupt the new queue.
@@ -313,7 +315,7 @@ export default function CheatGame({
 			if (Date.now() - lastPingRef.current > 25000) {
 				clearInterval(pingWatchdogRef.current);
 				try { activeSocket.close(); } catch(e) {}
-				if (!gameOver) attemptReconnect();
+				if (!gameOver && !quitConfirmedRef.current) attemptReconnect();
 			}
 		}, 5000);
 		return () => clearInterval(pingWatchdogRef.current);
@@ -502,7 +504,9 @@ export default function CheatGame({
 					setTimeoutRemaining(null);
 					removeConnectionTimer(state.your_info.id);
 					if (experimentalMode) {
+						quitConfirmedRef.current = true;  // prevents onclose from triggering reconnect
 						setExperimentOver(true);
+						if (!gameOver) setKickedOut(true); // kicked mid-turn, no round-end overlay to reuse
 						// Don't exit yet — user must click Finish
 					} else {
 						onExitGame();
@@ -526,7 +530,7 @@ export default function CheatGame({
 				console.log('[reconnect] onclose fired — code:', event.code, 'isCurrent:', isCurrent,
 					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOver);
 				if (!isCurrent) return;
-				if (!gameOver && !disableReconnect) attemptReconnect();
+				if (!gameOver && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
 			};
 
 			// Flush messages buffered during reconnect through the now-live handler
@@ -556,11 +560,9 @@ export default function CheatGame({
 
 		// Pause if the relevant player is currently speaking
 		if (["cards_played", "bluff_called", "bot_message", "discard"].includes(msg.type)) {
-			if (msg && (msg.current_player || msg.sender_id || msg.caller)) {
-				const playerId = msg.sender_id || msg.caller || msg.current_player;
-				if (playerId && speakingPlayers.has(playerId)) {
-					return;
-				}
+			const playerId = msg.sender_id ?? msg.caller ?? msg.current_player;
+			if (playerId != null && speakingPlayers.has(playerId)) {
+				return;
 			}
 		}
 
@@ -908,6 +910,8 @@ export default function CheatGame({
 	useEffect(() => {
 		if (isMyTurn) {
 			activeSocketRef.current?.send(JSON.stringify({type: 'turn_acknowledged'}));
+		} else {
+			setTimeoutRemaining(null);
 		}
 	}, [isMyTurn]);
 
@@ -942,6 +946,7 @@ export default function CheatGame({
 
 	const callBluff = () => {
 		setTimeoutRemaining(null);
+		setIsMyTurn(false);  // reset so the next state update re-triggers turn_acknowledged
 		activeSocket?.send(JSON.stringify({type: "bluff_called"}));
 		setHasActed(true);
 	};
@@ -1096,7 +1101,7 @@ export default function CheatGame({
 
 			{/* Game is over */}
 			<GameOverOverlay
-				gameOver={gameOver}
+				gameOver={gameOver && !kickedOut}
 				winner={winner}
 				gameOverDetails={gameOverDetails}
 				parseCard={parseCard}
@@ -1156,6 +1161,9 @@ export default function CheatGame({
 				{/* Connection dropped overlay */}
 				{!disableReconnect && <ConnectionDroppedOverlay connectionDropped={connectionDropped} isReconnecting={isReconnecting} showReconnected={showReconnected} />}
 				<TimeoutWarningOverlay timeoutRemaining={timeoutRemaining} pileSize={pileCards.length} />
+
+				{/* Kicked mid-turn in experimental mode */}
+				<KickedOutOverlay kickedOut={kickedOut} onFinish={onFinish} />
 
 				{/* Banner when game begins */}
 				<GameStartOverlay

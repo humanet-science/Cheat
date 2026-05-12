@@ -322,7 +322,8 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                                 code after a timeout and you will be marked as having participated. While in the
                                 waiting room, you can exit and re-join at any point. However, once the game has started
                                 closing or refreshing the browser tab will cause you to exit the study without
-                                receiving a completion code.
+                                receiving a completion code. If you are inactive in the game you will be disconnected
+                                after a timeout.
                             </p>
                             <div className="flex gap-3">
                                 <button

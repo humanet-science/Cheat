@@ -198,10 +198,10 @@ export function GameOverOverlay({
 				)}
 
 				{/* Show countdown and player count */}
-				{((countdown !== null && countdown <= 15) || (confirmedCount > 0)) && (
+				{!hasClickedNextRound && ((countdown !== null && countdown <= 15) || (confirmedCount > 0)) && (
 					<div className="mb-2 text-sm">
-						<div className="text-sm text-red-200">Exiting in {countdown}s</div>
-						{confirmedCount > 0 && (
+						<div className="text-sm text-red-200">You will be disconnected in {countdown}s</div>
+						{confirmedCount > 0 && !experimentalMode && (
 							<div className="mb-4 text-grey-200">{confirmedCount}/{totalHumans} players ready</div>
 						)}
 					</div>
@@ -281,7 +281,7 @@ export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, sho
 
 	if (showReconnected) {
 		return (
-			<div className="fixed bottom-4 right-4 z-[70] flex items-center gap-2 bg-green-600 bg-opacity-95 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+			<div className="fixed bottom-4 right-4 z-[73] flex items-center gap-2 bg-green-600 bg-opacity-95 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
 				<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
 					<path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
 				</svg>
@@ -294,9 +294,9 @@ export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, sho
 		return (
 			<>
 				{/* Transparent blocker: appears immediately so the user can't play while offline */}
-				<div className="fixed inset-0 z-[69]" />
+				<div className="fixed inset-0 z-[72]" />
 				{showSpinner && (
-					<div className="fixed bottom-4 right-4 z-[70] flex items-center gap-2 bg-gray-900 bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+					<div className="fixed bottom-4 right-4 z-[71] flex items-center gap-2 bg-gray-900 bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
 						<svg className="animate-spin w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24">
 							<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
 							<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -322,6 +322,25 @@ export function ConnectionDroppedOverlay({connectionDropped, isReconnecting, sho
 				</button>
 			</div>
 		</div>
+	);
+}
+
+export function KickedOutOverlay({ kickedOut, onFinish }) {
+	if (!kickedOut) return null;
+	return (
+
+		<div className="fixed inset-0 flex items-center justify-center z-[70] bg-black bg-opacity-60 backdrop-blur-sm">
+			<div className="text-center bg-white rounded-2xl p-8 shadow-2xl max-w-[90%]">
+				<div className="text-5xl mb-4">⚠️</div>
+					<div className="text-2xl font-bold text-gray-900 mb-3">Disconnected</div>
+					<div className="text-lg text-gray-600 mb-6">You were removed from the game due to inactivity.</div>
+					<button
+					onClick={onFinish}
+					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
+				>
+					Finish
+				</button>
+			</div></div>
 	);
 }
 
@@ -380,7 +399,7 @@ export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 						Need help?
 					</button>
 				)}
-				<div className={`flex items-center gap-2 ${countdown > 15 ? 'bg-gray-900' : 'bg-red-500'} bg-opacity-90 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg`}>
+				<div className={`flex items-center gap-2 ${countdown > 15 ? 'bg-gray-900 bg-opacity-90' : 'bg-red-500 bg-opacity-100'} text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg`}>
 					<svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
 						<circle cx="12" cy="12" r="9" />
 						<path strokeLinecap="round" d="M12 7v5l3 3" />

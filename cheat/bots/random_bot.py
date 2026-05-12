@@ -60,9 +60,8 @@ class RandomBot(BotPlayer):
         # If this is the first play of the trick, choose a declared rank (not Ace)
         if len(game.pile) == 0:
             # choose declared rank strategically or randomly (cannot declare Ace, and also do not declare a discarded rank)
-            declared_rank = random.choice(
-                [r for r in RANKS if (r != "A" and r not in game.discarded_ranks)]
-            )
+            available = [r for r in RANKS if r != "A" and r not in game.discarded_ranks]
+            declared_rank = random.choice(available or [r for r in RANKS if r != "A"])
         else:
             declared_rank = game.current_rank  # must match current trick rank
 
