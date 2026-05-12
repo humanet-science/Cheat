@@ -15,7 +15,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -44,7 +44,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -68,7 +68,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -94,7 +94,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -122,7 +122,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -140,7 +140,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -160,7 +160,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -178,7 +178,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 9, avatar: "🐭"
 			}
@@ -209,7 +209,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -229,7 +229,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -258,7 +258,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -276,7 +276,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -296,7 +296,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -324,7 +324,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -347,7 +347,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -377,7 +377,7 @@ const TUTORIAL_SLIDES = [{
 			your_info: {
 				id: 1, name: "Bot 1", cardCount: 10, avatar: "🤖", type: "bot"
 			}
-		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "✈️"}}, {
+		}, {your_info: {id: 2, name: "Player 2", cardCount: 7, avatar: "🐝️"}}, {
 			your_info: {
 				id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 			}
@@ -522,7 +522,7 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 											your_info: {
 												id: 1, name: "Bot 1", cardCount: 11, avatar: "🤖", type: "bot"
 											}
-										}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "✈️"}}, {
+										}, {your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "🐝️"}}, {
 											your_info: {
 												id: 3, name: "Player 3", cardCount: 10, avatar: "🐭"
 											}
