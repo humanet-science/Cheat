@@ -563,7 +563,6 @@ async def websocket_endpoint(ws: WebSocket):
                 old_player.session_token = token
                 player = old_player
                 player_to_game[player.session_token] = game_id
-                _game = active_games.get(game_id)
                 if _game:
                     await old_player.send_message(
                         {
@@ -994,7 +993,16 @@ async def websocket_endpoint(ws: WebSocket):
                         still_connected = [
                             p for p in _g.players if p.type == "human" and p.connected
                         ]
-                        if not still_connected:
+                        # Don't end the game if another player is still within their grace period
+                        still_in_grace = [
+                            p
+                            for p in _g.players
+                            if p.type == "human"
+                            and not p.connected
+                            and getattr(p, "session_token", None) in reconnection_slots
+                            and getattr(p, "session_token", None) != _t
+                        ]
+                        if not still_connected and not still_in_grace:
                             ws_log.info(
                                 f"All humans disconnected from game {_gid}, ending game."
                             )
