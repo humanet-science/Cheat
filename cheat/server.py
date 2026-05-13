@@ -433,16 +433,15 @@ async def run_game(_game: CheatGame):
                     f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}"
                 )
 
-        # Notify all connected human players that the game is over
+        # Notify connected human players the game is over
+        msg_type = "study_complete" if _game.experimental_mode else "quit_confirmed"
         for player in _game.players:
             if player.type == "human" and player.connected and player.ws:
                 try:
-                    await player.ws.send_json({"type": "quit_confirmed"})
-                    server_log.info(f"Sent quit_confirmed to {player.name}")
+                    await player.ws.send_json({"type": msg_type})
+                    server_log.info(f"Sent {msg_type} to {player.name}")
                 except Exception as e:
-                    server_log.error(
-                        f"Error sending quit_confirmed to {player.name}: {e}"
-                    )
+                    server_log.error(f"Error sending {msg_type} to {player.name}: {e}")
 
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")

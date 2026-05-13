@@ -948,7 +948,13 @@ class CheatGame:
         # Start a timer: 30 seconds to start a new round in multiplayer mode
         # Wait for at least one confirmation
         # TODO: adjust this for the experimental mode?
-        timeout = 30 if self.game_mode == "multiplayer" else 30000000
+        timeout = (
+            30
+            if (self.game_mode == "multiplayer" and self.timeout is None)
+            else self.timeout
+            if (self.game_mode == "multiplayer" and self.timeout is not None)
+            else 30000000
+        )
         start_time = asyncio.get_event_loop().time()
 
         while True:

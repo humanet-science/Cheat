@@ -500,13 +500,18 @@ export default function CheatGame({
 				if (msg.type === "player_reconnect_resolved") {
 					removeConnectionTimer(msg.player_id);
 				}
+				if (msg.type === "study_complete") {
+					// Natural end-of-study: show win/stalemate overlay with Finish button
+					quitConfirmedRef.current = true;
+					setExperimentOver(true);
+				}
 				if (msg.type === "quit_confirmed") {
 					setTimeoutRemaining(null);
 					removeConnectionTimer(state.your_info.id);
 					if (experimentalMode) {
 						quitConfirmedRef.current = true;  // prevents onclose from triggering reconnect
 						setExperimentOver(true);
-						if (!gameOver) setKickedOut(true); // kicked mid-turn, no round-end overlay to reuse
+						setKickedOut(true);  // inactivity kick — show Disconnected overlay
 						// Don't exit yet — user must click Finish
 					} else {
 						onExitGame();

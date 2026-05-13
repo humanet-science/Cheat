@@ -349,20 +349,28 @@ class LLM_Player(Player):
             system_prompt=self.system_prompt,
             additional_prompts=play_prompt,
         )
-        response = input_to_client(
-            kind=self.kind, client=self.client, **input_data, **self.model_kwargs
-        )
 
-        # Log the response
-        game.player_logger.info(f"LLM response: {response}")
-        game.log(
-            GameAction(
-                type="LLM_response",
-                player_id=self.id,
-                timestamp=datetime.now(),
-                data=dict(response=response),
+        # Catch LLM response failures, e.g. due to server-side outages
+        try:
+            response = input_to_client(
+                kind=self.kind, client=self.client, **input_data, **self.model_kwargs
             )
-        )
+
+            # Log the response
+            game.player_logger.info(f"LLM response: {response}")
+            game.log(
+                GameAction(
+                    type="LLM_response",
+                    player_id=self.id,
+                    timestamp=datetime.now(),
+                    data=dict(response=response),
+                )
+            )
+
+        # Give nonsensical response that cannot be parsed. This will be caught and eventually a bot will take over
+        except Exception as e:
+            game.player_logger.error(f"Error obtaining LLM response: {e}")
+            response = "Error"
 
         # Convert to a GameAction
         return convert_LLM_response(game, response, player_id=self.id)
