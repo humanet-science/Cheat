@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, {useState, useEffect, useLayoutEffect, useRef, useCallback} from 'react';
 import CheatGame from '../CheatGame';
 
 const TUTORIAL_SLIDES = [{
@@ -428,12 +428,42 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 	// Ref so the task-completion effect can call nextSlide without a stale closure
 	const nextSlideRef = useRef(null);
 
-	// Reset when slide changes
+	// Timeout IDs for the current slide's in-flight messages.
+	// Cancelled immediately on navigation so future-slide messages never reach CheatGame.
+	const messageTimeoutsRef = useRef([]);
+
+	// Written by CheatGame on mount; calling it wipes speech bubbles + action queue.
+	const clearCheatMessagesRef = useRef(null);
+
+	// slideStatesRef.current[N] = the tutorialState to use when entering slide N.
+	// Index 0 is pre-populated with the clean initial state; subsequent entries are
+	// written by nextSlide() before advancing, so going back always finds the right snapshot.
+	const _initialSlideStates = new Array(TUTORIAL_SLIDES.length).fill(null);
+	_initialSlideStates[0] = {
+		current_rank: null, current_player: null,
+		hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"],
+		pile_size: 0, pile_plays: [], lastPlayedCards: [],
+		hasPlayedCards: false, hasCalledBluff: false, hasSentMessage: false,
+	};
+	const slideStatesRef = useRef(_initialSlideStates);
+
+	// Reset when slide changes – seed tutorialState from this slide's saved snapshot,
+	// falling back to the slide's own hardcoded defaults when no snapshot exists yet.
 	useEffect(() => {
 		setTaskCompleted(false);
-		setTutorialState(prev => ({
-			...prev, hasPlayedCards: false, hasCalledBluff: false
-		}));
+		const prevState = slideStatesRef.current[currentSlide];
+		const setupMsg = TUTORIAL_SLIDES[currentSlide].messages.find(msg => msg.type === 'state');
+		setTutorialState({
+			current_rank: prevState?.current_rank ?? setupMsg?.current_rank ?? null,
+			current_player: setupMsg?.current_player ?? 0,
+			hand: prevState?.hand ?? setupMsg?.your_info?.hand ?? ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"],
+			pile_size: prevState?.pile_size ?? setupMsg?.pile_size ?? 0,
+			pile_plays: prevState?.pile_plays ?? [],
+			lastPlayedCards: [],
+			hasPlayedCards: false,
+			hasCalledBluff: false,
+			hasSentMessage: false,
+		});
 	}, [currentSlide]);
 
 	// Check task completion when state changes
@@ -488,6 +518,7 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 							current_rank: sentMsg.declared_rank,
 							current_player: 1, // Move to next player
 							pile_size: (prev.pile_size ?? 0) + sentMsg.cards.length,
+							pile_plays: [...(prev.pile_plays ?? []), {declared_rank: sentMsg.declared_rank, card_count: sentMsg.cards.length, player_id: 0}],
 							hasPlayedCards: true,
 						}));
 
@@ -566,7 +597,7 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 						data = JSON.stringify(response);
 						console.log('Modified call to bluff_called:', response);
 						setTutorialState(prev => ({
-							...prev, current_rank: null
+							...prev, current_rank: null, pile_plays: [], pile_size: 0
 						}));
 					}
 					if (sentMsg.type === 'human_message') {
@@ -616,38 +647,58 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 		// Send messages for current slide
 		const slide = TUTORIAL_SLIDES[currentSlide];
 
+		// Use this slide's saved snapshot, if any
+		const prevState = slideStatesRef.current[currentSlide];
+
 		const processedMessages = slide.messages.map(msg => {
-			// Clone the message
 			const processed = JSON.parse(JSON.stringify(msg));
 
-			// Fill in dynamic data
 			if (msg.type === 'cards_played' && msg.declared_rank === '') {
-				processed.declared_rank = tutorialState.current_rank;
+				processed.declared_rank = prevState?.current_rank ?? null;
 			}
 
 			if (msg.type === 'cards_played' && msg.your_info?.hand) {
-				processed.your_info.hand = tutorialState.hand;
+				processed.your_info.hand = prevState?.hand ?? msg.your_info.hand;
 			}
 
 			if (msg.type === 'state' && msg.your_info?.hand) {
-				processed.your_info.hand = tutorialState.hand;
-				processed.your_info.cardCount = tutorialState.hand.length;
-				processed.pile_size = tutorialState.pile_size;
-				processed.current_rank = (msg.current_rank === -1 ? null : tutorialState.current_rank);
+				processed.your_info.hand = prevState?.hand ?? msg.your_info.hand;
+				processed.your_info.cardCount = (prevState?.hand ?? msg.your_info.hand).length;
+				processed.pile_size = prevState?.pile_size ?? msg.pile_size ?? 0;
+				processed.current_rank = msg.current_rank === -1 ? null : (prevState?.current_rank ?? msg.current_rank);
 			}
 
 			return processed;
 		});
 
-		// Send processed messages
-		processedMessages.forEach((msg, index) => {
-			setTimeout(() => {
-				const event = new MessageEvent('message', {
-					data: JSON.stringify(msg)
-				});
-				mockSocket.onmessage?.(event);
-			}, index * 500);
-		});
+		// Always prepend a catch_up so CheatGame rebuilds the pile from the saved pile_plays.
+		// This undoes any cards added by the previous slide's messages (e.g. bot plays).
+		const allMessages = [
+			{type: 'catch_up', pile_plays: prevState?.pile_plays ?? []},
+			...processedMessages,
+		];
+
+		// Send processed messages; track bot card plays into pile_plays as they fire
+		messageTimeoutsRef.current = allMessages.map((msg, index) => setTimeout(() => {
+			if (msg.type === 'cards_played') {
+				setTutorialState(prev => ({
+					...prev,
+					pile_plays: [...(prev.pile_plays ?? []), {
+						declared_rank: msg.declared_rank,
+						card_count: msg.card_count,
+						player_id: msg.player_id ?? msg.current_player,
+					}],
+				}));
+			}
+			const event = new MessageEvent('message', {data: JSON.stringify(msg)});
+			mockSocket.onmessage?.(event);
+		}, index * 500));
+
+		// Safety-net cleanup (immediate cancellation happens in prevSlide/nextSlide)
+		return () => {
+			messageTimeoutsRef.current.forEach(clearTimeout);
+			messageTimeoutsRef.current = [];
+		};
 	}, [currentSlide, mockSocket]);
 
 	const handleClose = () => {
@@ -668,6 +719,13 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 
 
 	const nextSlide = () => {
+		// Cancel any in-flight messages from the current slide immediately
+		messageTimeoutsRef.current.forEach(clearTimeout);
+		messageTimeoutsRef.current = [];
+
+		// Snapshot current state into the next slide's entry so it inherits it on entry (or re-entry)
+		slideStatesRef.current[currentSlide + 1] = {...tutorialState};
+
 		if (currentSlide < TUTORIAL_SLIDES.length - 1) {
 			setIsTransitioning(true);
 			setSlideDirection('next-exit'); // Old slide exits left
@@ -690,6 +748,11 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 	nextSlideRef.current = nextSlide;
 
 	const prevSlide = () => {
+		// Cancel any in-flight messages from the current slide immediately
+		messageTimeoutsRef.current.forEach(clearTimeout);
+		messageTimeoutsRef.current = [];
+		clearCheatMessagesRef.current?.();
+
 		if (currentSlide > 0) {
 			setIsTransitioning(true);
 			setSlideDirection('prev-exit'); // Old slide exits right
@@ -726,6 +789,31 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 		ro.observe(node);
 		resizeObserverRef.current = ro;
 	}, []);
+
+	// Smooth height animation for the description panel.
+	// useLayoutEffect fires before paint so we can snap to the old height,
+	// then rAF applies the new one, giving the CSS transition a concrete start point.
+	const descRef = useRef(null);
+	const descHeightRef = useRef(null);
+	useLayoutEffect(() => {
+		const el = descRef.current;
+		if (!el) return;
+		el.style.transition = 'none';
+		el.style.height = 'auto';
+		const newHeight = el.scrollHeight;
+		if (descHeightRef.current !== null) {
+			el.style.height = descHeightRef.current + 'px';
+			requestAnimationFrame(() => {
+				el.style.transition = 'height 0.5s ease';
+				el.style.height = newHeight + 'px';
+				descHeightRef.current = newHeight;
+			});
+		} else {
+			el.style.height = newHeight + 'px';
+			el.style.transition = 'height 0.5s ease';
+			descHeightRef.current = newHeight;
+		}
+	}, [currentSlide]);
 
 	const slide = TUTORIAL_SLIDES[currentSlide];
 
@@ -788,14 +876,16 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 							tutorialScale={0.7}
 							disableReconnect={true}
 							showDealAnimation={false}
+							clearMessagesRef={clearCheatMessagesRef}
 						/>
 					</div>)}</div>
 			</div>
 
 			{/* Description and Controls: 25% */}
 			<div
+				ref={descRef}
 				className={`relative p-6 pl-20 pr-20 flex flex-col items-center justify-center text-center overflow-hidden transition-all duration-1000 ${showText ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-				style={{flexShrink: 0, minHeight: '120px', maxHeight: '350px'}}
+				style={{flexShrink: 0, minHeight: '120px'}}
 			>
 
 				<div
@@ -806,8 +896,8 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 								slideDirection === 'prev-enter' ? 'transform -translate-x-1/2 opacity-0' : // Enter from left (initial)
 									'transform translate-x-0 opacity-100'}`}
 				>
-					<h2 className="text-gray-50 text-2xl sm:text-3xl font-bold mb-2 whitespace-nowrap">{slide.title}</h2>
-					<p className="text-gray-300 text-lg mb-6">
+					<h2 className="text-gray-50 text-xl sm:text-3xl font-bold mb-2 whitespace-nowrap">{slide.title}</h2>
+					<p className="text-gray-300 text-sm sm:text-lg mb-6">
 						{slide.experiment_description ? slide.experiment_description : slide.description}
 						{slide.task && (<span className="text-yellow-400"> {slide.task.description}</span>)}
 					</p>
