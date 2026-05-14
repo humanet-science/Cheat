@@ -63,6 +63,7 @@ export default function CheatGame({
 																		tutorialScale = null,
 																		showDealAnimation = true,
 																		disableReconnect = false,
+																		clearMessagesRef = null,
 																	}) {
 
 	// Game state and previous state
@@ -178,6 +179,25 @@ export default function CheatGame({
 	const [playAnnouncements, setPlayAnnouncements] = useState([]);
 	const [speakingPlayers, setSpeakingPlayers] = useState(new Set());
 	const [messageInput, setMessageInput] = useState("");
+	// Incremented when Tutorial navigates back; pending timeouts that would promote
+	// a floating bubble into a playAnnouncement check this and skip if stale.
+	const statusGenerationRef = useRef(0);
+
+	// Expose a clear function for the Tutorial to call on navigation, wiping any
+	// in-flight speech bubbles and aborting queued messages from the previous slide.
+	if (clearMessagesRef) {
+		clearMessagesRef.current = () => {
+			setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
+			setPlayAnnouncements([]);
+			setSpeakingPlayers(new Set());
+			setDiscards([]);
+			setActionQueue([]);
+			setAnimatingCards(null);
+			processingRef.current = false;
+			queueGenerationRef.current++;
+			statusGenerationRef.current++;
+		};
+	}
 
 	// Use containerWidth/containerHeight if provided, otherwise fall back to window
 	const {width: windowWidth, height: windowHeight} = useScreenSize();
@@ -764,6 +784,8 @@ export default function CheatGame({
 				}
 				setPileCards(rebuiltPile);
 				setPlayAnnouncements(newAnnouncements);
+				setSpeakingPlayers(new Set());
+				setStatusMessages(prev => prev.filter(m => !m.is_play_announcement));
 				if (rebuiltPile.length > 0) {
 					setLastPlayedCount(msg.pile_plays.at(-1).card_count);
 				}
@@ -930,9 +952,10 @@ export default function CheatGame({
 
 					// Remove after animation, or move to constant play announcements array
 					const duration = msg.is_play_announcement ? 4000 : 3000;
+					const gen = statusGenerationRef.current;
 					setTimeout(() => {
 						setStatusMessages(prev => prev.filter(m => m.id !== msg.id));
-						if (msg.is_play_announcement && msg.message !== 'Call!' && msg?.rank === declaredRank) {
+						if (statusGenerationRef.current === gen && msg.is_play_announcement && msg.message !== 'Call!' && msg?.rank === declaredRank) {
 							setPlayAnnouncements(prev => [...prev, {...msg}]);
 						}
 					}, duration);
@@ -1229,6 +1252,7 @@ export default function CheatGame({
 													height={height}
 													playerPositions={playerPositionsRef.current}
 													selfId={state.your_info.id}
+													tutorialScale={tutorialScale}
 				/>
 
 			</div>

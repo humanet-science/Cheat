@@ -6,7 +6,7 @@ import React, {useEffect} from "react";
  * @returns {JSX.Element|null}
  * @constructor
  */
-export default function DiscardAnimation({discards, width, height, playerPositions, selfId}) {
+export default function DiscardAnimation({discards, width, height, playerPositions, selfId, tutorialScale = null}) {
 
 
 	// Calculate available width based on player positions
@@ -40,7 +40,10 @@ export default function DiscardAnimation({discards, width, height, playerPositio
 		if (!element) return width;
 
 		const rect = element.getBoundingClientRect();
-		const playerRightEdge = rect.right + 20;
+		// rect.width is in visual/viewport pixels; divide by scale to get game-area pixels.
+		// topmostPlayer.x is already in game-area coordinates (width/2 + pos.x).
+		const scale = tutorialScale ?? 1;
+		const playerRightEdge = topmostPlayer.x + (rect.width / scale) / 2 + 20;
 
 		// If player is too close to top (within 200px), constrain width
 		if (topmostPlayer.y < 220) {
@@ -125,7 +128,10 @@ export default function DiscardAnimation({discards, width, height, playerPositio
 	return (
     <div
       className="fixed top-4 right-4 rounded-lg p-4 z-0"
-      style={{ maxWidth: `${availableWidth}px` }}
+      style={{
+        maxWidth: `${availableWidth}px`,
+        ...(tutorialScale ? { transform: `scale(${1 / tutorialScale})`, transformOrigin: 'top right' } : {})
+      }}
     >
       <div
         className="font-bold mb-3 opacity-75 flex justify-end"
