@@ -146,6 +146,26 @@ export function GameOverOverlay({
 	setHasClickedNextRound,
 	onFinish,
 }) {
+	useEffect(() => {
+		if (!experimentalMode) return;
+		if (countdown === null || countdown > 2 || hasClickedNextRound) return;
+		if (experimentOver) return;
+		ws.send(JSON.stringify({type: "new_round"}));
+		if (totalHumans > 1) {
+			ws.send(JSON.stringify({type: "human_message", message: "Player joined", sender_id: state.your_info.id}));
+		}
+		setSelectedCards([]);
+		setDeclaredRank("");
+		setHasActed(false);
+		setPileCards([]);
+		setActionQueue([]);
+		setIsNewRound(true);
+		setDiscards([]);
+		setPlayAnnouncements([]);
+		setHasClickedNextRound(true);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [countdown]);
+
 	if (!gameOver) return null;
 
 	const isStalemate = winner === null;
@@ -200,7 +220,10 @@ export function GameOverOverlay({
 				{/* Show countdown and player count */}
 				{!hasClickedNextRound && ((countdown !== null && countdown <= 15) || (confirmedCount > 0)) && (
 					<div className="mb-2 text-sm">
-						<div className="text-sm text-red-200">You will be disconnected in {countdown}s</div>
+						{experimentalMode
+						? <div className="text-sm text-gray-200">The next game will automatically start in {countdown}s</div>
+						: <div className="text-sm text-red-200">You will be disconnected in {countdown}s</div>
+					}
 						{confirmedCount > 0 && !experimentalMode && (
 							<div className="mb-4 text-grey-200">{confirmedCount}/{totalHumans} players ready</div>
 						)}

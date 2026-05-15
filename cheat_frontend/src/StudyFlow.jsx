@@ -87,6 +87,7 @@ function ProlificGate({ onId, loading = false, error = null }) {
                 </p>
 
                 <p className="text-lg text-left text-gray-700">
+                    You will first be guided through a tutorial showing you how to play.
                     To continue, please enter your Prolific ID:
                 </p>
 
