@@ -147,7 +147,7 @@ def get_player(*, type: str, **kwargs) -> Player:
     :raises: ValueError if the player type is not recognised
     """
 
-    PERMITTED_PLAYER_TYPES = ["human", "smartbot", "randombot", "llm"]
+    PERMITTED_PLAYER_TYPES = ["human", "smartbot", "smartbotold", "randombot", "llm"]
 
     # Get the player type and raise a ValueError if unrecognised
     if type.lower() not in PERMITTED_PLAYER_TYPES:
@@ -164,6 +164,12 @@ def get_player(*, type: str, **kwargs) -> Player:
         from cheat.bots import SmartBot
 
         return SmartBot(**kwargs)
+
+    # SmartBot
+    elif type.lower() == "smartbotold":
+        from cheat.bots import SmartBotOld
+
+        return SmartBotOld(**kwargs)
 
     # RandomBot
     elif type.lower() == "randombot":

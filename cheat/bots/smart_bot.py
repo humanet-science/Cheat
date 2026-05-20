@@ -1,5 +1,8 @@
+import math
 import pickle
 import random
+
+import numpy as np
 
 from cheat.action import GameAction
 from cheat.card import RANKS, str_to_Card
@@ -23,6 +26,7 @@ class SmartBot(BotPlayer):
         display_name: str | None = None,
         avatar: str | None = None,
         verbosity: float = 0.3,
+        temperature: float = 0.02,
         display_type: str | None = None,
     ):
         super().__init__(
@@ -33,6 +37,7 @@ class SmartBot(BotPlayer):
             display_type=display_type,
         )
         self.verbosity = verbosity
+        self.temperature = temperature
 
         # Dictionary containing information about other players — this is built dynamically
         self.other_player_repr = {}
@@ -48,6 +53,7 @@ class SmartBot(BotPlayer):
             avatar=self.avatar,
             type=self.type,
             verbosity=self.verbosity,
+            temperature=self.temperature,
         )
 
     def write_info(self, path) -> None:
@@ -65,12 +71,16 @@ class SmartBot(BotPlayer):
     def populate_player_repr(self, game) -> None:
         """Populate the inner representation of other players' estimated dynamics and cards"""
 
-        # Clear the known cards list
-        for pid, p_info in self.other_player_repr.items():
-            p_info["known_cards"] = []
+        new_history = game.history[self.last_action_idx :]
+
+        # Clear known_cards only when there is new history to process; this keeps
+        # cards visible across repeated calls with no intervening game events.
+        if new_history:
+            for pid, p_info in self.other_player_repr.items():
+                p_info["known_cards"] = []
 
         # Check only the most recent round
-        for idx, action in enumerate(game.history[self.last_action_idx :]):
+        for idx, action in enumerate(new_history):
             if action.type in ["play", "call"]:
                 # Create dictionary entry for player, if not yet present
                 if action.player_id not in self.other_player_repr:
@@ -135,6 +145,8 @@ class SmartBot(BotPlayer):
 
         # Update the estimated lie and call probability for each player
         for pid, p_info in self.other_player_repr.items():
+            if pid not in self.other_player_repr_hist:
+                self.other_player_repr_hist[pid] = {"p_lie_est": [], "p_call_est": []}
             if p_info.get("N_plays_called", 0) > 0:
                 p_info["p_lie_est"] = p_info.get("N_lies", 0) / p_info["N_plays_called"]
                 self.other_player_repr_hist[pid]["p_lie_est"].append(
@@ -152,26 +164,178 @@ class SmartBot(BotPlayer):
         # Update the index of items processed
         self.last_action_idx = len(game.history)
 
-    async def make_move(self, game) -> GameAction:
-        """Play some cards, either true ones or false
+    def calculate_prob_of_having_cards(
+        self, play, game, cards_of_rank_on_hand
+    ) -> float:
+        """Calculate the probability that the player held at least n_cards_played cards of the
+        declared rank before playing, using the hypergeometric distribution.
 
-        :param game: the current `CheatGame` instance
-        :return: (tuple) tuple of declared rank and played cards
+        Uses P(≥ k) rather than P(= k) so that players holding more than the minimum are not
+        incorrectly penalised.
         """
 
-        # Build an inner representation of the other players
+        deck_size = 4 * (13 - len(game.discarded_ranks))
+        n_cards_played = len(play.data["cards_played"])
+        hand_size_before = len(game.players[play.player_id].hand) + n_cards_played
+        available_rank_cards = 4 - cards_of_rank_on_hand
+
+        # Sum P(having exactly j cards of rank) for j = n_cards_played … min(available, hand)
+        total = math.comb(deck_size, hand_size_before)
+        return (
+            sum(
+                math.comb(available_rank_cards, j)
+                * math.comb(deck_size - available_rank_cards, hand_size_before - j)
+                for j in range(
+                    n_cards_played, min(available_rank_cards, hand_size_before) + 1
+                )
+            )
+            / total
+        )
+
+    def calculate_lie_prob(self, play: GameAction, game) -> float:
+        """Calculates the probability that a play is a lie, based on card distributions. If the player is self,
+        can also include knowledge of the own hand count. The underlying assumptions are that if a player holds
+        cards of the rank they are purporting to play they will play all of them (i.e. will not play one 3 if they hold
+        two; but this is just to simplify the sum).
+
+        :param play: the play to judge
+        :param game: state of the game. Only pile sizes and hand counts are used, the decision is not based on the
+            actual content of the play.
+        :return: estimated probability that the play is a lie
+        """
+
+        # Calculate the number of cards of the claimed rank, taking the number of cards on hand into account
+        cards_of_rank_on_hand = len(
+            [c for c in self.hand if c.rank == play.data["declared_rank"]]
+        )
+
+        # Mathematical probability of telling the truth
+        p_true_math = self.calculate_prob_of_having_cards(
+            play, game, cards_of_rank_on_hand
+        )
+
+        # Estimate observed lie probability from behaviour.
+        # Prior beta(1, 2) encodes a default ~33% lie rate; updates with observed evidence.
+        p_lie_est = np.random.beta(
+            1 + self.other_player_repr.get(play.player_id, {}).get("N_lies", 0),
+            2
+            + self.other_player_repr.get(play.player_id, {}).get("N_plays_called", 0)
+            - self.other_player_repr.get(play.player_id, {}).get("N_lies", 0),
+        )
+
+        # Probability that they have the cards given the play (Bayes law)
+        p_true = p_true_math / (p_true_math * (1 - p_lie_est) + p_lie_est)
+
+        return 1 - p_true
+
+    def calculate_call_prob(self, play: GameAction, game) -> float:
+        """Calculates the probability that next player will call a play.
+
+        :param play: the play to judge
+        :param game: state of the game. Only pile sizes and hand counts are used, the decision is not based on the
+            actual content of the play.
+        :return: estimated probability that the play is a lie
+        """
+
+        # If we empty our hand, they must call
+        if len(play.data["cards_played"]) == len(self.hand):
+            return 1
+
+        # Else, if they only have a small number of cards left and the played rank isn't in their known cards,
+        # highly likely they will call our play
+        elif len(
+            game.players[(play.player_id + 1) % game.num_players].hand
+        ) <= 2 and play.data["declared_rank"] not in {
+            c.rank
+            for c in self.other_player_repr.get(
+                (play.player_id + 1) % game.num_players, {}
+            ).get("known_cards", [])
+        }:
+            return 1
+
+        # Since we don't know how many cards of the rank they hold, assume they hold one
+        cards_of_rank_on_hand = 1
+
+        # Mathematical probability of telling the truth
+        p_true_math = self.calculate_prob_of_having_cards(
+            play, game, cards_of_rank_on_hand
+        )
+
+        # Estimate observed call probability from behaviour.
+        # Prior beta(1, 2) encodes a default ~33% call rate; updates with observed evidence.
+        p_call_est = np.random.beta(
+            1
+            + self.other_player_repr.get(
+                ((play.player_id + 1) % game.num_players), {}
+            ).get("N_calls", 0),
+            2
+            + self.other_player_repr.get(
+                ((play.player_id + 1) % game.num_players), {}
+            ).get("N_plays", 0),
+        )
+
+        # Probability they think we have the cards given the play
+        p_true = p_true_math / (p_true_math * (1 - p_call_est) + p_call_est)
+
+        return 1 - p_true
+
+    def estimate_position(self, hand_sizes: dict) -> int:
+        """Estimates the position of self, based on hand count burden. For a move, this calculates the share
+        of cards in self's hand. Zero indicates a win, 1 a loss; values in between indicate the relative position
+        accordingly. A loss is strongly penalised so that it is avoided at all costs.
+
+        :param hand_sizes: dictionary of the expected hand sizes of the players.
+        :return: the expected position in the game, measured as a fraction of hand burden
+        """
+        res = hand_sizes[self.id] / sum(hand_sizes.values())
+        for pid, h in hand_sizes.items():
+            if h == 0 and pid == self.id:
+                return 0  # strongly incentivise a win
+            elif h == 0:
+                return 10  # strongly disincentivise any move that leads to a loss
+        return res
+
+    async def make_move(self, game) -> GameAction:
+        """
+
+        :param game:
+        :return:
+        """
+
+        # Edge case: previous player is out of cards: must call
+        if len(game.players[(self.id - 1) % game.num_players].hand) == 0:
+            return GameAction(type="call", player_id=self.id)
+
+        # Edge case: can win with honest play.
+        if (
+            game.current_rank is None
+            and all([c.rank == self.hand[0].rank for c in self.hand])
+            and self.hand[0].rank != "A"
+        ) or (
+            game.current_rank is not None
+            and all([c.rank == game.current_rank for c in self.hand])
+        ):
+            return GameAction(
+                type="play",
+                player_id=self.id,
+                data=dict(
+                    declared_rank=self.hand[0].rank, cards_played=list(self.hand)
+                ),
+            )
+
+        # Build an inner representation of the other player's lie/call rates
         self.populate_player_repr(game)
 
-        # Initial probabilities
-        p_lie, p_call = 0.5, 0.5
-
+        # First: choose a rank if none is currently declared
+        # If is self's turn to declare a rank, first choose one based on what the next player probably doesn't have
+        # and what we have a lot of
         if len(game.pile) == 0:
             # Do not declare a rank self doesn't hold, because the chance of being caught is high with no potential
             # pay-off
-            feasible_ranks = []
+            feasible_ranks = set()
             for c in self.hand:
                 if c.rank not in feasible_ranks and c.rank != "A":
-                    feasible_ranks.append(c.rank)
+                    feasible_ranks.add(c.rank)
 
             # Remove any known ranks in the hands of players with fewer than 4 cards, if that player is sitting at a
             # distance of two or less
@@ -184,109 +348,194 @@ class SmartBot(BotPlayer):
                         for r in {c.rank for c in p_info["known_cards"]}:
                             if r in feasible_ranks:
                                 feasible_ranks.remove(r)
-        else:
-            # Must follow suit
-            feasible_ranks = [game.current_rank]
 
-        # If a player is running low on cards, decrease lie probability proportionally to distance from that player
-        low_running_players = [p.id for p in game.players if len(p.hand) < 4]
-        if low_running_players:
-            d_min = min(
-                (pid - self.id + game.num_players) % game.num_players
-                for pid in low_running_players
-            )
-            # Decrease chance of lying by distance
-            p_lie *= (d_min - 1) / max(1, game.num_players - 2)
-
-        # If the previous player is running low on cards, increase chance of calling by number of cards left on hand.
-        # If the previous player has no cards left, p_call is 1 and the play is necessarily called
-        if len(game.players[(self.id - 1) % game.num_players].hand) < 4:
-            p_call = min(
-                1,
-                p_call
-                + (
-                    0.5
-                    / float(
-                        len(game.players[(self.id - 1) % game.num_players].hand) + 1
+            # Select a rank based on the number of cards available of that rank.
+            if feasible_ranks:
+                current_rank = (
+                    np.random.choice(
+                        list(feasible_ranks),
+                        1,
+                        p=np.array(
+                            [
+                                len([c for c in self.hand if c.rank == r])
+                                for r in feasible_ranks
+                            ]
+                        )
+                        / len([c for c in self.hand if c.rank in feasible_ranks]),
                     )
-                ),
-            )
-            if p_call == 1 and len(game.pile) > 0:
-                return GameAction(type="call", player_id=self.id)
+                    .flatten()
+                    .item()
+                )
 
-        # Get the estimated lie probability of the previous player
-        prev_player_info = self.other_player_repr.get(
-            (self.id - 1) % game.num_players, {}
-        )
-        if prev_player_info.get("p_lie_est"):
-            p_call = 0.5 * (p_call + prev_player_info["p_lie_est"])
-        next_player_info = self.other_player_repr.get(
-            (self.id + 1) % game.num_players, {}
-        )
-        if next_player_info.get("p_call_est"):
-            p_lie = max(0, p_lie - next_player_info["p_call_est"])
-
-        # Call
-        if len(game.pile) > 0 and random.random() < p_call:
-            return GameAction(type="call", player_id=self.id)
-
-        # Play
-        else:
-            # Select a rank. If no feasible rank exists (e.g. only holding Aces), must lie
-            if game.current_rank:
-                declared_rank = game.current_rank
-            elif feasible_ranks:
-                declared_rank = random.choice(feasible_ranks)
+            # If no feasible rank exists (e.g. only holding Aces), must lie
             else:
-                declared_rank = random.choice(
+                current_rank = random.choice(
                     [r for r in RANKS if (r != "A" and r not in game.discarded_ranks)]
                 )
 
-            # If holding cards of the chosen rank, prefer to play the truth
-            true_cards = [c for c in self.hand if c.rank == declared_rank]
+        else:
+            # Must follow suit
+            current_rank = game.current_rank
 
-            if true_cards:
-                p_lie *= 0.5
+        # Decision analysis: go through all possible plays and select the play with the best chance of winning
+        possible_actions = []
+        possible_truthful_play = None
 
-            # Lie with given probability or if not true cards available
-            if random.random() < p_lie or not true_cards:
-                # Choose how many cards to play depending on the assumed probability of being called
-                if next_player_info.get("p_call_est", None) is None:
-                    n_cards_to_play = random.randint(1, min(3, len(self.hand)))
-                else:
-                    if next_player_info["p_call_est"] < 0.2:
-                        n_cards_to_play = min(3, len(self.hand))
-                    elif next_player_info["p_call_est"] < 0.5:
-                        n_cards_to_play = min(2, len(self.hand))
-                    else:
-                        n_cards_to_play = min(1, len(self.hand))
-
-                # Select some random cards to play that are NOT of the declared rank and are preferably aces
-                chosen = []
-                potential_other_cards = []
-                for c in self.hand:
-                    if c.rank == "A" and len(chosen) < n_cards_to_play:
-                        chosen.append(c)
-                    elif c.rank != declared_rank:
-                        potential_other_cards.append(c)
-                if len(chosen) < n_cards_to_play:
-                    chosen.extend(
-                        random.sample(
-                            potential_other_cards,
-                            min(
-                                len(potential_other_cards),
-                                n_cards_to_play - len(chosen),
-                            ),
-                        )
-                    )
-            else:
-                chosen = random.sample(true_cards, random.randint(1, len(true_cards)))
-
-            return GameAction(
+        # Simplest case: playing truthfully (if possible).
+        if any([c.rank == current_rank for c in self.hand]):
+            # Hypothetical truthful play
+            action = GameAction(
                 type="play",
                 player_id=self.id,
-                data=dict(declared_rank=declared_rank, cards_played=chosen),
+                data=dict(
+                    declared_rank=current_rank,
+                    cards_played=[c for c in self.hand if c.rank == current_rank],
+                ),
             )
+
+            # Calculate resulting position in game
+            pos = self.estimate_position(
+                dict(
+                    (p.id, len(p.hand))
+                    if p.id != self.id
+                    else (
+                        p.id,
+                        len(p.hand)
+                        - len([c for c in self.hand if c.rank == current_rank]),
+                    )
+                    for p in game.players
+                )
+            )
+
+            # Append to list of possible actions
+            possible_actions.append((action, pos))
+            possible_truthful_play = action
+
+        # Next: lie. Can play one, two, or three cards, up to the total number of cards on hand minus one
+        # (when playing all cards would definitely be called). If I'm holding only one card (and it's an Ace),
+        # I have to play it if I have no other choice. It also makes no sense to lie about fewer cards than
+        # the maximum possible truthful play unless I can rid myself of Aces.
+        for k in range(1, min(len(self.hand) + 1, 4)):
+            # Hypothetical lie with k cards. When lying, prefer to get rid of Aces and cards of which
+            # we only have one
+            cards_to_lose = [c for c in self.hand if c.rank == "A"]
+            cards_to_lose.extend(
+                [
+                    c
+                    for c in self.hand
+                    if c not in cards_to_lose
+                    and c.rank != current_rank
+                    and len([_c for _c in self.hand if _c.rank == c.rank]) == 1
+                ]
+            )
+            if len(cards_to_lose) < k:
+                cards_to_lose.extend(
+                    np.random.choice(
+                        [c for c in self.hand if c not in cards_to_lose],
+                        k - len(cards_to_lose),
+                        replace=False,
+                    )
+                )
+
+            # Check that the play isn't actually a true play, in which case it will already have been considered
+            if all([c.rank == current_rank for c in cards_to_lose]):
+                continue
+
+            # Check that if we are playing leq many cards as the truthful play that we are at least getting
+            # rid of an Ace (otherwise no point in lying about fewer cards than the truthful play)
+            if possible_truthful_play:
+                if not any([c.rank == "A" for c in cards_to_lose[:k]]) and k <= len(
+                    possible_truthful_play.data["cards_played"]
+                ):
+                    continue
+
+            action = GameAction(
+                type="play",
+                player_id=self.id,
+                data=dict(
+                    declared_rank=current_rank,
+                    cards_played=cards_to_lose[:k],
+                ),
+            )
+
+            # Calculate probability of being called
+            p_call = self.calculate_call_prob(action, game)
+
+            # If called: pick up pile and next player can potentially rid themselves of some cards
+            hand_sizes = dict((p.id, len(p.hand)) for p in game.players)
+            hand_sizes[self.id] += len(game.pile)
+            if len(game.players[(self.id + 1) % game.num_players].hand) < 4:
+                hand_sizes[(self.id + 1) % game.num_players] -= 1
+            elif len(game.players[(self.id + 1) % game.num_players].hand) < 8:
+                hand_sizes[(self.id + 1) % game.num_players] -= 2
+            else:
+                hand_sizes[(self.id + 1) % game.num_players] -= 3
+            pos_called = self.estimate_position(hand_sizes)
+
+            # Possibility of not being called: can rid self of cards
+            hand_sizes = dict((p.id, len(p.hand)) for p in game.players)
+            hand_sizes[self.id] -= k
+            pos_not_called = self.estimate_position(hand_sizes)
+
+            # Append to list of possible outcomes
+            possible_actions.append(
+                (action, pos_called * p_call + pos_not_called * (1 - p_call))
+            )
+
+        # Lastly: call. Calculate the probability that the last play was a lie
+        if len(game.pile) > 0:
+            # Get last play
+            last_player, declared_rank, cards_played = game.last_play()
+            last_play = GameAction(
+                type="play",
+                player_id=last_player,
+                data={"cards_played": cards_played, "declared_rank": declared_rank},
+            )
+
+            # Calculate the probability they were lying
+            p_is_lie = self.calculate_lie_prob(last_play, game)
+
+            # If they were telling the truth: I pick up pile and next player can potentially rid
+            # themselves of some cards
+            hand_sizes = dict((p.id, len(p.hand)) for p in game.players)
+            hand_sizes[self.id] += len(game.pile)
+            if len(game.players[(self.id + 1) % game.num_players].hand) < 4:
+                hand_sizes[(self.id + 1) % game.num_players] -= 1
+            elif len(game.players[(self.id + 1) % game.num_players].hand) < 8:
+                hand_sizes[(self.id + 1) % game.num_players] -= 2
+            else:
+                hand_sizes[(self.id + 1) % game.num_players] -= 3
+            pos_true = self.estimate_position(hand_sizes)
+
+            # Possibility they were lying: they pick up the pile and I can potentially rid myself of cards
+            hand_sizes = dict((p.id, len(p.hand)) for p in game.players)
+            hand_sizes[(self.id - 1) % game.num_players] += len(game.pile)
+            hand_sizes[self.id] -= max(
+                [
+                    len(set([_c for _c in self.hand if _c.rank == c.rank]))
+                    for c in self.hand
+                    if c.rank != "A"
+                ],
+                default=0,
+            )  # Consider the largest possible number of cards I can shed honestly to make the decision
+            pos_lie = self.estimate_position(hand_sizes)
+
+            # Append to list of possible outcomes
+            possible_actions.append(
+                (
+                    GameAction(type="call", player_id=self.id),
+                    pos_true * (1 - p_is_lie) + pos_lie * p_is_lie,
+                )
+            )
+        possible_actions = sorted(possible_actions, key=lambda x: x[-1])
+
+        # Softmax weighting of scores
+        scores = np.array([pos for _, pos in possible_actions], dtype=float)
+        weights = np.exp(-(scores - scores[0]) / self.temperature)
+        weights /= weights.sum()
+        chosen = np.random.choice(len(possible_actions), p=weights)
+
+        return possible_actions[chosen][0]
 
     async def choose_action(self, game) -> GameAction:
         """Pass-through; required for interface compatibility with bot players"""

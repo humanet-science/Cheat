@@ -136,17 +136,6 @@ class CheatGame:
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
         self.player_logger = setup_player_logger(self.game_id, self.out_path)
-        self.log(
-            GameAction(
-                type="new_round",
-                player_id=None,
-                timestamp=datetime.now(),
-                data=dict(
-                    round=self.round,
-                    player_hands={p.id: [str(c) for c in p.hand] for p in self.players},
-                ),
-            )
-        )
 
         # Deal out cards to the players
         self.deal_cards()
@@ -160,6 +149,7 @@ class CheatGame:
             )
         )
 
+        # Set up the loggegr
         for p in self.players:
             p.logger = self.player_logger
             if self.player_info_path:
@@ -168,6 +158,19 @@ class CheatGame:
                 if p.id is not None:
                     p.write_info(self.player_info_path)
                     self.player_info_written[p.id] = True
+
+        # Write the initial state
+        self.log(
+            GameAction(
+                type="new_round",
+                player_id=None,
+                timestamp=datetime.now(),
+                data=dict(
+                    round=self.round,
+                    player_hands={p.id: [str(c) for c in p.hand] for p in self.players},
+                ),
+            )
+        )
 
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
@@ -239,20 +242,20 @@ class CheatGame:
         # If new trick (pile empty) then this declared_rank becomes the round rank
         if len(self.pile) == 0:
             self.current_rank = declared_rank
-        else:
-            # otherwise must match current_rank
-            if declared_rank != self.current_rank:
-                raise InvalidMove(f"Must declare {self.current_rank} this trick.")
-
-        # Validate cards are in player's han: this may become necessary later when playing with LLMs
-        # TODO: error should be caught and should not crash the game!
-        for c in cards_played:
-            if c not in player.hand:
-                raise InvalidMove("Trying to play a card not in hand.")
+        # else:
+        #     # otherwise must match current_rank
+        #     if declared_rank != self.current_rank:
+        #         raise InvalidMove(f"Must declare {self.current_rank} this trick.")
+        #
+        # # Validate cards are in player's hand: this may become necessary later when playing with LLMs
+        # # TODO: error should be caught and should not crash the game!
+        # if any([c not in player.hand for c in cards_played]):
+        #     raise InvalidMove("Trying to play a card not in hand.")
 
         # remove cards and add to pile
         for c in cards_played:
             player.hand.remove(c)
+
         self.pile.extend([str_to_Card(c) for c in cards_played])
         self.pile_plays.append(
             {
@@ -597,13 +600,17 @@ class CheatGame:
 
     async def play(self, player: Player, declared_rank: str, cards: list) -> None:
         """Play a card"""
+
+        # Copy so play_turn's hand mutations don't clear this reference
+        cards = list(cards)
+
         await self.collect_messages(
             player_id=player.id, message_type="thinking_new_play"
         )
-        self.play_turn(player, declared_rank, cards)
         self.player_logger.info(
             f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
         )
+        self.play_turn(player, declared_rank, cards)
 
         # If the player forgot to call the previous player, not realising they had no cards left,
         # that player wins
@@ -625,6 +632,7 @@ class CheatGame:
                     "actual_cards": [str(c) for c in cards],
                 }
             )
+            await self.send_state_to_all()
             self.winner_cleanup(player)
 
         # Else: broadcast the play
@@ -886,19 +894,17 @@ class CheatGame:
                 data=None,
             )
         )
-        self.logger.info(f"Player {player.name} left, replacing with bot")
+        self.logger.info(f"Player {player.display_name} left, replacing with bot")
 
         # Create a bot with the same characteristics
         bot_name = f"{player.name}_bot"
-        bot = RandomBot(
+        bot = SmartBot(
             id=player.id,  # Keep the same ID
             name=bot_name,
             display_name=f"{player.display_name}_bot"
             if player.display_type != "bot"
             else player.display_name,
             avatar=player.avatar,  # Keep the same avatar
-            p_call=0.3,
-            p_lie=0.3,
             verbosity=0.2,
         )
 

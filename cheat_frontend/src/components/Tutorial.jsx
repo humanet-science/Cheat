@@ -309,7 +309,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 8,
 	title: "Successful Bluff Call",
-	description: "When you successfully call a bluff, they pick up the pile and it's your turn. You can now declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn. But when you successfully call a bluff, they pick up the pile and it's your turn again.",
+	description: "When you successfully call a bluff, they pick up the pile and it's your turn again. You can now declare " + "a new rank. " + "If they weren't lying, you pick up the pile and miss a turn.",
 	task: {
 		type: 'play_cards',
 		description: "Continue your turn by picking cards and declaring a new rank.",

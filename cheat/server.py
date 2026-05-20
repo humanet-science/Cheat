@@ -345,6 +345,9 @@ async def try_start_game_from_queue(num_players, mode):
         # If an API key is missing (e.g. for a mixed LLM-human game), kick waiting players out of the queue
         except cheat.MissingAPIKeyError as e:
             server_log.error(e)
+        except Exception as e:
+            server_log.error(f"Failed to start game: {e}")
+            traceback.print_exc()
 
 
 async def start_study_slot(slot: GameSlot):
