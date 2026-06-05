@@ -1,4 +1,5 @@
 import React, {useState} from "react";
+import {BotAvatar} from "./BotAvatar";
 
 export function OpponentIcons({
 																opponents,
@@ -23,10 +24,15 @@ export function OpponentIcons({
 					transform: 'translate(-50%, -50%)',
 				}}
 				className={`player-opponent rounded-full z-10 p-4 w-[clamp(50px,7vw,80px)] h-[clamp(50px,7vw,80px)] border-2
-										${experimentalMode && ['bot', 'LLM'].includes(opp.type) ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
+										${experimentalMode && opp.type === 'bot' ? 'bg-[#07071a]' : experimentalMode && opp.type === 'LLM' ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
 				onClick={() => handlePlayerClick(opp)}
 			>
-				<div className="text-center flex flex-col items-center justify-center h-full relative">
+				{experimentalMode && opp.type === 'bot' && (
+					<div className="absolute inset-0 z-0 rounded-full overflow-hidden">
+						<BotAvatar id={opp.id} paletteIndex={index}/>
+					</div>
+				)}
+				<div className="text-center flex flex-col items-center justify-center h-full relative z-10">
 					{/* Curved player name */}
 					<svg width="200" height="100" viewBox="0 0 200 80"
 							 className="absolute left-1/2 -top-12 transform -translate-x-1/2">
@@ -41,8 +47,9 @@ export function OpponentIcons({
 						</text>
 					</svg>
 					{/* Avatar in center */}
-					<span
-						className="text-[clamp(20px,4vw,50px)] z-10 relative group-hover:scale-110 transition-all">{experimentalMode && opp.type === 'bot' ? '🤖' : opp.avatar}</span>
+					{(!experimentalMode || opp.type !== 'bot') && (
+						<span className="text-[clamp(20px,4vw,50px)] z-10 relative group-hover:scale-110 transition-all">{opp.avatar}</span>
+					)}
 				</div>
 
 				{/* Card icons for each opponent */}

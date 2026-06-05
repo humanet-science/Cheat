@@ -615,6 +615,8 @@ export default function CheatGame({
 			// Reset hasActed if it becomes your turn
 			if (msg.current_player === msg.your_info.id) {
 				setHasActed(false);
+			} else {
+				setSelectedCards([]); // to prevent highlights being stuck
 			}
 			setIsMyTurn(msg.current_player === msg.your_info.id);
 

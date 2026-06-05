@@ -75,14 +75,14 @@ treatments:
         avatar: 🧜‍♂️
         name: Bob
       - type: SmartBot
-        name: Beep Boop
+        name: AuraAI-1
         avatar: 🤖
         verbosity: 0.3
       - type: human
         avatar: 🧜‍♂️
         name: Cooper
       - type: SmartBot
-        name: His Botness
+        name: AuraAI-2
         avatar: 🤖
         verbosity: 0.2
 
@@ -124,7 +124,7 @@ treatments:
       - type: human
         avatar: 🧜‍♂️
         name: Candice
-        display_name: Beep Boop
+        display_name: AuraAI-1
         display_type: bot
       - type: human
         avatar: 🧜‍♂️
@@ -132,7 +132,7 @@ treatments:
       - type: human
         avatar: 🧜‍♂️
         name: Owen
-        display_name: His Botness
+        display_name: AuraAI-2
         display_type: bot
 
     # Only allow certain custom messages. If None, players can use the full message box
