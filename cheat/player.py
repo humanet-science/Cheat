@@ -8,6 +8,7 @@ from typing import Callable, List
 from fastapi import WebSocket
 
 from cheat.action import GameAction
+from cheat.bots.bot_messages import generate_comment
 from cheat.card import RANK_ORDER, Card
 
 """ Generic Player class that applies to humans, bots, and LLMs equally """
@@ -72,10 +73,10 @@ class Player:
         # To be implemented by subclasses
         raise NotImplementedError
 
-    async def broadcast_message(self, game, *args, **kwargs):
+    def broadcast_message(self, game, *args, **kwargs):
         # Base implementation: humans override with frontend, bots have their own internal message broadcasting
         # mechanisms
-        return None
+        pass
 
     async def send_message(self, message):
         """Send a message to the player's websocket"""
@@ -137,6 +138,13 @@ class HumanPlayer(Player):
         # Human players make moves via WebSocket
         pass
 
+    def broadcast_message(self, game, type: str = None, *_, **__):
+        # Humans displayed as bots can broadcast bot-like messages to others to make the deception more convincing
+        if self.display_type == "bot":
+            return generate_comment(game, type, verbosity=0.7, id=self.id)
+        else:
+            pass
+
 
 def get_player(*, type: str, **kwargs) -> Player:
     """Return a game player type from a configuration.
@@ -147,7 +155,14 @@ def get_player(*, type: str, **kwargs) -> Player:
     :raises: ValueError if the player type is not recognised
     """
 
-    PERMITTED_PLAYER_TYPES = ["human", "smartbot", "smartbotold", "randombot", "llm"]
+    PERMITTED_PLAYER_TYPES = [
+        "human",
+        "smartbot",
+        "smartbot_v1",
+        "smartbot_v2",
+        "randombot",
+        "llm",
+    ]
 
     # Get the player type and raise a ValueError if unrecognised
     if type.lower() not in PERMITTED_PLAYER_TYPES:
@@ -166,10 +181,16 @@ def get_player(*, type: str, **kwargs) -> Player:
         return SmartBot(**kwargs)
 
     # SmartBot
-    elif type.lower() == "smartbotold":
-        from cheat.bots import SmartBotOld
+    elif type.lower() == "smartbot_v1":
+        from cheat.bots import SmartBot_v1
 
-        return SmartBotOld(**kwargs)
+        return SmartBot_v1(**kwargs)
+
+    # SmartBot
+    elif type.lower() == "smartbot_v2":
+        from cheat.bots import SmartBot_v2
+
+        return SmartBot_v2(**kwargs)
 
     # RandomBot
     elif type.lower() == "randombot":

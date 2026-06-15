@@ -506,7 +506,9 @@ class CheatGame:
 
         msg_was_broadcast = False
         for player in _query_players:
-            if player.type in ["bot", "LLM"]:
+            if (player.type in ["bot", "LLM"]) or (
+                player.display_type == "bot" and player.type == "human"
+            ):
                 msg = player.broadcast_message(self, message_type)
                 msg_was_broadcast = msg is not None
                 if msg is not None:
@@ -519,14 +521,26 @@ class CheatGame:
                             data=msg,
                         )
                     )
-                    await self.broadcast_to_all(
-                        {
-                            "type": "bot_message",
-                            "sender_id": player.id,
-                            "message": msg,
-                            **self.get_info(),
-                        }
-                    )
+                    # Fake bots broadcast the messages only to others, not to themselves
+                    if player.display_type == "bot" and player.type == "human":
+                        await self.broadcast_to_others(
+                            player.id,
+                            {
+                                "type": "bot_message",
+                                "sender_id": player.id,
+                                "message": msg,
+                                **self.get_info(),
+                            },
+                        )
+                    else:
+                        await self.broadcast_to_all(
+                            {
+                                "type": "bot_message",
+                                "sender_id": player.id,
+                                "message": msg,
+                                **self.get_info(),
+                            }
+                        )
                     self.player_logger.info(f"{player.name} broadcasts: {msg}")
 
         return msg_was_broadcast
@@ -562,16 +576,32 @@ class CheatGame:
                 f"{self.players[data['sender_id']].name} broadcasts: {data['message']}"
             )
 
-            # Broadcast instantly to all players
-            await self.broadcast_to_all(
-                {
-                    "type": "human_message",
-                    "sender_id": data["sender_id"],
-                    "sender_name": self.players[data["sender_id"]].name,
-                    "message": data["message"],
-                    "num_players": len(self.players),
-                }
-            )
+            # Broadcast instantly to all players except if the player is a fake bot, in which case the
+            # human message is only reflected back to the sending player and repressed for all others to
+            # maintain the deception
+            if not (
+                self.players[data["sender_id"]].display_type == "bot"
+                and self.players[data["sender_id"]].type == "human"
+            ):
+                await self.broadcast_to_all(
+                    {
+                        "type": "human_message",
+                        "sender_id": data["sender_id"],
+                        "sender_name": self.players[data["sender_id"]].name,
+                        "message": data["message"],
+                        "num_players": len(self.players),
+                    }
+                )
+            else:
+                await self.players[data["sender_id"]].send_message(
+                    {
+                        "type": "human_message",
+                        "sender_id": data["sender_id"],
+                        "sender_name": self.players[data["sender_id"]].name,
+                        "message": data["message"],
+                        "num_players": len(self.players),
+                    }
+                )
 
         elif data.get("type") == "turn_acknowledged":
             # Set directly on player rather than queuing, so the outer game loop
@@ -862,7 +892,7 @@ class CheatGame:
                     was_lying = await self.call(current_player)
 
                     # If the call was successful, they play
-                    if was_lying:
+                    if was_lying and not self.round_over:
                         action = await current_player.make_move(self)
                         declared_rank = action.data.get("declared_rank")
                         cards = action.data.get("cards_played")
