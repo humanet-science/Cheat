@@ -1024,6 +1024,35 @@ async def websocket_endpoint(ws: WebSocket):
                             await _g.replace_player_with_bot(_p)
                         reconnection_slots.pop(_t, None)
 
+                        # Re-check after popping: if two grace periods expired
+                        # simultaneously, each task may have seen the other still in
+                        # reconnection_slots and chosen bot-replacement over ending the
+                        # game. Now that this slot is removed, check whether any humans
+                        # remain and end the game if not.
+                        if not _g.game_over:
+                            still_connected_recheck = [
+                                p
+                                for p in _g.players
+                                if p.type == "human" and p.connected
+                            ]
+                            still_in_grace_recheck = [
+                                p
+                                for p in _g.players
+                                if p.type == "human"
+                                and not p.connected
+                                and getattr(p, "session_token", None)
+                                in reconnection_slots
+                            ]
+                            if (
+                                not still_connected_recheck
+                                and not still_in_grace_recheck
+                            ):
+                                ws_log.info(
+                                    f"All humans gone from game {_gid} after bot replacement, ending game."
+                                )
+                                await _g.handle_message(_p, {"type": "quit"})
+                                _g.game_over = True
+
                     task = asyncio.create_task(_delayed_replace())
                     if token and not getattr(player, "timed_out", False):
                         reconnection_slots[token] = {
