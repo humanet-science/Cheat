@@ -10,7 +10,7 @@ from cheat.card import RANKS, str_to_Card
 from .generic_bot import BotPlayer
 
 
-class SmartBotOld(BotPlayer):
+class SmartBot_v1(BotPlayer):
     """Smart bot that inherits from the parent Player class. The Smart bot works the following way:
     - Keeps track of other players' behavioural patterns and estimates their lie and call probability
     - Adjusts its probability of lying and calling to what it thinks the players to its left and right are doing
