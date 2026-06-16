@@ -2,17 +2,22 @@ import React, {useState} from "react";
 import {BotAvatar} from "./BotAvatar";
 
 export function OpponentIcons({
-																opponents,
-																playerPositions,
-																handlePlayerClick,
-																state,
-																playAnnouncements,
-																getPlayerColor,
-																experimentalMode
-															}) {
+								opponents,
+								playerPositions,
+								handlePlayerClick,
+								state,
+								playAnnouncements,
+								getPlayerColor,
+								experimentalMode,
+								playerHighlight,
+							}) {
 
 	const [hoveredPlayer, setHoveredPlayer] = useState(null);
 	return (opponents.map((opp, index) => {
+		const isDimmed = playerHighlight && (
+			(playerHighlight === 'bots' && opp.type !== 'bot') ||
+			(playerHighlight === 'humans' && opp.type === 'bot')
+		);
 		return (
 			<div
 				key={opp.id}
@@ -22,9 +27,11 @@ export function OpponentIcons({
 					left: `calc(50% + ${playerPositions[opp.id]?.x || 0}px)`,
 					top: `calc(50% + ${playerPositions[opp.id]?.y || 0}px)`,
 					transform: 'translate(-50%, -50%)',
+					opacity: isDimmed ? 0.2 : 1,
+					transition: 'opacity 0.6s ease',
 				}}
 				className={`player-opponent rounded-full z-10 p-4 w-[clamp(50px,7vw,80px)] h-[clamp(50px,7vw,80px)] border-2
-										${experimentalMode && opp.type === 'bot' ? 'bg-[#07071a]' : experimentalMode && opp.type === 'LLM' ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
+								${experimentalMode && opp.type === 'bot' ? 'bg-[#07071a]' : experimentalMode && opp.type === 'LLM' ? 'bg-gradient-to-br from-gray-200 to-gray-600' : getPlayerColor(opp.id)} ${state.current_player === opp.id ? "border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.9)]" : ""} cursor-pointer transition-all duration-200 group`}
 				onClick={() => handlePlayerClick(opp)}
 			>
 				{experimentalMode && opp.type === 'bot' && (

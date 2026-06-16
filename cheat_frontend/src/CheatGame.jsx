@@ -64,6 +64,7 @@ export default function CheatGame({
 																		showDealAnimation = true,
 																		disableReconnect = false,
 																		clearMessagesRef = null,
+																		playerHighlight = null,
 																	}) {
 
 	// Game state and previous state
@@ -1179,6 +1180,7 @@ export default function CheatGame({
 					state={state}
 					getPlayerColor={getPlayerColor}
 					experimentalMode={experimentalMode}
+					playerHighlight={playerHighlight}
 				/>
 
 				{/* Animation of cards being dealt */}

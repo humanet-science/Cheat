@@ -141,7 +141,7 @@ class HumanPlayer(Player):
     def broadcast_message(self, game, type: str = None, *_, **__):
         # Humans displayed as bots can broadcast bot-like messages to others to make the deception more convincing
         if self.display_type == "bot":
-            return generate_comment(game, type, verbosity=0.7, id=self.id)
+            return generate_comment(game, type, verbosity=0.4, id=self.id)
         else:
             pass
 
