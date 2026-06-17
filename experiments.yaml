@@ -126,6 +126,7 @@ treatments:
         name: Candice
         display_name: AuraAI-1
         display_type: bot
+        verbosity: 0.4
       - type: human
         avatar: 🧜‍♂️
         name: Cooper
@@ -134,6 +135,7 @@ treatments:
         name: Owen
         display_name: AuraAI-2
         display_type: bot
+        verbosity: 0.4
 
     # Only allow certain custom messages. If None, players can use the full message box
     predefined_messages: ~

@@ -23,6 +23,7 @@ class Player:
     avatar: str | None = ""
     hand: List[Card] = None
     type: str = "human"
+    verbosity: float = 0.0
     display_type: str | None = None
     connected: bool = True
     timed_out: bool = False
@@ -49,6 +50,7 @@ class Player:
                 "id": self.id,
                 "name": self.display_name,
                 "true_name": self.name,
+                "verbosity": self.verbosity,
                 "avatar": self.avatar,
                 "type": self.display_type,
                 "hand": [str(card) for card in self.hand],
@@ -99,6 +101,7 @@ class HumanPlayer(Player):
         id: int | None,
         name: str,
         avatar: str,
+        verbosity: float = 0.0,
         ws: WebSocket = None,
         display_name: str | None = None,
         display_type: str | None = None,
@@ -110,6 +113,7 @@ class HumanPlayer(Player):
             display_name=display_name,
             avatar=avatar,
             type="human",
+            verbosity=verbosity,
             display_type=display_type,
             ws=ws,
             connected=ws is not None,
@@ -141,7 +145,7 @@ class HumanPlayer(Player):
     def broadcast_message(self, game, type: str = None, *_, **__):
         # Humans displayed as bots can broadcast bot-like messages to others to make the deception more convincing
         if self.display_type == "bot":
-            return generate_comment(game, type, verbosity=0.4, id=self.id)
+            return generate_comment(game, type, verbosity=self.verbosity, id=self.id)
         else:
             pass
 

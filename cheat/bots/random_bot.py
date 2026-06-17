@@ -26,11 +26,11 @@ class RandomBot(BotPlayer):
             name=name,
             display_name=display_name,
             avatar=avatar,
+            verbosity=verbosity,
             display_type=display_type,
         )
         self.p_call = p_call
         self.p_lie = p_lie
-        self.verbosity = verbosity
 
     def __dict__(self):
         return dict(

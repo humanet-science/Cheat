@@ -5,36 +5,141 @@ const getAPIBaseURL = () => {
     if (hostname === "localhost" || hostname === "127.0.0.1") {
         return "http://localhost:5050";
     }
-    // In production both game. and study. proxy /api/* to the backend
     return `${window.location.protocol}//${hostname}`;
 };
 
-const labelClassName = "block text-sm font-medium text-gray-700 my-2";
-const inputClassName = "appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
+const labelClassName = "block text-sm font-medium text-gray-700 mb-3";
+
+function LikertSlider({ leftLabel, rightLabel, value, onChange }) {
+    return (
+        <div className="flex items-center gap-4 py-1">
+            <span className="text-sm text-gray-500 w-36 text-right shrink-0">{leftLabel}</span>
+            <div className="flex-1">
+                <div className="relative flex items-center">
+                    <div className="absolute inset-x-0 h-1.5 bg-gray-200 rounded-full pointer-events-none" />
+                    {[0, 25, 50, 75, 100].map((pct) => (
+                        <div
+                            key={pct}
+                            className="absolute w-1.5 h-1.5 bg-gray-400 rounded-full pointer-events-none"
+                            style={{ left: `calc(${pct / 100} * (100% - 16px) + 8px)`, transform: 'translateX(-50%)' }}
+                        />
+                    ))}
+                    <input
+                        type="range"
+                        min={1}
+                        max={5}
+                        step={1}
+                        value={Number.isNaN(value) ? 3 : value}
+                        onChange={(e) => onChange(Number(e.target.value))}
+                        className="relative w-full accent-blue-500 cursor-pointer"
+                        style={{ background: 'transparent' }}
+                    />
+                </div>
+            </div>
+            <span className="text-sm text-gray-500 w-36 shrink-0">{rightLabel}</span>
+        </div>
+    );
+}
+
+function RadioGroup({ options, value, onChange, name }) {
+    return (
+        <div className="flex gap-6">
+            {options.map((opt) => (
+                <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                        type="radio"
+                        name={name}
+                        checked={value === opt}
+                        onChange={() => onChange(opt)}
+                        className="accent-blue-500"
+                    />
+                    {opt}
+                </label>
+            ))}
+        </div>
+    );
+}
+
+const PLAYER_TYPE_OPTIONS = ["Human", "AI agent", "Not sure"];
+
+const initSliders = () => ({ lied: NaN, called: NaN, annoying: NaN, mean: NaN, cautious: NaN, clueless: NaN, deceitful: NaN, cynical: NaN });
+
+function PlayerSection({ side, description, type, onTypeChange, sliders, onSliderChange }) {
+    const strategySliders = side === "right"
+        ? [
+            { key: "lied",   left: "Lied too often",    right: "Almost never lied" },
+            { key: "called", left: "Called too often",   right: "Almost never called" },
+        ]
+        : [
+            { key: "called", left: "Called too often",   right: "Almost never called" },
+            { key: "lied",   left: "Lied too often",    right: "Almost never lied" },
+        ];
+
+    const personalitySliders = [
+        { key: "clueless",  left: "Clueless",    right: "Clever" },
+        { key: "deceitful", left: "Deceitful",   right: "Honest" },
+        { key: "cynical",   left: "Suspicious",     right: "Trusting" },
+        { key: "cautious",  left: "Cautious",    right: "Risk-taking" },
+    ];
+
+    return (
+        <div className="border border-gray-200 rounded-lg p-5 space-y-5">
+            <div>
+                <h4 className="text-sm font-semibold text-gray-800">{description}</h4>
+            </div>
+
+            <div>
+                <label className={labelClassName}>Were they:</label>
+                <RadioGroup options={PLAYER_TYPE_OPTIONS} value={type} onChange={onTypeChange} name={`player-type-${side}`} />
+            </div>
+
+            <div>
+                <label className={labelClassName}>What did you think of their strategy? <span className="font-normal text-gray-400">(Click and slide along the scales to adjust your answer.)</span></label>
+                <div className="space-y-2">
+                    {strategySliders.map(({ key, left, right }) => (
+                        <LikertSlider
+                            key={key}
+                            leftLabel={left}
+                            rightLabel={right}
+                            value={sliders[key]}
+                            onChange={(v) => onSliderChange(key, v)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <label className={labelClassName}>How would you describe them as a player?</label>
+                <div className="space-y-2">
+                    {personalitySliders.map(({ key, left, right }) => (
+                        <LikertSlider
+                            key={key}
+                            leftLabel={left}
+                            rightLabel={right}
+                            value={sliders[key]}
+                            onChange={(v) => onSliderChange(key, v)}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
     const [myStrategy, setMyStrategy] = useState("");
     const [rightType, setRightType] = useState("");
-    const [rightStrategy, setRightStrategy] = useState("");
-    const [rightFeel, setRightFeel] = useState("");
+    const [rightSliders, setRightSliders] = useState(initSliders());
     const [leftType, setLeftType] = useState("");
-    const [leftStrategy, setLeftStrategy] = useState("");
-    const [leftFeel, setLeftFeel] = useState("");
-    const [overallExperience, setOverallExperience] = useState("");
-    const [tutorialFeedback, setTutorialFeedback] = useState("");
-    const [interfaceFeedback, setInterfaceFeedback] = useState("");
+    const [leftSliders, setLeftSliders] = useState(initSliders());
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState(null);
-
 
     const latestData = useRef({});
     latestData.current = {
         myStrategy,
-        rightPlayer: { type: rightType, strategy: rightStrategy, feel: rightFeel },
-        leftPlayer: { type: leftType, strategy: leftStrategy, feel: leftFeel },
-        overallExperience,
-        tutorialFeedback,
-        interfaceFeedback,
+        rightPlayer: { type: rightType, sliders: rightSliders },
+        leftPlayer:  { type: leftType,  sliders: leftSliders  },
     };
 
     async function handleSubmit(event) {
@@ -60,13 +165,6 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
         onSubmit();
     }
 
-    const playerTypeOptions = ["Human", "AI agent", "Not sure"];
-
-    const isComplete = [
-        myStrategy, rightType, rightStrategy, rightFeel,
-        leftType, leftStrategy, leftFeel,
-        overallExperience, tutorialFeedback, interfaceFeedback,
-    ].every((v) => v.trim() !== "");
 
     if (submitted && !error) {
         return (
@@ -77,15 +175,12 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
     }
 
     return (
-        <div className="h-screen overflow-y-auto py-8 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="h-screen overflow-y-auto py-8 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white p-8 rounded-2xl shadow-lg">
                 <form className="space-y-8" onSubmit={handleSubmit}>
                     <div>
                         <h3 className="text-lg leading-6 font-medium text-gray-900">Exit Survey</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                            We are trying to improve the game and would be grateful for your feedback.
-                            Please answer all questions. If a question does not apply, write 'N/A'.
-                        </p>
+                        <p className="mt-1 text-sm text-gray-500">Please answer the short survey below.</p>
                     </div>
 
                     {error && (
@@ -96,92 +191,39 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
 
                     <div className="space-y-6">
                         <div>
-                            <label className={labelClassName}>What was your strategy in the game?</label>
-                            <textarea className={inputClassName} dir="auto" rows={3} value={myStrategy} onChange={(e) => setMyStrategy(e.target.value)} />
+                            <label className={labelClassName}>What was your overall strategy in the game?</label>
+                            <textarea
+                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                dir="auto"
+                                rows={3}
+                                value={myStrategy}
+                                onChange={(e) => setMyStrategy(e.target.value)}
+                            />
                         </div>
 
-                        <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-                            <h4 className="text-sm font-semibold text-gray-800">
-                                For the player to your right (the one who played immediately before you):
-                            </h4>
-                            <div>
-                                <label className={labelClassName}>Were they:</label>
-                                <div className="flex gap-6">
-                                    {playerTypeOptions.map((opt) => (
-                                        <label key={opt} className="flex items-center gap-2 text-sm text-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={rightType === opt}
-                                                onChange={() => setRightType(rightType === opt ? "" : opt)}
-                                                className="rounded"
-                                            />
-                                            {opt}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelClassName}>What do you think their strategy was?</label>
-                                <textarea className={inputClassName} dir="auto" rows={3} value={rightStrategy} onChange={(e) => setRightStrategy(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className={labelClassName}>How do you feel about them?</label>
-                                <textarea className={inputClassName} dir="auto" rows={3} value={rightFeel} onChange={(e) => setRightFeel(e.target.value)} />
-                            </div>
-                        </div>
+                        <PlayerSection
+                            side="right"
+                            description="Think of the player to your right. This is the player who played immediately before you, and who you could either call out or continue their play."
+                            type={rightType}
+                            onTypeChange={setRightType}
+                            sliders={rightSliders}
+                            onSliderChange={(key, val) => setRightSliders((prev) => ({ ...prev, [key]: val }))}
+                        />
 
-                        <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-                            <h4 className="text-sm font-semibold text-gray-800">
-                                For the player to your left (the one who played immediately after you):
-                            </h4>
-                            <div>
-                                <label className={labelClassName}>Were they:</label>
-                                <div className="flex gap-6">
-                                    {playerTypeOptions.map((opt) => (
-                                        <label key={opt} className="flex items-center gap-2 text-sm text-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={leftType === opt}
-                                                onChange={() => setLeftType(leftType === opt ? "" : opt)}
-                                                className="rounded"
-                                            />
-                                            {opt}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelClassName}>What do you think their strategy was?</label>
-                                <textarea className={inputClassName} dir="auto" rows={3} value={leftStrategy} onChange={(e) => setLeftStrategy(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className={labelClassName}>How do you feel about them?</label>
-                                <textarea className={inputClassName} dir="auto" rows={3} value={leftFeel} onChange={(e) => setLeftFeel(e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className={labelClassName}>Overall, what was your experience playing? How do you feel about the game?</label>
-                            <textarea className={inputClassName} dir="auto" rows={3} value={overallExperience} onChange={(e) => setOverallExperience(e.target.value)} />
-                        </div>
-
-                        <div>
-                            <label className={labelClassName}>Was there anything in the game rules that you found confusing? How can we improve the tutorial?</label>
-                            <textarea className={inputClassName} dir="auto" rows={3} value={tutorialFeedback} onChange={(e) => setTutorialFeedback(e.target.value)} />
-                        </div>
-
-                        <div>
-                            <label className={labelClassName}>Was there anything in the game play that was annoying? How can we improve the game interface?</label>
-                            <textarea className={inputClassName} dir="auto" rows={3} value={interfaceFeedback} onChange={(e) => setInterfaceFeedback(e.target.value)} />
-                        </div>
+                        <PlayerSection
+                            side="left"
+                            description="Think of the player to your left. This is the player who played immediately after you, and who could either call you out or continue your play."
+                            type={leftType}
+                            onTypeChange={setLeftType}
+                            sliders={leftSliders}
+                            onSliderChange={(key, val) => setLeftSliders((prev) => ({ ...prev, [key]: val }))}
+                        />
                     </div>
 
                     <div className="mb-12">
                         <button
                             type="submit"
-                            disabled={!isComplete}
-                            className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
-                                text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+                                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
                         >
                             Submit
                         </button>

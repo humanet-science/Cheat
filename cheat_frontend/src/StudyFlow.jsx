@@ -294,7 +294,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                     <h2 className="text-xl font-bold text-gray-700 mb-2">You're in!</h2>
 
                     <p className="text-gray-500 text-sm mb-6">
-                        Choose a name and avatar, then join the waiting room. The game will start automatically once enough players have joined.
+                        Choose a name and avatar, then join the waiting room. The game will start automatically once enough other participants have joined.
                     </p>
                     <PlayerNameInput playerName={playerName} setPlayerName={setPlayerName} />
                     <AvatarSelection

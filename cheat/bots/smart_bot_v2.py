@@ -26,18 +26,16 @@ class SmartBot_v2(BotPlayer):
         display_name: str | None = None,
         avatar: str | None = None,
         verbosity: float = 0.3,
-        temperature: float = 0.02,
         display_type: str | None = None,
     ):
         super().__init__(
             id=id,
             name=name,
             avatar=avatar,
+            verbosity=verbosity,
             display_name=display_name,
             display_type=display_type,
         )
-        self.verbosity = verbosity
-        self.temperature = temperature
 
         # Dictionary containing information about other players — this is built dynamically
         self.other_player_repr = {}
@@ -53,7 +51,6 @@ class SmartBot_v2(BotPlayer):
             avatar=self.avatar,
             type=self.type,
             verbosity=self.verbosity,
-            temperature=self.temperature,
         )
 
     def write_info(self, path) -> None:

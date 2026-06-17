@@ -32,10 +32,10 @@ class SmartBot_v1(BotPlayer):
             id=id,
             name=name,
             avatar=avatar,
+            verbosity=verbosity,
             display_name=display_name,
             display_type=display_type,
         )
-        self.verbosity = verbosity
 
         # Dictionary containing information about other players — this is built dynamically
         self.other_player_repr = {}
