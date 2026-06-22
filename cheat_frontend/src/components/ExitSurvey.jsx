@@ -11,6 +11,7 @@ const getAPIBaseURL = () => {
 const labelClassName = "block text-sm font-medium text-gray-700 mb-3";
 
 function LikertSlider({ leftLabel, rightLabel, value, onChange }) {
+    const touched = !Number.isNaN(value);
     return (
         <div className="flex items-center gap-4 py-1">
             <span className="text-sm text-gray-500 w-36 text-right shrink-0">{leftLabel}</span>
@@ -29,9 +30,18 @@ function LikertSlider({ leftLabel, rightLabel, value, onChange }) {
                         min={1}
                         max={5}
                         step={1}
-                        value={Number.isNaN(value) ? 3 : value}
+                        value={touched ? value : 3}
                         onChange={(e) => onChange(Number(e.target.value))}
-                        className="relative w-full accent-blue-500 cursor-pointer"
+                        onPointerDown={touched ? undefined : (e) => {
+                            // If the click lands on the default value (3), onChange never fires,
+                            // so force-compute the value from pointer position.
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const pad = 10; // half of 20px thumb
+                            const usable = Math.max(1, rect.width - pad * 2);
+                            const x = Math.max(0, Math.min(e.clientX - rect.left - pad, usable));
+                            onChange(Math.max(1, Math.min(5, Math.round(1 + (x / usable) * 4))));
+                        }}
+                        className={`relative w-full cursor-pointer${touched ? '' : ' slider-untouched'}`}
                         style={{ background: 'transparent' }}
                     />
                 </div>
@@ -94,7 +104,7 @@ function PlayerSection({ side, description, type, onTypeChange, sliders, onSlide
             </div>
 
             <div>
-                <label className={labelClassName}>What did you think of their strategy? <span className="font-normal text-gray-400">(Click and slide along the scales to adjust your answer.)</span></label>
+                <label className={labelClassName}>What did you think of their strategy? <span className="font-normal text-gray-400">(Click on the scale to select your answer.)</span></label>
                 <div className="space-y-2">
                     {strategySliders.map(({ key, left, right }) => (
                         <LikertSlider
@@ -203,7 +213,7 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
 
                         <PlayerSection
                             side="right"
-                            description="Think of the player to your right. This is the player who played immediately before you, and who you could either call out or continue their play."
+                            description="Think of the player to your right. This is the player who played immediately before you, and whom you could either call out or continue their play."
                             type={rightType}
                             onTypeChange={setRightType}
                             sliders={rightSliders}

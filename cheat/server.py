@@ -840,33 +840,39 @@ async def websocket_endpoint(ws: WebSocket):
 
                     # Non-creating player has left the waiting queue for a specific game
                     elif player.session_token in player_to_game:
-                        _game = waiting_games[player_to_game[player.session_token]]
-                        for p in _game.players:
-                            if p.session_token == player.session_token:
-                                p.connected = False
-                                player_to_game.pop(player.session_token)
-                                await player.ws.send_json({"type": "quit_confirmed"})
-                                p.ws = None
-                                break
+                        _game_id = player_to_game[player.session_token]
+                        if _game_id not in waiting_games:
+                            pass  # already moved to an active game; stale exit_queue, ignore
+                        else:
+                            _game = waiting_games[_game_id]
+                            for p in _game.players:
+                                if p.session_token == player.session_token:
+                                    p.connected = False
+                                    player_to_game.pop(player.session_token)
+                                    await player.ws.send_json(
+                                        {"type": "quit_confirmed"}
+                                    )
+                                    p.ws = None
+                                    break
 
-                        await _game.broadcast_to_all(
-                            {
-                                "type": "player_exited_queue",
-                                "num_connected": len(
-                                    [
-                                        p
-                                        for p in _game.players
-                                        if p.connected and p.type == "human"
-                                    ]
-                                ),
-                                "num_slots": len(
-                                    [p for p in _game.players if p.type == "human"]
-                                ),
-                            }
-                        )
-                        ws_log.info(
-                            f"{player.name} left the queue for game {_game.game_id}."
-                        )
+                            await _game.broadcast_to_all(
+                                {
+                                    "type": "player_exited_queue",
+                                    "num_connected": len(
+                                        [
+                                            p
+                                            for p in _game.players
+                                            if p.connected and p.type == "human"
+                                        ]
+                                    ),
+                                    "num_slots": len(
+                                        [p for p in _game.players if p.type == "human"]
+                                    ),
+                                }
+                            )
+                            ws_log.info(
+                                f"{player.name} left the queue for game {_game.game_id}."
+                            )
 
                     # Study player leaving the queue
                     elif player in study_participants:

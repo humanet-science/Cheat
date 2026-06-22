@@ -3,9 +3,9 @@ import CheatGame from '../CheatGame';
 
 const EXPERIMENT_NAME_MAP = {
 	'Player 1': 'Participant 1',
-	'Player 2': 'Bot 1',
+	'Player 2': 'AI agent 1',
 	'Player 3': 'Participant 2',
-	'Player 4': 'Bot 2',
+	'Player 4': 'AI agent 2',
 };
 
 function remapNames(obj, nameMap, key = null) {
@@ -46,8 +46,8 @@ const TUTORIAL_SLIDES = [{
 	}]
 }, {
 	id: 2,
-	title: "Bots",
-	description: "Some of the players will be bots; you'll recognise them by their icons.",
+	title: "AI agents",
+	description: "Some of the players will be AI agents; you'll recognise them by their icons.",
 	experimentOnly: true,
 	playerHighlight: 'bots',
 	messages: [{

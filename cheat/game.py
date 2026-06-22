@@ -935,7 +935,7 @@ class CheatGame:
             if player.display_type != "bot"
             else player.display_name,
             avatar=player.avatar,  # Keep the same avatar
-            verbosity=0.2,
+            verbosity=player.verbosity if self.experimental_mode else 0.2,
         )
 
         # Transfer the hand and logger
@@ -961,7 +961,9 @@ class CheatGame:
                 {
                     "type": "human_message",
                     "sender_id": bot.id,
-                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!",
+                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!"
+                    if not self.experimental_mode
+                    else f"🤖 {player.display_name} left, I'm their AI replacement!",
                     **self.get_info(),
                 }
             )
