@@ -72,7 +72,7 @@ function RadioGroup({ options, value, onChange, name }) {
 
 const PLAYER_TYPE_OPTIONS = ["Human", "AI agent", "Not sure"];
 
-const initSliders = () => ({ lied: NaN, called: NaN, annoying: NaN, mean: NaN, cautious: NaN, clueless: NaN, deceitful: NaN, cynical: NaN });
+const initSliders = () => ({ lied: NaN, called: NaN, cautious: NaN, clueless: NaN, deceitful: NaN, cynical: NaN });
 
 function PlayerSection({ side, description, type, onTypeChange, sliders, onSliderChange }) {
     const strategySliders = side === "right"
@@ -88,7 +88,7 @@ function PlayerSection({ side, description, type, onTypeChange, sliders, onSlide
     const personalitySliders = [
         { key: "clueless",  left: "Clueless",    right: "Clever" },
         { key: "deceitful", left: "Deceitful",   right: "Honest" },
-        { key: "cynical",   left: "Suspicious",     right: "Trusting" },
+        { key: "cynical",   left: "Suspicious",  right: "Trusting" },
         { key: "cautious",  left: "Cautious",    right: "Risk-taking" },
     ];
 
