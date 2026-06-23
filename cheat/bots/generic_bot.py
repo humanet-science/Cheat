@@ -14,6 +14,7 @@ class BotPlayer(Player):
         display_type: str | None = None,
         avatar: str | None = None,
         verbosity: float = 0.2,
+        is_replacement: bool = False,
     ):
         super().__init__(
             id=id,
@@ -24,6 +25,8 @@ class BotPlayer(Player):
             verbosity=verbosity,
             display_type=display_type,
         )
+
+        self.is_replacement = is_replacement
 
     def broadcast_message(self, game, type: str = None, *_, **__):
         """Broadcast an opinion based on the state of play"""

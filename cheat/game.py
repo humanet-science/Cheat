@@ -936,6 +936,7 @@ class CheatGame:
             else player.display_name,
             avatar=player.avatar,  # Keep the same avatar
             verbosity=player.verbosity if self.experimental_mode else 0.2,
+            is_replacement=True,
         )
 
         # Transfer the hand and logger

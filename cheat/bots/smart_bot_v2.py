@@ -27,6 +27,7 @@ class SmartBot_v2(BotPlayer):
         avatar: str | None = None,
         verbosity: float = 0.3,
         display_type: str | None = None,
+        is_replacement: bool = False,
     ):
         super().__init__(
             id=id,
@@ -35,6 +36,7 @@ class SmartBot_v2(BotPlayer):
             verbosity=verbosity,
             display_name=display_name,
             display_type=display_type,
+            is_replacement=is_replacement,
         )
 
         # Dictionary containing information about other players — this is built dynamically
@@ -55,12 +57,11 @@ class SmartBot_v2(BotPlayer):
 
     def write_info(self, path) -> None:
         """Write out the internal configuration"""
+        _path = f"{path}/Player_{self.id if self.id is not None else self.name}.pickle"
+        if self.is_replacement:
+            _path = _path.replace(".pickle", "_replacement.pickle")
 
-        # TODO: Use json instead
-        with open(
-            f"{path}/Player_{self.id if self.id is not None else self.name}.pickle",
-            "wb",
-        ) as file:
+        with open(_path, "wb") as file:
             res = self.__dict__()
             res["other_player_repr_hist"] = self.other_player_repr_hist
             pickle.dump(res, file)

@@ -20,6 +20,7 @@ class RandomBot(BotPlayer):
         p_call: float = 0.3,
         p_lie: float = 0.3,
         verbosity: float = 0.3,
+        is_replacement: bool = False,
     ):
         super().__init__(
             id=id,
@@ -28,6 +29,7 @@ class RandomBot(BotPlayer):
             avatar=avatar,
             verbosity=verbosity,
             display_type=display_type,
+            is_replacement=is_replacement,
         )
         self.p_call = p_call
         self.p_lie = p_lie
@@ -44,9 +46,13 @@ class RandomBot(BotPlayer):
         )
 
     def write_info(self, path) -> None:
-        """Writes out the configuration"""
+        """Write out the internal configuration"""
+        _path = f"{path}/Player_{self.id if self.id is not None else self.name}.pickle"
+        if self.is_replacement:
+            _path = _path.replace(".pickle", "_replacement.pickle")
+
         with open(
-            f"{path}/Player_{self.id if self.id is not None else self.name}.pickle",
+            _path,
             "wb",
         ) as file:
             pickle.dump(self.__dict__(), file)
