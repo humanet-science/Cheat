@@ -138,7 +138,16 @@ treatments:
         verbosity: 0.4
 
     # Only allow certain custom messages. If None, players can use the full message box
-    predefined_messages: ~
+    predefined_messages:
+      - "Hello"
+      - "Hahaa"
+      - "Sorry"
+      - "Nice"
+      - "Yikes"
+      - "Damn"
+      - "No way!"
+      - "Try harder"
+      - "They lyin'"
 
     # Total number of games of this kind
     num_games: 0

@@ -284,7 +284,8 @@ export default function PlayerHand({
 									key={index}
 									onClick={() => sendMessage(msg)}
 									className="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
-																				text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75 hover:scale-110 active:scale-95 whitespace-nowrap"
+														 text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75
+														 hover:scale-110 active:scale-95 whitespace-nowrap"
 								>
 									{msg}
 								</button>))}
@@ -293,8 +294,9 @@ export default function PlayerHand({
 								{allowedMessages.slice(Math.ceil(allowedMessages.length / 2),).map((msg, index) => (<button
 									key={index + 6}
 									onClick={() => sendMessage(msg)}
-									className="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50 text-gray-950 font-semibold
-																				text-sm transition-all duration-200 hover:scale-110 active:scale-95 whitespace-nowrap"
+									className="px-2 py-0.5 rounded-full bg-amber-50 hover:bg-white backdrop-blur-lg opacity-50
+													 text-gray-950 font-semibold text-sm transition-all duration-300 hover:opacity-75
+													 hover:scale-110 active:scale-95 whitespace-nowrap"
 								>
 									{msg}
 								</button>))}

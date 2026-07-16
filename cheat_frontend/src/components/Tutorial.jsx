@@ -428,6 +428,7 @@ const TUTORIAL_SLIDES = [{
 	id: 10,
 	title: "Messaging",
 	description: "You can broadcast messages using the Message box, and you can warn the others when someone's cards are running low by clicking on their avatar.",
+	experiment_description: "You can broadcast messages by selecting from the Message box, and you can warn the others when someone's cards are running low by clicking on their avatar.",
 	task: {
 		type: 'human_message',
 		description: "Send a message in the game above to continue.",
@@ -934,7 +935,12 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 					>
 						<CheatGame
 							socket={mockSocket}
-							gameConfig={{numPlayers: 5, predefinedMessages: null, selfId: 0, experimentalMode: isExperiment}}
+							gameConfig={{
+								numPlayers: 5,
+								predefinedMessages: isExperiment ? ["Hello", "Hahaa", "Sorry", "Nice", "Yikes", "Damn", "No way!", "Try harder", "They lyin'"] : null,
+								selfId: 0,
+								experimentalMode: isExperiment
+						 }}
 							currentRound={currentRound}
 							onUpdateRound={updateRoundState}
 							onExitGame={() => {
