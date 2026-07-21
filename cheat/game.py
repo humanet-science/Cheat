@@ -382,7 +382,7 @@ class CheatGame:
                 type="win", player_id=winner.id, timestamp=datetime.now(), data=None
             )
         )
-        self.logger.info(f"End of round: {winner.name} wins!")
+        self.logger.info(f"End of round: {winner.display_name} wins!")
 
     def log(self, action: GameAction, **kwargs):
         """Logs a new action to the database. The index of the action is appended to the players list of actions, so
@@ -699,12 +699,12 @@ class CheatGame:
         # Check who picks up the pile to determine who goes next
         if f"Player {player.id} picks up" in result:
             self.player_logger.info(
-                f"Unsuccessful call by {self.players[self.turn].name}."
+                f"Unsuccessful call by {self.players[self.turn].display_name}."
             )
             was_lying = False
         else:
             self.player_logger.info(
-                f"Successful call by {self.players[self.turn].name}."
+                f"Successful call by {self.players[self.turn].display_name}."
             )
             was_lying = True
 
