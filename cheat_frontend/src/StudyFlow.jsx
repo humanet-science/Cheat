@@ -320,12 +320,15 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                             <h3 className="text-lg font-bold text-gray-800 mb-4">⚠️ Before you join</h3>
                             <p className="text-gray-600 mb-8">
                                 You are about to join the waiting room and will be automatically assigned to the next
-                                available game. If no games are available, you will be given a completion
-                                code after a timeout and you will be marked as having participated. While in the
-                                waiting room, you can exit and re-join at any point. However, once the game has started
-                                closing or refreshing the browser tab will cause you to exit the study without
-                                receiving a completion code. If you are inactive in the game you will be disconnected
-                                after a timeout.
+                                available game.
+                                If a game slot is available but doesn't fill with enough participants
+                                in time, you will be given a completion code after a timeout and marked as having participated.
+                                If all study slots have already been filled, you will not be assigned a game — unfortunately
+                                this means you were too late to take part.
+                                While in the waiting room, you can exit and re-join at any point.
+                                However, once the game has started closing or refreshing the browser tab will cause
+                                you to exit the study without receiving a completion code.
+                                If you are inactive in the game you will be disconnected after a timeout.
                             </p>
                             <div className="flex gap-3">
                                 <button
