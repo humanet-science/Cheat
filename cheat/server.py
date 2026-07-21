@@ -1074,9 +1074,14 @@ async def websocket_endpoint(ws: WebSocket):
                             "game_id": game_id,
                             "task": task,
                         }
-                    server_log.info(
-                        f"Marked {player.display_name} as disconnected in game {game_id}, grace period started"
-                    )
+                    if getattr(player, "timed_out", False):
+                        server_log.info(
+                            f"Marked {player.display_name} as disconnected in game {game_id}"
+                        )
+                    else:
+                        server_log.info(
+                            f"Marked {player.display_name} as disconnected in game {game_id}, grace period started"
+                        )
 
                     if not getattr(player, "timed_out", False):
                         await _game.broadcast_to_all(
