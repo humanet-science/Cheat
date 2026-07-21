@@ -351,7 +351,7 @@ class CheatGame:
                     data=discarded_ranks,
                 )
             )
-            self.player_logger.debug(
+            self.player_logger.info(
                 f"{player.name} discards {', '.join(discarded_ranks)}."
             )
             return f"Player {player.id} discards {', '.join(discarded_ranks)}."
@@ -541,7 +541,7 @@ class CheatGame:
                                 **self.get_info(),
                             }
                         )
-                    self.player_logger.debug(f"{player.name} broadcasts: {msg}")
+                    self.player_logger.info(f"{player.name} broadcasts: {msg}")
 
         return msg_was_broadcast
 
@@ -572,7 +572,7 @@ class CheatGame:
                     data=data["message"],
                 )
             )
-            self.player_logger.debug(
+            self.player_logger.info(
                 f"{self.players[data['sender_id']].name} broadcasts: {data['message']}"
             )
 
@@ -637,7 +637,7 @@ class CheatGame:
         await self.collect_messages(
             player_id=player.id, message_type="thinking_new_play"
         )
-        self.player_logger.debug(
+        self.player_logger.info(
             f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
         )
         self.play_turn(player, declared_rank, cards)
@@ -698,12 +698,12 @@ class CheatGame:
 
         # Check who picks up the pile to determine who goes next
         if f"Player {player.id} picks up" in result:
-            self.player_logger.debug(
+            self.player_logger.info(
                 f"Unsuccessful call by {self.players[self.turn].name}."
             )
             was_lying = False
         else:
-            self.player_logger.debug(
+            self.player_logger.info(
                 f"Successful call by {self.players[self.turn].name}."
             )
             was_lying = True

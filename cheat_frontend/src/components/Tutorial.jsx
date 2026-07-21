@@ -428,7 +428,7 @@ const TUTORIAL_SLIDES = [{
 	id: 10,
 	title: "Messaging",
 	description: "You can broadcast messages using the Message box, and you can warn the others when someone's cards are running low by clicking on their avatar.",
-	experiment_description: "You can broadcast messages by selecting from the Message box, and you can warn the others when someone's cards are running low by clicking on their avatar.",
+	experiment_description: "You can broadcast messages by selecting from the options, and you can warn the others when someone's cards are running low by clicking on their avatar.",
 	task: {
 		type: 'human_message',
 		description: "Send a message in the game above to continue.",
@@ -454,7 +454,7 @@ const TUTORIAL_SLIDES = [{
 		type: "human_message",
 		sender_id: 0,
 		sender_name: 'You',
-		message: "Broadcast a message using the message box below!",
+		message: "Try broadcasting a message to the others!",
 		num_players: 5
 	}]
 }, {

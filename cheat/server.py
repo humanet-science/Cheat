@@ -32,7 +32,7 @@ import cheat.bots
 from cheat.game import CheatGame
 from cheat.logging_config import setup_logging
 from cheat.player import HumanPlayer, get_player
-from cheat.utils import game_from_config
+from cheat.utils import game_from_config, silence_console_logs
 
 # Set up logging
 loggers = setup_logging()
@@ -281,6 +281,10 @@ def new_game(
         predefined_messages=game_config.get("predefined_messages", None),
         timeout=game_config.get("timeout", None),
     )
+
+    # Turn off console logging, if specified (file logging is unaffected)
+    if not game_config.get("show_logs", False):
+        silence_console_logs(game)
 
     # Set the system prompt for all LLM players, if not specified from the config
     for i, player in enumerate(game.players):

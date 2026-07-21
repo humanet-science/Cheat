@@ -11,6 +11,15 @@ from cheat.player import get_player
 """ General utility functions"""
 
 
+def silence_console_logs(game: CheatGame) -> None:
+    """Raise the level of a game's console log handlers so INFO-level game/player
+    messages are suppressed there, while file logging (game.log) is unaffected."""
+    for logger in (game.logger, game.player_logger):
+        for handler in logger.handlers:
+            if not isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.WARN)
+
+
 def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
     """Sets up a new CheatGame instance from a configuration file
 
@@ -59,10 +68,9 @@ def game_from_config(config: dict, *, show_logs: bool = False) -> CheatGame:
                     player_id_after=(player.id + 1) % game.num_players,
                 )
 
-    # Turn off logging, if specified
+    # Turn off console logging, if specified (file logging is unaffected)
     if not show_logs:
-        game.logger.setLevel(logging.WARN)
-        game.player_logger.setLevel(logging.WARN)
+        silence_console_logs(game)
 
     # Write metadata to folder
     if game.out_path is not None:
