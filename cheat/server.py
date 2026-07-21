@@ -410,9 +410,11 @@ async def run_game(_game: CheatGame):
     """Run a single game to completion"""
     try:
         server_log.info(
-            f"Starting new game with {len(_game.players)} players; game id: {_game.game_id}."
+            f"Starting game {_game.game_id} with {len(_game.players)} players."
         )
         while not _game.game_over:
+            server_log.info(f"Round {_game.round} starting in game {_game.game_id}.")
+
             await _game.broadcast_to_all(
                 {"type": "new_round", **_game.get_info()}, append_state=True
             )

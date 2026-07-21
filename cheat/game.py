@@ -352,7 +352,7 @@ class CheatGame:
                 )
             )
             self.player_logger.info(
-                f"{player.name} discards {', '.join(discarded_ranks)}."
+                f"{player.display_name} discards {', '.join(discarded_ranks)}."
             )
             return f"Player {player.id} discards {', '.join(discarded_ranks)}."
         return None
@@ -541,7 +541,7 @@ class CheatGame:
                                 **self.get_info(),
                             }
                         )
-                    self.player_logger.info(f"{player.name} broadcasts: {msg}")
+                    self.player_logger.info(f"{player.display_name} broadcasts: {msg}")
 
         return msg_was_broadcast
 
@@ -638,7 +638,7 @@ class CheatGame:
             player_id=player.id, message_type="thinking_new_play"
         )
         self.player_logger.info(
-            f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
+            f"{player.display_name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
         )
         self.play_turn(player, declared_rank, cards)
 
@@ -768,7 +768,7 @@ class CheatGame:
                 continue
 
             self.logger.debug(
-                f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})"
+                f"Current player: {current_player.display_name} (id: {current_player.id}, type: {current_player.type})"
             )
 
             # Human's turn
@@ -1053,10 +1053,12 @@ class CheatGame:
                                 player.timed_out = True
                                 await player.send_message({"type": "quit_confirmed"})
                                 await player.ws.close()
-                                self.logger.info(f"Closed WebSocket for {player.name}")
+                                self.logger.info(
+                                    f"Closed WebSocket for {player.display_name}"
+                                )
                             except Exception as e:
                                 self.logger.error(
-                                    f"Error closing WebSocket for {player.name}: {e}"
+                                    f"Error closing WebSocket for {player.display_name}: {e}"
                                 )
                             player.connected = False
                     break
