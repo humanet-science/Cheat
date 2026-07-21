@@ -573,7 +573,7 @@ class CheatGame:
                 )
             )
             self.player_logger.info(
-                f"{self.players[data['sender_id']].name} broadcasts: {data['message']}"
+                f"{self.players[data['sender_id']].display_name} broadcasts: {data['message']}"
             )
 
             # Broadcast instantly to all players except if the player is a fake bot, in which case the
