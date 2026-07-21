@@ -439,7 +439,7 @@ async def run_game(_game: CheatGame):
         for player in _game.players:
             if player.type == "human":
                 server_log.debug(
-                    f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}"
+                    f"Player {player.display_name}: connected={player.connected}, has_ws={player.ws is not None}"
                 )
 
         # Notify connected human players the game is over
@@ -448,9 +448,11 @@ async def run_game(_game: CheatGame):
             if player.type == "human" and player.connected and player.ws:
                 try:
                     await player.ws.send_json({"type": msg_type})
-                    server_log.info(f"Sent {msg_type} to {player.name}")
+                    server_log.info(f"Sent {msg_type} to {player.display_name}")
                 except Exception as e:
-                    server_log.error(f"Error sending {msg_type} to {player.name}: {e}")
+                    server_log.error(
+                        f"Error sending {msg_type} to {player.display_name}: {e}"
+                    )
 
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")
@@ -560,7 +562,7 @@ async def websocket_endpoint(ws: WebSocket):
                 _game = active_games.get(game_id)
                 if not _game:
                     ws_log.info(
-                        f"Reconnect for {old_player.name}: game {game_id} already ended"
+                        f"Reconnect for {old_player.display_name}: game {game_id} already ended"
                     )
                     await ws.send_json(
                         {"type": "server_error", "message": "Game has ended"}
@@ -599,7 +601,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
 
                     ws_log.info(
-                        f"Player {old_player.name} reconnected to game {game_id}"
+                        f"Player {old_player.display_name} reconnected to game {game_id}"
                     )
             else:
                 await ws.send_json({"type": "reconnect_failed"})
@@ -792,7 +794,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                 except asyncio.TimeoutError:
                     ws_log.warning(
-                        f"Ping timeout for {player.name if player else 'unknown'}, closing connection"
+                        f"Ping timeout for {player.display_name if player else 'unknown'}, closing connection"
                     )
                     try:
                         await ws.close(code=1001)
@@ -940,13 +942,15 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
 
     except WebSocketDisconnect:
-        ws_log.info(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
+        ws_log.info(
+            f"WebSocket disconnected: {player.display_name if player else 'Unknown'}"
+        )
     except RuntimeError as e:
         # Starlette raises RuntimeError("WebSocket is not connected") when receive_json
         # is called after the socket has already been closed (e.g. by the ping loop).
         # Treat this identically to a clean disconnect so the finally block runs normally.
         ws_log.info(
-            f"WebSocket closed unexpectedly for {player.name if player else 'Unknown'}: {e}"
+            f"WebSocket closed unexpectedly for {player.display_name if player else 'Unknown'}: {e}"
         )
     except Exception as e:
         ws_log.error(f"WebSocket error: {e}")
@@ -980,9 +984,6 @@ async def websocket_endpoint(ws: WebSocket):
                     for p in _game.players:
                         if p.session_token == player.session_token:
                             p.connected = False
-                            server_log.info(
-                                f"Marked {p.name} as disconnected in game {game_id}"
-                            )
                             break
 
                     # Always give a grace period so the player can reconnect.
@@ -1025,7 +1026,7 @@ async def websocket_endpoint(ws: WebSocket):
                         else:
                             if grace > 0:
                                 server_log.info(
-                                    f"Grace period expired for {_p.name}, replacing with bot"
+                                    f"Grace period expired for {_p.display_name}."
                                 )
                             await _g.broadcast_to_all(
                                 {
@@ -1033,6 +1034,7 @@ async def websocket_endpoint(ws: WebSocket):
                                     "player_id": _p.id,
                                 }
                             )
+                            server_log.info(f"Replacing {_p.display_name} with a bot.")
                             await _g.replace_player_with_bot(_p)
                         reconnection_slots.pop(_t, None)
 
@@ -1073,7 +1075,7 @@ async def websocket_endpoint(ws: WebSocket):
                             "task": task,
                         }
                     server_log.info(
-                        f"Marked {player.name} as disconnected in game {game_id}, grace period started"
+                        f"Marked {player.display_name} as disconnected in game {game_id}, grace period started"
                     )
 
                     if not getattr(player, "timed_out", False):
