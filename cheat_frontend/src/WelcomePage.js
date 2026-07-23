@@ -1,5 +1,5 @@
 // WelcomePage.js
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Logo} from './utils/Logo';
 import LoadingWindow from "./components/GameLoading";
 import Tutorial from "./components/Tutorial";
@@ -45,6 +45,22 @@ const WelcomePage = ({onGameStart}) => {
     // Help boxes for the menu options
     const [showGameModeHelp, setShowGameModeHelp] = useState(false);
     const [showNumPlayersHelp, setShowNumPlayersHelp] = useState(false);
+    const gameModeHelpRef = useRef(null);
+    const numPlayersHelpRef = useRef(null);
+
+    // Close help boxes when clicking outside of them
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (gameModeHelpRef.current && !gameModeHelpRef.current.contains(e.target)) {
+                setShowGameModeHelp(false);
+            }
+            if (numPlayersHelpRef.current && !numPlayersHelpRef.current.contains(e.target)) {
+                setShowNumPlayersHelp(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Player has joined queue and is waiting animation
     const [isWaiting, setIsWaiting] = useState(false);
@@ -472,13 +488,22 @@ const WelcomePage = ({onGameStart}) => {
                                             <label className="block text-gray-500 text-sm font-bold">
                                                 Game Mode
                                             </label>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowGameModeHelp(!showGameModeHelp)}
-                                                className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
-                                            >
-                                                ?
-                                            </button>
+                                            <div className="relative" ref={gameModeHelpRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowGameModeHelp(!showGameModeHelp)}
+                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
+                                                >
+                                                    ?
+                                                </button>
+
+                                                {/* Help Tooltip */}
+                                                {showGameModeHelp && (<div
+                                                    className="absolute z-20 top-full left-0 mt-2 p-3 w-56 max-w-[calc(100vw-4rem)] font-medium bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 shadow-lg">
+                                                    In <strong>Single Player</strong> all opponents are bots;
+                                                    in <strong>Multiplayer</strong> some opponents are human.
+                                                </div>)}
+                                            </div>
                                         </div>
 
 
@@ -499,12 +524,6 @@ const WelcomePage = ({onGameStart}) => {
                                             </button>
                                         </div>
                                     </div>
-                                    {/* Help Tooltip */}
-                                    {showGameModeHelp && (<div
-                                        className="mb-3 p-3 absolute top-1/3 left-1/3 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 pointer-events-none">
-                                        In <strong>Single Player</strong> all opponents are bots;
-                                        in <strong>Multiplayer</strong> some opponents are human.
-                                    </div>)}
 
                                     {/* Number of players */}
                                     <div className="mb-6">
@@ -512,13 +531,22 @@ const WelcomePage = ({onGameStart}) => {
                                             <label className="block text-gray-500 text-sm font-bold">
                                                 Number of Players
                                             </label>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowNumPlayersHelp(!showNumPlayersHelp)}
-                                                className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
-                                            >
-                                                ?
-                                            </button>
+                                            <div className="relative" ref={numPlayersHelpRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowNumPlayersHelp(!showNumPlayersHelp)}
+                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
+                                                >
+                                                    ?
+                                                </button>
+
+                                                {/* Help Tooltip */}
+                                                {showNumPlayersHelp && (<div
+                                                    className="absolute z-20 top-full left-0 mt-2 p-3 w-56 max-w-[calc(100vw-4rem)] font-medium bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 shadow-lg">
+                                                    In Multiplayer mode, at most 3 players will be human and at
+                                                    least one player will be a bot.
+                                                </div>)}
+                                            </div>
                                         </div>
                                         <div className="flex gap-2 relative">
                                             {[3, 4, 5, 6].map((count) => (<button
@@ -531,14 +559,6 @@ const WelcomePage = ({onGameStart}) => {
                                             </button>))}
                                         </div>
                                     </div>
-
-                                    {/* Help Tooltip */}
-                                    {showNumPlayersHelp && (<div
-                                        className="mb-3 p-3 absolute left-[45%] top-1/2 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 pointer-events-none">
-                                        In Multiplayer mode, at most 3 players will be human and at least one
-                                        player
-                                        will be a bot.
-                                    </div>)}
                                 </div>
                             </div>
 
