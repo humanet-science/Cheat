@@ -291,7 +291,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
         return (
             <div className="min-h-screen flex items-center justify-center px-4">
                 <form onSubmit={(e) => { e.preventDefault(); setShowConfirm(true); }} className="rounded-2xl bg-white p-8 max-w-md w-full shadow-2xl">
-                    <h2 className="text-xl font-bold text-gray-700 mb-2">You're in!</h2>
+                    <h2 className="text-xl font-bold text-gray-500 mb-2">You're in!</h2>
 
                     <p className="text-gray-500 text-sm mb-6">
                         Choose a name and avatar, then join the waiting room. The game will start automatically once enough other participants have joined.
