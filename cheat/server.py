@@ -604,7 +604,6 @@ async def websocket_endpoint(ws: WebSocket):
                         f"Player {old_player.display_name} reconnected to game {game_id}"
                     )
             else:
-                ws_log.info(f"Reconnect failed: no slot for token {token!r}")
                 await ws.send_json({"type": "reconnect_failed"})
                 return
             # Fall through to ping loop + message loop so the connection stays alive.
@@ -1088,9 +1087,6 @@ async def websocket_endpoint(ws: WebSocket):
                             "game_id": game_id,
                             "task": task,
                         }
-                        ws_log.info(
-                            f"Reconnect slot opened for {player.display_name} with token {token!r}"
-                        )
                     if getattr(player, "timed_out", False):
                         server_log.info(
                             f"Marked {player.display_name} as disconnected in game {game_id}"
