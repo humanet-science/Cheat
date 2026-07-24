@@ -145,6 +145,48 @@ export default function CheatGame({
 	// Called to abort a running reconnect loop when the active socket proves it's still alive
 	// (i.e. a message arrives on it while we're attempting to reconnect).
 	const cancelReconnectRef = useRef(null);
+	// Tracks the single in-flight liveness_check round trip, if any: {nonce, resolve}.
+	const pendingLivenessRef = useRef(null);
+
+	// Some browsers (Chromium/Brave observed) don't fire onclose immediately when the
+	// network drops — the socket object can sit in OPEN state and still deliver
+	// already-buffered messages after connectivity returns, even though the server
+	// gave up on it long ago. Neither a message arriving, nor a local send() not
+	// throwing, proves the socket is actually usable end-to-end right now (send()
+	// only checks local readyState — a dead TCP path can silently accept writes for a
+	// long time before the OS notices). Only a fresh round trip the server must
+	// actively participate in right now can prove that; a buffered/stale message can't
+	// fake a nonce that didn't exist until this call.
+	const verifySocketAlive = (socket) => {
+		return new Promise((resolve) => {
+			if (!socket || socket.readyState !== WebSocket.OPEN) {
+				resolve(false);
+				return;
+			}
+			const nonce = Math.random().toString(36).slice(2);
+			const timer = setTimeout(() => {
+				if (pendingLivenessRef.current?.nonce === nonce) {
+					pendingLivenessRef.current = null;
+					resolve(false);
+				}
+			}, 1500);
+			pendingLivenessRef.current = {
+				nonce,
+				resolve: (alive) => {
+					clearTimeout(timer);
+					pendingLivenessRef.current = null;
+					resolve(alive);
+				},
+			};
+			try {
+				socket.send(JSON.stringify({type: 'liveness_check', nonce}));
+			} catch (e) {
+				clearTimeout(timer);
+				pendingLivenessRef.current = null;
+				resolve(false);
+			}
+		});
+	};
 	// Ref always tracking the *current* active socket. Used inside onclose/offline handlers
 	// to discard events from old sockets that fire after a swap (race vs. React cleanup).
 	const activeSocketRef = useRef(socket);
@@ -239,6 +281,7 @@ export default function CheatGame({
 
 		const token = sessionTokenRef.current;
 		if (!token) { reconnectingRef.current = false; setConnectionDropped(true); return; }
+		console.log('[reconnect] starting attemptReconnect loop with token', token);
 
 		// Block interaction immediately — the visual spinner appears after a short delay
 		// so instant reconnects don't flash the badge, but clicks are always swallowed.
@@ -257,15 +300,23 @@ export default function CheatGame({
 			const result = await new Promise((resolve) => {
 				const ws = new WebSocket(WS_URL);
 				let settled = false;
+				// Distinguishes "never even got a WebSocket handshake" (real transport/
+				// network failure) from "connected fine, died/rejected after" — both used
+				// to log as an undifferentiated 'error', which made it impossible to tell
+				// whether retries were actually reaching the server.
+				let opened = false;
 				const finish = (outcome, newWs = null, buf = null) => {
 					if (settled) return;
 					settled = true;
 					if (outcome !== 'confirmed') ws.close();
 					resolve({outcome, ws: newWs, buffer: buf});
 				};
-				const timer = setTimeout(() => finish('timeout'), 4000);
+				const timer = setTimeout(() => finish(opened ? 'timeout-after-open' : 'timeout-no-open'), 4000);
 				const buffer = [];
-				ws.onopen = () => ws.send(JSON.stringify({type: 'reconnect', token}));
+				ws.onopen = () => {
+					opened = true;
+					ws.send(JSON.stringify({type: 'reconnect', token}));
+				};
 				ws.onmessage = (e) => {
 					clearTimeout(timer);
 					const msg = JSON.parse(e.data);
@@ -279,11 +330,12 @@ export default function CheatGame({
 					} else if (msg.type === 'reconnect_failed') {
 						// Server has no slot yet — it hasn't detected our disconnect yet
 						// (ping timeout takes ~15s). Treat as retriable, not terminal.
-						finish('error');
+						// This outcome proves full connectivity — we got a real server reply.
+						finish('no-slot-yet');
 					}
 				};
-				ws.onerror = () => { clearTimeout(timer); finish('error'); };
-				ws.onclose = () => { clearTimeout(timer); finish('error'); };
+				ws.onerror = () => { clearTimeout(timer); finish(opened ? 'error-after-open' : 'error-before-open'); };
+				ws.onclose = () => { clearTimeout(timer); finish(opened ? 'closed-after-open' : 'closed-before-open'); };
 			});
 
 			if (cancelled) { result.ws?.close(); break; }
@@ -396,21 +448,45 @@ export default function CheatGame({
 					return;
 				}
 
-				// Ping-pong with backend to keep connection alive
+				// Ping-pong with backend to keep connection alive (server's own keepalive
+				// watchdog — always reply, independent of the liveness check below).
 				if (msg.type === 'ping') {
 					lastPingRef.current = Date.now();
-					activeSocket.send(JSON.stringify({type: 'pong'}));
+					try {
+						activeSocket.send(JSON.stringify({type: 'pong'}));
+					} catch (e) {
+						// Send failed — socket is dead. The liveness check below (triggered by
+						// reconnectingRef) doesn't apply here since we're not necessarily
+						// reconnecting yet, but there's nothing more to do with this ping either.
+					}
+					return;
 				}
 
-				// Any message on the active socket proves it's still alive.
-				// If we're stuck in a reconnect loop (e.g. triggered by a brief offline
-				// event while the server never detected a drop), cancel it immediately.
-				if (reconnectingRef.current) {
-					console.log('[reconnect] active socket still alive — cancelling reconnect loop');
-					cancelReconnectRef.current?.();
+				// Resolve a pending liveness_check round trip. Only a match to a nonce we
+				// generated moments ago counts — a buffered/stale message can't fake it.
+				if (msg.type === 'liveness_ack') {
+					if (pendingLivenessRef.current?.nonce === msg.nonce) {
+						pendingLivenessRef.current.resolve(true);
+					}
+					return;
 				}
 
-				if (msg.type === 'ping') return;
+				// A message merely arriving proves nothing — a zombie socket (browser hasn't
+				// fired onclose yet after a network drop) can still deliver already-buffered
+				// messages after the server has long since given up on it. Only cancel the
+				// reconnect loop once a fresh, unfakeable round trip confirms the socket is
+				// genuinely usable right now. Guard against starting a second check while one
+				// is already in flight.
+				if (reconnectingRef.current && !pendingLivenessRef.current) {
+					verifySocketAlive(activeSocket).then((alive) => {
+						if (alive) {
+							console.log('[reconnect] verified socket alive via liveness check — cancelling reconnect loop');
+							cancelReconnectRef.current?.();
+						} else {
+							console.log('[reconnect] socket failed liveness check — keeping reconnect loop running');
+						}
+					});
+				}
 
 				try {
 
@@ -431,6 +507,12 @@ export default function CheatGame({
 					processingRef.current = false;
 					setAnimatingCards(null);
 
+					// Check if has acted needs to be updated
+					if (msg.current_player === msg.your_info?.id) setHasActed(false);
+
+					// Check if is my turn
+					setIsMyTurn(msg.current_player === msg.your_info?.id);
+
 					// Check if a 'new_round' message was missed
 					if (prevStateRef.current?.current_round !== msg?.current_round) {
 						setCountdown(null);
@@ -442,8 +524,6 @@ export default function CheatGame({
 						setHasClickedNextRound(false);
 						removeAllConnectionTimers();
 						setSpeakingPlayers(new Set());
-          	if (msg.current_player === msg.your_info?.id) setHasActed(false);
-          	setIsMyTurn(msg.current_player === msg.your_info?.id);
       	  }
 
 					return;
@@ -592,8 +672,11 @@ export default function CheatGame({
 			}
 		}
 
-		// Process the action
+		// Process the action. Wrapped in try/finally so a thrown error can't leave
+		// processingRef stuck true forever — that would silently freeze the queue and
+		// every future message for the rest of the game.
 		processingRef.current = true;
+		try {
 		if (msg.type === "state") {
 
 			// Get the previous state
@@ -629,7 +712,7 @@ export default function CheatGame({
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg.player_id === msg.your_info.id));
+			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
 			const scatterRange = Math.min(Math.min(width * 0.08, 60), Math.min(height * 0.08, 50))  // Horizontal scatter based on width
@@ -818,14 +901,20 @@ export default function CheatGame({
 		// Abort if a reconnect cleared the queue while we were suspended in an await.
 		// Without this guard, a stale run would call removeProcessed() on the new queue
 		// and silently drop the first message (typically the post-reconnect state update).
-		if (queueGenerationRef.current !== generation) {
-			processingRef.current = false;
-			return;
+		if (queueGenerationRef.current === generation) {
+			// remove the processed action
+			removeProcessed(); // Remove after processing
 		}
-
-		// remove the processed action
-		removeProcessed(); // Remove after processing
-		processingRef.current = false;
+		} catch (e) {
+			console.error('CheatGame: processActionQueue failed processing message', msg, e);
+			// Drop the offending message rather than retrying it forever, so the queue
+			// (and every message behind it) isn't wedged for the rest of the game.
+			if (queueGenerationRef.current === generation) {
+				removeProcessed();
+			}
+		} finally {
+			processingRef.current = false;
+		}
 
 	};
 
@@ -936,10 +1025,20 @@ export default function CheatGame({
 		}
 	}, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
-	// Notify backend the moment the player can see their turn, so the idle timer starts from now
+	// Notify backend the moment the player can see their turn, so the idle timer starts from now.
+	// The socket can die in the gap between a message setting isMyTurn=true and this effect
+	// actually running (effects fire after commit, not synchronously) — guard against send()
+	// throwing on a CLOSING/CLOSED socket, since an uncaught throw here has no ErrorBoundary
+	// to catch it.
 	useEffect(() => {
 		if (isMyTurn) {
-			activeSocketRef.current?.send(JSON.stringify({type: 'turn_acknowledged'}));
+			try {
+				if (activeSocketRef.current?.readyState === WebSocket.OPEN) {
+					activeSocketRef.current.send(JSON.stringify({type: 'turn_acknowledged'}));
+				}
+			} catch (e) {
+				console.error('CheatGame: failed to send turn_acknowledged', e);
+			}
 		} else {
 			setTimeoutRemaining(null);
 		}

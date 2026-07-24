@@ -792,6 +792,7 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 		// Cancel any in-flight messages from the current slide immediately
 		messageTimeoutsRef.current.forEach(clearTimeout);
 		messageTimeoutsRef.current = [];
+		clearCheatMessagesRef.current?.();
 
 		// Snapshot current state into the next slide's entry so it inherits it on entry (or re-entry)
 		slideStatesRef.current[currentSlide + 1] = {...tutorialState};

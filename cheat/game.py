@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Literal
 
 from cheat.action import GameAction
-from cheat.bots import RandomBot, SmartBot
+from cheat.bots import SmartBot
 from cheat.card import RANKS, SUITS, Card, str_to_Card
 from cheat.logging_config import setup_game_logger, setup_player_logger
 from cheat.player import Player
@@ -985,8 +985,9 @@ class CheatGame:
         self._new_round_confirmations = set()
 
         # Start a timer: 30 seconds to start a new round in multiplayer mode
-        # Wait for at least one confirmation
-        # TODO: adjust this for the experimental mode?
+        # Wait for at least one confirmation. In experimental mode the confirmation
+        # count only drives the countdown UI — see the timeout-reached branch below,
+        # which always continues regardless of who confirmed.
         timeout = (
             30
             if (self.game_mode == "multiplayer" and self.timeout is None)
@@ -1023,6 +1024,16 @@ class CheatGame:
 
             # Timeout reached
             if elapsed > timeout:
+                if self.experimental_mode:
+                    # Study games always continue automatically after the countdown,
+                    # regardless of who confirmed — a dropped "new_round" message
+                    # shouldn't get a player disconnected. The per-turn idle timeout
+                    # (game.py play_round) is what enforces inactivity once it's
+                    # actually their turn.
+                    self.logger.info(
+                        "Timeout reached in experimental mode; starting new round for everyone"
+                    )
+                    break
                 if len(self._new_round_confirmations) == 0:
                     # No one confirmed - end game
                     if self.game_mode != "single":

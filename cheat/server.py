@@ -604,6 +604,7 @@ async def websocket_endpoint(ws: WebSocket):
                         f"Player {old_player.display_name} reconnected to game {game_id}"
                     )
             else:
+                ws_log.info(f"Reconnect failed: no slot for token {token!r}")
                 await ws.send_json({"type": "reconnect_failed"})
                 return
             # Fall through to ping loop + message loop so the connection stays alive.
@@ -811,6 +812,19 @@ async def websocket_endpoint(ws: WebSocket):
 
                 if message["type"] == "pong":
                     _pong_received.set()
+                    continue
+
+                # Dedicated liveness probe: the client uses this to verify a socket it
+                # suspects might be a "zombie" (browser hasn't fired onclose yet after a
+                # network drop, but the connection is actually dead) before trusting it.
+                # Unlike an inbound message merely arriving, or a local send() not
+                # throwing, echoing the nonce back requires this exact connection to
+                # still be genuinely alive end-to-end right now — a buffered/stale
+                # message can't fake a nonce that didn't exist until this round trip.
+                elif message["type"] == "liveness_check":
+                    await ws.send_json(
+                        {"type": "liveness_ack", "nonce": message.get("nonce")}
+                    )
                     continue
 
                 # Player has left the queue. If the player is the creator of the game, the game is removed from the
@@ -1074,6 +1088,9 @@ async def websocket_endpoint(ws: WebSocket):
                             "game_id": game_id,
                             "task": task,
                         }
+                        ws_log.info(
+                            f"Reconnect slot opened for {player.display_name} with token {token!r}"
+                        )
                     if getattr(player, "timed_out", False):
                         server_log.info(
                             f"Marked {player.display_name} as disconnected in game {game_id}"
