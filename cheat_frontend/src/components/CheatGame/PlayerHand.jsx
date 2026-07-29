@@ -22,6 +22,7 @@ import {CARD_DEAL_INTERVAL, CARD_FLIGHT_TIME, VALID_RANKS} from "../../utils/con
  * @param parseCard
  * @param toggleCard
  * @param setMessageInput
+ * @param callHintMessage - When set, clicking "Call!" shows this as a reminder instead of calling
  * @returns {JSX.Element}
  * @constructor
  */
@@ -47,6 +48,7 @@ export default function PlayerHand({
 																		 yourName,
 																		 pileCards,
 																		 callBluff,
+																		 callHintMessage,
 																		 isDealingCards,
 																	 }) {
 
@@ -77,6 +79,14 @@ export default function PlayerHand({
 			return;
 		}
 		play();
+	};
+
+	const handleCallClick = () => {
+		if (callHintMessage) {
+			triggerReminder(callHintMessage);
+			return;
+		}
+		callBluff();
 	};
 
 
@@ -243,7 +253,7 @@ export default function PlayerHand({
 							{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
 								<div className="pop-in flex-1 sm:flex-initial items-center gap-4">
 									<button
-										onClick={callBluff}
+										onClick={handleCallClick}
 										className="bg-red-600 hover:bg-red-700 transition-all duration-300 transform hover:scale-105 active:scale-95 text-white font-bold py-2 px-4 rounded-xl"
 									>
 										Call!

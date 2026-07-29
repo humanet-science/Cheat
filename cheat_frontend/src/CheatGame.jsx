@@ -49,6 +49,10 @@ import {VALID_RANKS} from "./utils/constants";
  *   Used in Tutorial where game is scaled/transformed. If null, uses window height.
  * @param {number|null} [tutorialScale=null] - Scale factor for Tutorial context (e.g., 0.7).
  *   Passed to StatusMessage component to properly scale and position floating messages.
+ * @param {string|null} [callHintMessage=null] - Used in Tutorial. When set, clicking "Call!" shows
+ *   this message as a reminder instead of actually calling the bluff — for slides that want the
+ *   player to practice a different action (e.g. playing cards) while still allowing them to see
+ *   what calling looks like.
  */
 export default function CheatGame({
 																		socket,
@@ -65,6 +69,7 @@ export default function CheatGame({
 																		disableReconnect = false,
 																		clearMessagesRef = null,
 																		playerHighlight = null,
+																		callHintMessage = null,
 																	}) {
 
 	// Game state and previous state
@@ -1340,6 +1345,7 @@ export default function CheatGame({
 					yourName={state.your_info.true_name}
 					pileCards={pileCards}
 					callBluff={callBluff}
+					callHintMessage={callHintMessage}
 					isDealingCards={isDealingCards}
 				/>
 

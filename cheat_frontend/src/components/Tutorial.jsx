@@ -218,7 +218,7 @@ const TUTORIAL_SLIDES = [{
 			id: 0, name: "You", cardCount: 10, avatar: "🎮", hand: ['2♠', "2♥", "3♠", "4♥", "8♦", "8♣", "9♦", "J♣", "J♦", "A♣"]
 		},
 		declared_rank: "",
-		cards: ["K♦, Q♥"],
+		cards: ["K♦", "Q♥"],
 		card_count: 2,
 		hands: [10, 10, 7, 10, 12],
 		current_player: 2,
@@ -613,31 +613,6 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 								mock.onmessage(new MessageEvent('message', {
 									data: JSON.stringify(cardPlayedMsg)
 								}));
-
-								// Then send state update
-								// setTimeout(() => {
-								// 	const stateMsg = {
-								// 		type: 'state',
-								// 		your_info: {
-								// 			id: 0, name: "You", cardCount: newHand.length, avatar: "🎮", hand: newHand
-								// 		},
-								// 		players: [
-								// 			{your_info: {id: 0, name: "You", cardCount: newHand.length, avatar: "🎮"}},
-								// 			{your_info: {id: 1, name: "Player 1", cardCount: 11, avatar: "🐝"}},
-								// 			{your_info: {id: 2, name: "Player 2", cardCount: 9, avatar: "️🤖", type: "bot"}},
-								// 			{your_info: {id: 3, name: "Player 3", cardCount: 10, avatar: "🦊"}},
-								// 			{your_info: {id: 4, name: "Player 4", cardCount: 12, avatar: "🤖", type: "bot"}}
-								// 		],
-								// 		current_player: 1, // Next player's turn
-								// 		current_rank: sentMsg.declared_rank,
-								// 		pile_size: (tutorialState.pile_size ?? 0) + sentMsg.cards.length,
-								// 		num_players: 5
-								// 	};
-								//
-								// 	mock.onmessage(new MessageEvent('message', {
-								// 		data: JSON.stringify(isExperiment ? remapNames(stateMsg, EXPERIMENT_NAME_MAP) : stateMsg)
-								// 	}));
-								// }, 0); // Small delay between messages
 							}, 0);
 						}
 
@@ -954,6 +929,9 @@ export default function Tutorial({onClose, allowSkip = true, isExperiment= false
 							showDealAnimation={false}
 							clearMessagesRef={clearCheatMessagesRef}
 							playerHighlight={activeSlides[currentSlide]?.playerHighlight ?? null}
+							callHintMessage={activeSlides[currentSlide]?.task?.type === 'play_cards'
+								? "Calling is a valid option, but on this slide we'd like you to try playing instead."
+								: null}
 						/>
 					</div>)}</div>
 			</div>
