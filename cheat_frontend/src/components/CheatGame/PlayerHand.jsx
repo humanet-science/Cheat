@@ -46,7 +46,6 @@ export default function PlayerHand({
 																		 playerPositions,
 																		 yourId,
 																		 yourName,
-																		 pileCards,
 																		 callBluff,
 																		 callHintMessage,
 																		 isDealingCards,
@@ -249,8 +248,8 @@ export default function PlayerHand({
 								</div>)}
 
 
-							{/* Call Bluff button */}
-							{isMyTurn && pileCards.length > 0 && state.current_rank && !hasActed && (
+							{/* Call Bluff button. */}
+							{isMyTurn && state.pile_size > 0 && state.current_rank && !hasActed && (
 								<div className="pop-in flex-1 sm:flex-initial items-center gap-4">
 									<button
 										onClick={handleCallClick}
