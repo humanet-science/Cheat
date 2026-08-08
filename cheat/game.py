@@ -616,6 +616,16 @@ class CheatGame:
             )
             player.turn_acknowledged = True
 
+        # Frontend caught an exception in its own message-processing loop. Logged only —
+        # deliberately not put on message_queue, so a client-side bug can never be mistaken
+        # for a game move (e.g. consuming a human player's turn-input slot).
+        elif data.get("type") == "client_error":
+            self.logger.error(
+                f"Frontend error for player {player.id} ({player.display_name}) "
+                f"while processing '{data.get('processing_msg_type')}': {data.get('message')}\n"
+                f"{data.get('stack') or ''}"
+            )
+
         elif data.get("type") == "quit":
             await self.broadcast_to_all(
                 {"type": "game_ended", "reason": "player_quit", "player_id": player.id}
@@ -724,10 +734,12 @@ class CheatGame:
             }
         )
 
-        # Whoever picked up cards does a four-of-a-kind check
+        # Unsuccessful call means caller skips a turn.
+        # Whoever picked up cards also does a four-of-a-kind check
         if was_lying:
             await self.check_for_fours(self.players[last_player])
         else:
+            self.next_player()
             await self.check_for_fours(player)
 
         # Send updated state to all clients after bluff
@@ -735,11 +747,6 @@ class CheatGame:
 
         # Collect opinions
         await self.collect_messages()
-
-        # Unsuccessful call means caller skips a turn
-        if not was_lying:
-            self.next_player()
-            await self.send_state_to_all()
 
         return was_lying
 

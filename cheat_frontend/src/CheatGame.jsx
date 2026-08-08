@@ -108,6 +108,8 @@ export default function CheatGame({
 
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
+	const gameOverRef = useRef(false);
+	useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
 	const [winner, setWinner] = useState(null);
 	const [gameOverDetails, setGameOverDetails] = useState({declaredRank: null, actualCards: null});
 	const [hasClickedNextRound, setHasClickedNextRound] = useState(false);
@@ -393,7 +395,7 @@ export default function CheatGame({
 			if (Date.now() - lastPingRef.current > 25000) {
 				clearInterval(pingWatchdogRef.current);
 				try { activeSocket.close(); } catch(e) {}
-				if (!gameOver && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !quitConfirmedRef.current) attemptReconnect();
 			}
 		}, 5000);
 		return () => clearInterval(pingWatchdogRef.current);
@@ -414,7 +416,7 @@ export default function CheatGame({
 			console.log('[reconnect] offline fired — onLine:', navigator.onLine,
 				'reconnecting:', reconnectingRef.current,
 				'socketState:', activeSocketRef.current?.readyState);
-			if (!gameOver && !navigator.onLine) attemptReconnect();
+			if (!gameOverRef.current && !navigator.onLine) attemptReconnect();
 		};
 		const handleOnline = () => {
 			console.log('[reconnect] online fired — reconnecting:', reconnectingRef.current);
@@ -639,9 +641,9 @@ export default function CheatGame({
 				// delayed onclose, also observed in Brave).
 				const isCurrent = activeSocket === activeSocketRef.current;
 				console.log('[reconnect] onclose fired — code:', event.code, 'isCurrent:', isCurrent,
-					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOver);
+					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOverRef.current);
 				if (!isCurrent) return;
-				if (!gameOver && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
 			};
 
 			// Flush messages buffered during reconnect through the now-live handler
@@ -917,6 +919,23 @@ export default function CheatGame({
 			if (queueGenerationRef.current === generation) {
 				removeProcessed();
 			}
+			// Report to the backend so these show up in the game logs
+			try {
+				activeSocketRef.current?.send(JSON.stringify({
+					type: 'client_error',
+					message: String(e?.message ?? e),
+					stack: e?.stack ?? null,
+					processing_msg_type: msg?.type ?? null,
+				}));
+			} catch (sendError) {
+				// Socket unusable: do nothing
+			}
+			// If the error happened between setting and clearing one of these, it would
+			// otherwise stay stuck "true" forever, permanently freezing the queue
+			// for the rest of the game.
+			setAnimatingCards(null);
+			setDealingFromCenter(false);
+			setIsDealingCards(false);
 		} finally {
 			processingRef.current = false;
 		}
