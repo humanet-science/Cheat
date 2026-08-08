@@ -124,7 +124,7 @@ export default function CheatGame({
 	// Idle timeout warning (seconds remaining when server sent the reminder)
 	const [timeoutRemaining, setTimeoutRemaining] = useState(null);
 
-	// Active socket (may be replaced on reconnect)
+	// Active socket (can be replaced on reconnect)
 	const [activeSocket, setActiveSocket] = useState(socket);
 	useEffect(() => { setActiveSocket(socket); }, [socket]);
 
@@ -278,7 +278,7 @@ export default function CheatGame({
 	// Attempt to reconnect using the stored session token.
 	// Keeps retrying every 2s until the server confirms (success) or explicitly rejects
 	// the token (slot expired) — rather than giving up after a fixed number of attempts.
-	// This handles the case where wifi is still off during early retries.
+	// This handles the case where Wi-Fi is still off during early retries.
 	const attemptReconnect = useCallback(async () => {
 		if (reconnectingRef.current) return;
 		if (serverErrorRef.current) return;
@@ -399,11 +399,11 @@ export default function CheatGame({
 		return () => clearInterval(pingWatchdogRef.current);
 	}, [activeSocket]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when wifi drops —
+	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when Wi-Fi drops —
 	// the browser keeps the socket in OPEN state until the close handshake completes.
 	// The offline event fires immediately and lets us trigger reconnect right away.
 	// Guard with navigator.onLine: Chromium can fire the offline event with a delay, after
-	// wifi has already returned. In that case onLine is true and we skip the spurious reconnect.
+	// Wi-Fi has already returned. In that case onLine is true, and we skip the spurious reconnect.
 	//
 	// The online handler skips the throttled retry delay so reconnect attempts resume
 	// immediately when the network returns, rather than waiting for a possibly-throttled
@@ -512,7 +512,7 @@ export default function CheatGame({
 					processingRef.current = false;
 					setAnimatingCards(null);
 
-					// Check if has acted needs to be updated
+					// Check whether hasActed needs to be updated
 					if (msg.current_player === msg.your_info?.id) setHasActed(false);
 
 					// Check if is my turn
@@ -662,7 +662,7 @@ export default function CheatGame({
 		if (processingRef.current || animatingCards || dealingFromCenter || isDealingCards) return;
 
 		// Snapshot the queue generation. If a reconnect clears the queue while we're
-		// suspended in an await, the generation will have changed and we abort before
+		// suspended in an await, the generation will have changed, and we abort before
 		// calling removeProcessed() so we don't eat the first item of the new queue.
 		const generation = queueGenerationRef.current;
 
