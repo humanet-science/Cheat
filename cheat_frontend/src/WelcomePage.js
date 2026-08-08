@@ -461,7 +461,7 @@ const WelcomePage = ({onGameStart}) => {
                             </svg>
                         </button>
                         <div className="pl-8 pr-12 pt-8">
-                            <h2 className="text-xl font-bold text-gray-500">Quick Pairing</h2>
+                            <h2 className="text-xl font-bold text-gray-600">Quick Pairing</h2>
                             <span className="text-sm text-gray-500 leading-6">
                                 Play on your own or with the next available humans in the queue.
                             </span>
@@ -599,7 +599,7 @@ const WelcomePage = ({onGameStart}) => {
                             </svg>
                         </button>
                         <div className="pl-8 pr-12 pt-8">
-                            <h2 className="text-xl font-bold text-gray-500">Play with friends</h2>
+                            <h2 className="text-xl font-bold text-gray-600">Play with friends</h2>
                             <span className="text-sm text-gray-500 leading-6">
                                 Create a private game or join one with a game key.
                             </span>
