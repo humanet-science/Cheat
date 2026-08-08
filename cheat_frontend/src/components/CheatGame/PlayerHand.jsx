@@ -1,6 +1,27 @@
 import React, { useState, useRef } from "react";
 import {CARD_DEAL_INTERVAL, CARD_FLIGHT_TIME, VALID_RANKS} from "../../utils/constants";
 
+// Inlined rather than loaded via <img src="/icons/arrow_up.svg">: these are the submit
+// controls for playing/declaring/messaging, and an externally-fetched icon can render a
+// beat late (or not at all, on a slow/blocked connection) right when a player is looking
+// for the button to confirm their turn.
+function ArrowUpIcon({className}) {
+	return (
+		<svg viewBox="140.183 131.772 207.485 257.951" className={className}
+				 style={{filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'}}>
+			{/* transform-origin matters here: this matrix is anchored at (124.613, 175.803),
+			    not the default (0,0) — dropping it shifts the shape outside the viewBox entirely. */}
+			<g style={{transformOrigin: '124.613003px 175.803116px'}}
+				 transform="matrix(-10.045929, 0, 0, -10.045929, 118.043533, 84.109673)">
+				<path
+					d="M 132.863 177.009 L 126.063 183.809 L 126.063 163.509 L 123.463 163.509 L 123.463 183.809 L 116.663 177.009 L 114.663 178.809 L 123.463 187.609 C 124.163 188.309 125.263 188.209 125.863 187.609 L 134.563 178.909 L 132.863 177.009 Z"
+					fill="rgb(242, 242, 242)"
+				/>
+			</g>
+		</svg>
+	);
+}
+
 /**
  * PlayerHand component displays the user's cards and play controls, as well as the player's message sending
  * functionality.
@@ -216,14 +237,7 @@ export default function PlayerHand({
 									onClick={handlePlayClick}
 									className="absolute top-1/2 -translate-y-1/2 right-1 px-1 py-1 rounded-full transition-all duration-300 transform scale-[0.8] bg-green-600 hover:bg-green-500 shadow-lg"
 								>
-									<img
-										src="/icons/arrow_up.svg"
-										alt="Arrow up"
-										className="w-4 h-4 m-1"
-										style={{
-											filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
-										}}
-									/>
+									<ArrowUpIcon className="w-4 h-4 m-1" />
 								</button>
 							</div>
 						)
@@ -278,14 +292,7 @@ export default function PlayerHand({
 									disabled={!messageInput.trim()}
 									className={`absolute right-1 px-1 py-1 rounded-full font-bold text-white transition-all bg-blue-500 hover:bg-blue-400 duration-300 transform scale-[0.8] shadow-lg'}`}
 								>
-									<img
-										src="/icons/arrow_up.svg"
-										alt="Arrow up"
-										className="w-4 h-4 m-1"
-										style={{
-											filter: 'drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white) drop-shadow(0 0 0.2px white)'
-										}}
-									/>
+									<ArrowUpIcon className="w-4 h-4 m-1" />
 								</button>)}
 							</div>) : (<div className="w-full sm:w-auto flex flex-col gap-1">
 							<div className="flex gap-1 sm:gap-2 flex-wrap justify-center">
