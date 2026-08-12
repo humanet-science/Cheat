@@ -1,5 +1,5 @@
 // WelcomePage.js
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Logo} from './utils/Logo';
 import LoadingWindow from "./components/GameLoading";
 import Tutorial from "./components/Tutorial";
@@ -11,8 +11,11 @@ const WelcomePage = ({onGameStart}) => {
     const [animationPhase, setAnimationPhase] = useState('drawing'); // 'drawing' | 'buttons-visible' | 'form-visible'
     const [showSubtitle, setShowSubtitle] = useState(false);
 
-    // Currently active tab in the 'New Game' window
-    const [activeTab, setActiveTab] = useState('quick'); // 'quick' or 'create'
+    // Which top-level window is open: 'quick' (Quick Pairing) or 'friends' (Play with Friends)
+    const [activeWindow, setActiveWindow] = useState('quick');
+
+    // Currently active tab in the 'Play with Friends' window
+    const [activeTab, setActiveTab] = useState('create'); // 'create' or 'join'
 
     // Show the tutorial
     const [showTutorial, setShowTutorial] = useState(false);
@@ -24,8 +27,7 @@ const WelcomePage = ({onGameStart}) => {
     // Is the Creator of the game (and is thus the only person that can cancel it)
     const [isGameCreator, setIsGameCreator] = useState(false);
 
-    // Form to join an existing game
-    const [showJoinForm, setShowJoinForm] = useState(false);
+    // Game key for joining an existing game
     const [gameKey, setGameKey] = useState('');
 
     // Error when joining game (game is full or key invalid)
@@ -43,6 +45,22 @@ const WelcomePage = ({onGameStart}) => {
     // Help boxes for the menu options
     const [showGameModeHelp, setShowGameModeHelp] = useState(false);
     const [showNumPlayersHelp, setShowNumPlayersHelp] = useState(false);
+    const gameModeHelpRef = useRef(null);
+    const numPlayersHelpRef = useRef(null);
+
+    // Close help boxes when clicking outside of them
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (gameModeHelpRef.current && !gameModeHelpRef.current.contains(e.target)) {
+                setShowGameModeHelp(false);
+            }
+            if (numPlayersHelpRef.current && !numPlayersHelpRef.current.contains(e.target)) {
+                setShowNumPlayersHelp(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Player has joined queue and is waiting animation
     const [isWaiting, setIsWaiting] = useState(false);
@@ -261,23 +279,26 @@ const WelcomePage = ({onGameStart}) => {
         };
     };
 
-    // When clicking on 'New Game', show the corresponding menu
-    const handleNewGameClick = () => {
+    // When clicking on 'Quick Pairing', show the corresponding menu
+    const handleQuickPairingClick = () => {
         setAnimationPhase('form-visible');
-        setShowJoinForm(false);
+        setActiveWindow('quick');
+        setGameKey('');
+        setJoinError('');
     };
 
-    // When clicking on 'Join game', show corresponding menu
-    const handleJoinGameClick = () => {
+    // When clicking on 'Play with Friends', show corresponding menu
+    const handlePlayWithFriendsClick = () => {
         setAnimationPhase('form-visible');
-        setShowJoinForm(true);
+        setActiveWindow('friends');
+        setActiveTab('create');
     };
 
     // Only allow clicking on the submit button if name, avatar, and T&Cs have been supplied;
     const handleSubmit = (e) => {
         e.preventDefault();
         if (playerName.trim() && selectedAvatar && acceptedTerms) {
-            if (activeTab === 'create' && !showJoinForm) {
+            if (activeWindow === 'friends' && activeTab === 'create') {
                 handleNewJoinGame(playerName.trim(), selectedAvatar, true, null, numHumans, numBots);
             } else {
                 handleNewJoinGame(playerName.trim(), selectedAvatar, false, numPlayers, null, null, gameMode, gameKey);
@@ -383,22 +404,22 @@ const WelcomePage = ({onGameStart}) => {
                 <div className={`flex flex-col sm:flex-row gap-4 w-full justify-center mt-4 sm:px-0 px-6 transition-opacity
                 ${animationPhase === 'moving' ? 'opacity-100 duration-700 delay-200' : animationPhase === 'buttons-visible' ? 'duration-500' : 'opacity-0'} `}>
                     <button
-                        onClick={handleNewGameClick}
-                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all text-lg"
+                        onClick={handleQuickPairingClick}
+                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-all text-lg"
                     >
-                        <img src="/icons/plus_icon.svg" className="w-6 h-6" alt=""/>New Game
+                        <img src="/icons/quick_pairing.svg" className="w-4 h-6" alt=""/>Quick Pairing
                     </button>
                     <button
-                        onClick={handleJoinGameClick}
-                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-orange-400 to-pink-400 hover:from-orange-500 hover:to-pink-500 text-white font-bold py-3 px-6 rounded-lg transition-colors text-lg"
+                        onClick={handlePlayWithFriendsClick}
+                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-orange-400 to-pink-400 hover:from-orange-500 hover:to-pink-500 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"
                     >
-                        <img src="/icons/link_icon.svg" className="w-6 h-6" alt=""/>Join Game
+                        <img src="/icons/friends.svg" className="w-6 h-6" alt=""/>Play with friends
                     </button>
                     <button
                         onClick={() => setShowTutorial(true)}
-                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 px-5 rounded-lg transition-colors text-lg"
+                        className="drop-shadow-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-br from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white font-bold py-3 px-4 rounded-lg transition-colors text-lg"
                     >
-                        <img src="/icons/book_icon.svg" className="w-6 h-6 mx-1" alt=""/>How to play
+                        <img src="/icons/book_icon.svg" className="w-6 h-6 mx-1" alt=""/>Tutorial
                     </button>
                 </div>
             </div>
@@ -421,43 +442,187 @@ const WelcomePage = ({onGameStart}) => {
                     ${animationPhase === 'form-visible' ? 'scale-100' : 'scale-95'}
                 `} style={{transitionDuration: '400ms'}}>
 
-                {/* New Game form*/}
-                {animationPhase === 'form-visible' && !showJoinForm && (
+                {/* Quick Pairing form */}
+                {animationPhase === 'form-visible' && activeWindow === 'quick' && (
 
-                    <div className={`rounded-2xl bg-white ${isLandscape ? '' : 'max-w-md'} w-full shadow-2xl`}>
+                    <div className={`relative rounded-2xl bg-white ${isLandscape ? '' : 'max-w-md'} w-full shadow-2xl`}>
 
-                        {/* Top row: Tabs and Close Button */}
-                        <div className="pl-8 pr-2 flex items-center justify-between pt-2">
-                            {/* Tab Navigation */}
+                        {/* Close Button, fixed to top-right corner */}
+                        <button
+                            onClick={() => setAnimationPhase('buttons-visible')}
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 transition-colors"
+                            type="button"
+                        >
+                            <svg
+                                className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                        <div className="pl-8 pr-12 pt-8">
+                            <h2 className="text-xl font-bold text-gray-600">Quick Pairing</h2>
+                            <span className="text-sm text-gray-500 leading-6">
+                                Play on your own or with the next available humans in the queue.
+                            </span>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="p-8 pt-2">
+                            <div className={`grid ${isLandscape ? 'grid-cols-2 gap-6' : 'grid-cols-1'}`}>
+                                <div className={isLandscape ? 'border-r border-gray-200 pr-6' : ''}>
+
+                                    {/* Player Name Input */}
+                                    <PlayerNameInput playerName={playerName} setPlayerName={setPlayerName}/>
+
+                                    {/* Avatar Selection */}
+                                    <AvatarSelection
+                                        selectedAvatar={selectedAvatar}
+                                        setSelectedAvatar={setSelectedAvatar}
+                                        random_shuffle={true}/>
+                                </div>
+                                <div>
+                                    {/* Game mode selection */}
+                                    <div className="mb-6">
+                                        <div
+                                            className="flex items-center gap-2 mb-4"> {/* Changed from label to div */}
+                                            <label className="block text-gray-500 text-sm font-bold">
+                                                Game Mode
+                                            </label>
+                                            <div className="relative" ref={gameModeHelpRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowGameModeHelp(!showGameModeHelp)}
+                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
+                                                >
+                                                    ?
+                                                </button>
+
+                                                {/* Help Tooltip */}
+                                                {showGameModeHelp && (<div
+                                                    className="absolute z-20 top-full left-0 mt-2 p-3 w-56 max-w-[calc(100vw-4rem)] font-medium bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 shadow-lg">
+                                                    In <strong>Single Player</strong> all opponents are bots;
+                                                    in <strong>Multiplayer</strong> some opponents are human.
+                                                </div>)}
+                                            </div>
+                                        </div>
+
+
+                                        <div className="flex gap-4 relative whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGameMode('single')}
+                                                className={`px-5 py-3 rounded-lg transition-colors ${gameMode === 'single' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700'}`}
+                                            >
+                                                Single Player
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGameMode('multiplayer')}
+                                                className={`px-5 py-3 rounded-lg transition-colors ${gameMode === 'multiplayer' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                            >
+                                                Multiplayer
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Number of players */}
+                                    <div className="mb-6">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <label className="block text-gray-500 text-sm font-bold">
+                                                Number of Players
+                                            </label>
+                                            <div className="relative" ref={numPlayersHelpRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowNumPlayersHelp(!showNumPlayersHelp)}
+                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
+                                                >
+                                                    ?
+                                                </button>
+
+                                                {/* Help Tooltip */}
+                                                {showNumPlayersHelp && (<div
+                                                    className="absolute z-20 top-full left-0 mt-2 p-3 w-56 max-w-[calc(100vw-4rem)] font-medium bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 shadow-lg">
+                                                    In Multiplayer mode, at most 3 players will be human and at
+                                                    least one player will be a bot.
+                                                </div>)}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 relative">
+                                            {[3, 4, 5, 6].map((count) => (<button
+                                                key={count}
+                                                type="button"
+                                                onClick={() => setNumPlayers(count)}
+                                                className={`flex-1 py-3 rounded-lg transition-colors ${numPlayers === count ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                            >
+                                                {count}
+                                            </button>))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            {/* Terms and Conditions Checkbox */}
+                            <TermsCheckbox
+                                acceptedTerms={acceptedTerms}
+                                setAcceptedTerms={setAcceptedTerms}/>
+
+                            {/* Submit Button */}
+                            <button
+                                type="submit"
+                                disabled={!playerName.trim() || !selectedAvatar || !acceptedTerms}
+                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
+                                text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+                            >
+                                Start Game
+                            </button>
+                        </form>
+                    </div>)}
+
+                {/* Play with Friends form */}
+                {animationPhase === 'form-visible' && activeWindow === 'friends' && (
+
+                    <div className={`relative rounded-2xl bg-white ${isLandscape ? '' : 'max-w-md'} w-full shadow-2xl`}>
+
+                        {/* Close Button, fixed to top-right corner */}
+                        <button
+                            onClick={() => { setAnimationPhase('buttons-visible'); setGameKey(''); setJoinError(''); }}
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 transition-colors"
+                            type="button"
+                        >
+                            <svg
+                                className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                        <div className="pl-8 pr-12 pt-8">
+                            <h2 className="text-xl font-bold text-gray-600">Play with friends</h2>
+                            <span className="text-sm text-gray-500 leading-6">
+                                Create a private game or join one with a game key.
+                            </span>
+                        </div>
+
+                        {/* Tab Navigation */}
+                        <div className="pl-8 pr-8 pt-2">
                             <div className="flex w-full border-b border-gray-200">
                                 <button
                                     type="button"
-                                    onClick={() => setActiveTab('quick')}
-                                    className={`flex-1 py-3 text-center transition-colors ${activeTab === 'quick' ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
-                                >
-                                    Quick Pairing
-                                </button>
-                                <button
-                                    type="button"
                                     onClick={() => setActiveTab('create')}
-                                    className={`flex-1 w-full py-3 text-center transition-colors ${activeTab === 'create' ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                                    className={`flex-1 py-3 text-center transition-colors ${activeTab === 'create' ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                                 >
                                     Create Game
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('join')}
+                                    className={`flex-1 w-full py-3 text-center transition-colors ${activeTab === 'join' ? 'text-blue-600 border-b-2 border-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    Join Game
+                                </button>
                             </div>
-                            {/* Close Button */}
-                            <button
-                                onClick={() => setAnimationPhase('buttons-visible')}
-                                className="text-gray-500 hover:text-gray-700 transition-colors -mt-6 -mr-1"
-                                type="button"
-                            >
-                                <svg
-                                    className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
-                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                          d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
                         </div>
 
 
@@ -475,84 +640,7 @@ const WelcomePage = ({onGameStart}) => {
                                         random_shuffle={true}/>
                                 </div>
                                 <div>
-                                    {/* Quick Pairing Tab */}
-                                    {activeTab === 'quick' && (<>
-                                        {/* Game mode selection */}
-                                        <div className="mb-6">
-                                            <div
-                                                className="flex items-center gap-2 mb-4"> {/* Changed from label to div */}
-                                                <label className="block text-gray-500 text-sm font-bold">
-                                                    Game Mode
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowGameModeHelp(!showGameModeHelp)}
-                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
-                                                >
-                                                    ?
-                                                </button>
-                                            </div>
-
-
-                                            <div className="flex gap-4 relative whitespace-nowrap">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setGameMode('single')}
-                                                    className={`px-5 py-3 rounded-lg transition-colors ${gameMode === 'single' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700'}`}
-                                                >
-                                                    Single Player
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setGameMode('multiplayer')}
-                                                    className={`px-5 py-3 rounded-lg transition-colors ${gameMode === 'multiplayer' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                                                >
-                                                    Multiplayer
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {/* Help Tooltip */}
-                                        {showGameModeHelp && (<div
-                                            className="mb-3 p-3 absolute top-1/3 left-1/3 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 pointer-events-none">
-                                            In <strong>Single Player</strong> all opponents are bots;
-                                            in <strong>Multiplayer</strong> some opponents are human.
-                                        </div>)}
-
-                                        {/* Number of players */}
-                                        <div className="mb-6">
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <label className="block text-gray-500 text-sm font-bold">
-                                                    Number of Players
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowNumPlayersHelp(!showNumPlayersHelp)}
-                                                    className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 font-bold flex items-center justify-center text-xs hover:bg-gray-300 transition-colors flex-shrink-0"
-                                                >
-                                                    ?
-                                                </button>
-                                            </div>
-                                            <div className="flex gap-2 relative">
-                                                {[3, 4, 5, 6].map((count) => (<button
-                                                    key={count}
-                                                    type="button"
-                                                    onClick={() => setNumPlayers(count)}
-                                                    className={`flex-1 py-3 rounded-lg transition-colors ${numPlayers === count ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                                                >
-                                                    {count}
-                                                </button>))}
-                                            </div>
-                                        </div>
-
-                                        {/* Help Tooltip */}
-                                        {showNumPlayersHelp && (<div
-                                            className="mb-3 p-3 absolute left-[45%] top-1/2 font-medium transition-all w-1/2 bg-blue-200 bg-opacity-50 backdrop-blur-lg rounded-lg text-sm text-gray-700 pointer-events-none">
-                                            In Multiplayer mode, at most 3 players will be human and at least one
-                                            player
-                                            will be a bot.
-                                        </div>)}
-                                    </>)}
-
+                                    {/* Create Game Tab */}
                                     {activeTab === 'create' && (<>
                                         {/* Player Configuration - Side by Side */}
                                         <div className="mb-6">
@@ -616,71 +704,16 @@ const WelcomePage = ({onGameStart}) => {
                                                 className="font-bold text-blue-600">{numHumans + numBots}</span>
                                             </p>
                                         </div>
-                                    </>)}</div>
-                            </div>
+                                    </>)}
 
-
-                            {/* Terms and Conditions Checkbox */}
-                            <TermsCheckbox
-                                acceptedTerms={acceptedTerms}
-                                setAcceptedTerms={setAcceptedTerms}/>
-
-                            {/* Join Button */}
-                            <button
-                                type="submit"
-                                disabled={!playerName.trim() || !selectedAvatar || !acceptedTerms}
-                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
-                                text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
-                            >
-                                {activeTab === 'quick' ? 'Start Game' : 'Create Game'}
-                            </button>
-                        </form>
-                    </div>)}
-
-                {/* New Game form*/}
-                {animationPhase === 'form-visible' && showJoinForm && (
-
-                    <div className={`rounded-2xl bg-white ${isLandscape ? '' : 'max-w-md'} w-full shadow-2xl`}>
-
-                        <button
-                            onClick={() => { setAnimationPhase('buttons-visible'); setGameKey(''); setJoinError(''); }}
-                            className="absolute right-1 top-1 text-gray-500 hover:text-gray-700 transition-colors"
-                            type="button"
-                        >
-                            <svg
-                                className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-2xl transition-colors m-1 p-1"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-
-
-                        <form onSubmit={handleSubmit} className="p-8">
-                            <div className={`grid ${isLandscape ? 'grid-cols-2 gap-6' : 'grid-cols-1'}`}>
-                                <div className={isLandscape ? 'border-r border-gray-200 pr-6' : ''}>
-                                    {/* Player Name Input */}
-                                    <PlayerNameInput playerName={playerName} setPlayerName={setPlayerName}/>
-
-                                    {/* Avatar Selection */}
-                                    <AvatarSelection
-                                        selectedAvatar={selectedAvatar}
-                                        setSelectedAvatar={setSelectedAvatar}
-                                        random_shuffle={true}/>
-                                </div>
-                                <div>
-                                    {/* Terms and Conditions Checkbox */}
-                                    <TermsCheckbox
-                                        acceptedTerms={acceptedTerms}
-                                        setAcceptedTerms={setAcceptedTerms}/>
-
-                                    {/* Game Key Input and Button - Side by Side */}
-                                    <div className="mb-6">
-                                        <label className="block text-gray-500 text-sm font-bold mb-2">
-                                            Game Key
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1 relative">
+                                    {/* Join Game Tab */}
+                                    {activeTab === 'join' && (<>
+                                        {/* Game Key Input */}
+                                        <div className="mb-6">
+                                            <label className="block text-gray-500 text-sm font-bold mb-2">
+                                                Game Key
+                                            </label>
+                                            <div className="relative">
                                                 <input
                                                     type="text"
                                                     placeholder="Enter game key ..."
@@ -703,17 +736,26 @@ const WelcomePage = ({onGameStart}) => {
                                                     </div>
                                                 )}
                                             </div>
-                                            <button
-                                                type="submit"
-                                                disabled={!playerName.trim() || !selectedAvatar || !gameKey.trim() || !acceptedTerms}
-                                                className="px-8 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-colors whitespace-nowrap"
-                                            >
-                                                Join
-                                            </button>
                                         </div>
-                                    </div>
+                                    </>)}
                                 </div>
                             </div>
+
+
+                            {/* Terms and Conditions Checkbox */}
+                            <TermsCheckbox
+                                acceptedTerms={acceptedTerms}
+                                setAcceptedTerms={setAcceptedTerms}/>
+
+                            {/* Submit Button */}
+                            <button
+                                type="submit"
+                                disabled={!playerName.trim() || !selectedAvatar || !acceptedTerms || (activeTab === 'join' && !gameKey.trim())}
+                                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed
+                                text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+                            >
+                                {activeTab === 'create' ? 'Create Game' : 'Join'}
+                            </button>
                         </form>
                     </div>)}
                 </div></div>

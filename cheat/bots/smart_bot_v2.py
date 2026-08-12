@@ -1,5 +1,4 @@
 import math
-import os
 import pickle
 import random
 
@@ -11,7 +10,7 @@ from cheat.card import RANKS, str_to_Card
 from .generic_bot import BotPlayer
 
 
-class SmartBot(BotPlayer):
+class SmartBot_v2(BotPlayer):
     """Smart bot that inherits from the parent Player class. The Smart bot works the following way:
     - Keeps track of other players' behavioural patterns and estimates their lie and call probability
     - Adjusts its probability of lying and calling to what it thinks the players to its left and right are doing
@@ -27,7 +26,6 @@ class SmartBot(BotPlayer):
         display_name: str | None = None,
         avatar: str | None = None,
         verbosity: float = 0.3,
-        temperature: float = 0.02,
         display_type: str | None = None,
         is_replacement: bool = False,
     ):
@@ -40,7 +38,6 @@ class SmartBot(BotPlayer):
             display_type=display_type,
             is_replacement=is_replacement,
         )
-        self.temperature = temperature
 
         # Dictionary containing information about other players — this is built dynamically
         self.other_player_repr = {}
@@ -56,7 +53,6 @@ class SmartBot(BotPlayer):
             avatar=self.avatar,
             type=self.type,
             verbosity=self.verbosity,
-            temperature=self.temperature,
         )
 
     def write_info(self, path) -> None:
@@ -220,7 +216,7 @@ class SmartBot(BotPlayer):
         # Prior beta(1, 2) encodes a default ~33% lie rate; updates with observed evidence.
         p_lie_est = np.random.beta(
             1 + self.other_player_repr.get(play.player_id, {}).get("N_lies", 0),
-            2
+            1
             + self.other_player_repr.get(play.player_id, {}).get("N_plays_called", 0)
             - self.other_player_repr.get(play.player_id, {}).get("N_lies", 0),
         )
@@ -239,22 +235,6 @@ class SmartBot(BotPlayer):
         :return: estimated probability that the play is a lie
         """
 
-        # If we empty our hand, they must call
-        if len(play.data["cards_played"]) == len(self.hand):
-            return 1
-
-        # Else, if they only have a small number of cards left and the played rank isn't in their known cards,
-        # highly likely they will call our play
-        elif len(
-            game.players[(play.player_id + 1) % game.num_players].hand
-        ) <= 2 and play.data["declared_rank"] not in {
-            c.rank
-            for c in self.other_player_repr.get(
-                (play.player_id + 1) % game.num_players, {}
-            ).get("known_cards", [])
-        }:
-            return 1
-
         # Since we don't know how many cards of the rank they hold, assume they hold one
         cards_of_rank_on_hand = 1
 
@@ -270,7 +250,7 @@ class SmartBot(BotPlayer):
             + self.other_player_repr.get(
                 ((play.player_id + 1) % game.num_players), {}
             ).get("N_calls", 0),
-            2
+            1
             + self.other_player_repr.get(
                 ((play.player_id + 1) % game.num_players), {}
             ).get("N_plays", 0),
@@ -282,20 +262,20 @@ class SmartBot(BotPlayer):
         return 1 - p_true
 
     def estimate_position(self, hand_sizes: dict) -> int:
-        """Estimates the position of self, based on hand count burden. For a move, this calculates the share
-        of cards in self's hand. Zero indicates a win, 1 a loss; values in between indicate the relative position
-        accordingly. A loss is strongly penalised so that it is avoided at all costs.
+        """Estimates the position of self, based on hand counts.
 
         :param hand_sizes: dictionary of the expected hand sizes of the players.
-        :return: the expected position in the game, measured as a fraction of hand burden
+        :return: the expected position in the game
         """
-        res = hand_sizes[self.id] / sum(hand_sizes.values())
         for pid, h in hand_sizes.items():
             if h == 0 and pid == self.id:
                 return 0  # strongly incentivise a win
             elif h == 0:
-                return 10  # strongly disincentivise any move that leads to a loss
-        return res
+                return 2 * len(
+                    hand_sizes
+                )  # strongly disincentivise any move that leads to a loss
+        sorted_by_hand = sorted(hand_sizes.items(), key=lambda x: x[1])
+        return next(i for i, (pid, _) in enumerate(sorted_by_hand) if pid == self.id)
 
     async def make_move(self, game) -> GameAction:
         """
@@ -324,9 +304,6 @@ class SmartBot(BotPlayer):
                     declared_rank=self.hand[0].rank, cards_played=list(self.hand)
                 ),
             )
-
-        # Build an inner representation of the other player's lie/call rates
-        self.populate_player_repr(game)
 
         # First: choose a rank if none is currently declared
         # If is self's turn to declare a rank, first choose one based on what the next player probably doesn't have
@@ -381,7 +358,6 @@ class SmartBot(BotPlayer):
 
         # Decision analysis: go through all possible plays and select the play with the best chance of winning
         possible_actions = []
-        possible_truthful_play = None
 
         # Simplest case: playing truthfully (if possible).
         if any([c.rank == current_rank for c in self.hand]):
@@ -411,7 +387,6 @@ class SmartBot(BotPlayer):
 
             # Append to list of possible actions
             possible_actions.append((action, pos))
-            possible_truthful_play = action
 
         # Next: lie. Can play one, two, or three cards, up to the total number of cards on hand minus one
         # (when playing all cards would definitely be called). If I'm holding only one card (and it's an Ace),
@@ -442,14 +417,6 @@ class SmartBot(BotPlayer):
             # Check that the play isn't actually a true play, in which case it will already have been considered
             if all([c.rank == current_rank for c in cards_to_lose]):
                 continue
-
-            # Check that if we are playing leq many cards as the truthful play that we are at least getting
-            # rid of an Ace (otherwise no point in lying about fewer cards than the truthful play)
-            if possible_truthful_play:
-                if not any([c.rank == "A" for c in cards_to_lose[:k]]) and k <= len(
-                    possible_truthful_play.data["cards_played"]
-                ):
-                    continue
 
             action = GameAction(
                 type="play",
@@ -531,13 +498,9 @@ class SmartBot(BotPlayer):
             )
         possible_actions = sorted(possible_actions, key=lambda x: x[-1])
 
-        # Softmax weighting of scores
-        scores = np.array([pos for _, pos in possible_actions], dtype=float)
-        weights = np.exp(-(scores - scores[0]) / self.temperature)
-        weights /= weights.sum()
-        chosen = np.random.choice(len(possible_actions), p=weights)
-
-        return possible_actions[chosen][0]
+        return random.choice(
+            [a for a in possible_actions if a[-1] == possible_actions[0][-1]]
+        )[0]
 
     async def choose_action(self, game) -> GameAction:
         """Pass-through; required for interface compatibility with bot players"""

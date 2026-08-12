@@ -8,128 +8,192 @@ import React, {useEffect} from "react";
  */
 export default function DiscardAnimation({discards, width, height, playerPositions, selfId, tutorialScale = null}) {
 
+	// Calculate available width AND height based on player positions.
+	//
+	// Width: constrained by the topmostPlayer (existing logic — keeps the box to
+	// their right so it doesn't overlap them horizontally).
+	//
+	// Height: depends on which players actually fall inside the box's horizontal
+	// footprint [boxLeftEdge, screenRight].
+	//   • If the box extends left past a player's right edge, that player's top
+	//     edge caps the height (the box would slide under them otherwise).
+	//   • If the box sits entirely to the right of the topmostPlayer, the only
+	//     height constraint comes from whatever player IS inside the box's range
+	//     (e.g. the top-right player in a 4-player game).
+	//   • If no player overlaps the box horizontally, fall back to half the screen.
+	const calculateAvailableSpace = () => {
+		// The discard box is `fixed` inside the game container.  When the
+		// container has a CSS transform (tutorial mode), `position:fixed`
+		// elements are positioned relative to that transformed ancestor, so
+		// the coordinate system is the CONTAINER'S CSS space, not the viewport.
+		//
+		// player.x_css  = width/2  + pos.x          (game coords, CSS pixels)
+		// player.y_css  = height/2 + pos.y
+		// player half-sizes in CSS = rect.viewport_size / tutorialScale
+		//
+		// In normal mode (tutorialScale=null, ts=1) this reduces to the same
+		// result as using viewport coords directly, since the container fills
+		// the full viewport.
+		if (!playerPositions) return { width: 0.8 * width, height: height * 0.4 };
 
-	// Calculate available width based on player positions
-	const calculateAvailableWidth = () => {
-		if (!playerPositions) return 0.8 * width;
+		const ts = tutorialScale ?? 1;
+		const boxRight_css = width - 16; // fixed right-4 in container CSS space
 
-		// Find players in the top portion of screen
-		const topPlayers = Object.entries(playerPositions)
+		// Convert every opponent to container CSS coordinates.
+		const opponents = Object.entries(playerPositions)
 			.filter(([id]) => parseInt(id) !== selfId)
 			.map(([id, pos]) => {
-				const viewportY = height / 2 + pos.y;
-    const viewportX = width / 2 + pos.x;
-    return { id, x: viewportX, y: viewportY };
+				const el = document.getElementById(`player-${id}`);
+				if (!el) return null;
+				const r = el.getBoundingClientRect();
+				const x_css = width  / 2 + pos.x;
+				const y_css = height / 2 + pos.y;
+				return {
+					id,
+					left_css:    x_css - r.width  / (2 * ts),
+					right_css:   x_css + r.width  / (2 * ts),
+					top_css:     y_css - r.height / (2 * ts),
+					centerY_css: y_css,
+				};
 			})
-			.filter(player => player.y < 220); // Top 30% of screen
+			.filter(Boolean);
 
-		if (topPlayers.length === 0) {
-			// No players near top, use full width
-			return 0.9 * width;
+		// ── Width ────────────────────────────────────────────────────────────────
+		// "Top players" = upper portion of the container (CSS y < 220).
+		const topOpponents = opponents.filter(p => p.centerY_css < 220);
+
+		let boxLeft_css = 16; // default: box spans nearly the full container
+		if (topOpponents.length > 0) {
+			const topmostPlayer = topOpponents.reduce((top, p) => {
+				if (p.centerY_css < top.centerY_css) return p;
+				if (p.centerY_css === top.centerY_css && p.right_css > top.right_css) return p;
+				return top;
+			});
+			boxLeft_css = topmostPlayer.right_css + 20;
 		}
 
-		// Find the topmost player (or rightmost if multiple at same height)
-		const topmostPlayer = topPlayers.reduce((top, player) => {
-			if (player.y < top.y) return player;
-			if (player.y === top.y && player.x > top.x) return player;
-			return top;
-		});
+		const availWidth_css = Math.max(0, boxRight_css - boxLeft_css);
 
-		// Get actual element to measure width
-		const element = document.getElementById(`player-${topmostPlayer.id}`);
-		if (!element) return width;
-
-		const rect = element.getBoundingClientRect();
-		// rect.width is in visual/viewport pixels; divide by scale to get game-area pixels.
-		// topmostPlayer.x is already in game-area coordinates (width/2 + pos.x).
-		const scale = tutorialScale ?? 1;
-		const playerRightEdge = topmostPlayer.x + (rect.width / scale) / 2 + 20;
-
-		// If player is too close to top (within 200px), constrain width
-		if (topmostPlayer.y < 220) {
-			return width - playerRightEdge - 20; // 20px padding
+		// ── Height ───────────────────────────────────────────────────────────────
+		// Find the topmost opponent (smallest top_css) whose horizontal extent
+		// overlaps the box.
+		let minTop_css = null;
+		for (const p of opponents) {
+			if (p.right_css > boxLeft_css && p.left_css < boxRight_css) {
+				if (minTop_css === null || p.top_css < minTop_css) minTop_css = p.top_css;
+			}
 		}
 
-		return width;
+		const availHeight_css = minTop_css !== null
+			? Math.max(0, minTop_css - 16 - 12)
+			: height * 0.5;
+
+		return { width: availWidth_css, height: availHeight_css };
 	};
 
-	const availableWidth = calculateAvailableWidth();
+	const { width: availableWidth, height: availableHeight } = calculateAvailableSpace();
 
-	// Calculate adaptive card sizing based on available width
-  const calculateCardLayout = () => {
-    const numSets = discards.length;
-    const basePadding = 28; // Container padding
-    const minCardWidth = 30;
-    const maxCardWidth = 50;
-    const minOverlap = 8;
-    const maxOverlap = 12;
-    const minGap = 8;
-    const maxGap = 16;
+	// Determine card dimensions by iterating over possible row counts (1, 2, 3, …).
+	// For each row count we compute a single scale factor s constrained by both the
+	// available width (piles per row) and the available height (number of rows).
+	// We pick the fewest rows where s * maxCardWidth >= minCardWidth.
+	const calculateCardLayout = () => {
+		const numSets = discards.length;
+		const containerPadding = 32; // p-4 = 16px top + 16px bottom
+		const headerHeight = 40;     // "Discarded Sets" label + mb-3
+		const maxCardWidth = 50;
+		const minCardWidth = 20;
+		const maxOverlap = 12;
+		const maxGap = 16;
+		const minGap = 4;
 
-    // Each set needs: cardWidth + (3 * overlap) for the 4 overlapping cards
-    const availableForCards = availableWidth - basePadding;
+		const availW = availableWidth - containerPadding;
+		const availH = availableHeight - containerPadding - headerHeight;
 
-    // Calculate what card width we can afford
-    let cardWidth = maxCardWidth;
-    let cardOverlap = maxOverlap;
-    let setGap = maxGap;
+		// A pile at scale 1 occupies (maxCardWidth + 3*maxOverlap) wide × maxCardWidth*1.5 tall.
+		const maxPileWidth = maxCardWidth + 3 * maxOverlap;
 
-    // Try with max dimensions first
-    let totalWidth = numSets * (cardWidth + 3 * cardOverlap) + (numSets - 1) * setGap;
+		// For each row count, sWidth and sHeight pull in opposite directions:
+		// more rows → larger sWidth (fewer piles per row) but smaller sHeight.
+		// Iterate over all candidates and keep the one with the largest s.
+		let bestS = 0;
+		let bestLayout = null;
 
-    if (totalWidth > availableForCards) {
-      // Need to scale down
-      const scaleFactor = availableForCards / totalWidth;
-      cardWidth = Math.max(minCardWidth, cardWidth * scaleFactor);
-      cardOverlap = Math.max(minOverlap, cardOverlap * scaleFactor);
-      setGap = Math.max(minGap, setGap * scaleFactor);
-    }
+		for (let rows = 1; rows <= numSets; rows++) {
+			const pilesPerRow = Math.ceil(numSets / rows);
 
-    const cardHeight = cardWidth * 1.5; // Maintain aspect ratio
-    const fontSize = {
-      corner: Math.max(8, cardWidth * 0.2),
-      suit: Math.max(8, cardWidth * 0.25),
-      center: Math.max(12, cardWidth * 0.5)
-    };
+			// Scale limited by width: fit `pilesPerRow` piles + gaps in availW
+			const totalWAt1 = pilesPerRow * maxPileWidth + (pilesPerRow - 1) * maxGap;
+			const sWidth = totalWAt1 > 0 ? availW / totalWAt1 : 1;
 
-    return { cardWidth, cardHeight, cardOverlap, setGap, fontSize };
-  };
+			// Scale limited by height: fit `rows` rows + gaps in availH
+			const totalHAt1 = rows * maxCardWidth * 1.5 + (rows - 1) * maxGap;
+			const sHeight = totalHAt1 > 0 ? availH / totalHAt1 : 1;
 
-  const layout = calculateCardLayout();
+			const s = Math.min(1, sWidth, sHeight);
+			const cardWidth = s * maxCardWidth;
 
+			if (cardWidth >= minCardWidth && s > bestS) {
+				bestS = s;
+				const cardHeight = cardWidth * 1.5;
+				const cardOverlap = s * maxOverlap;
+				const setGap = Math.max(minGap, s * maxGap);
+				bestLayout = {
+					cardWidth,
+					cardHeight,
+					cardOverlap,
+					setGap,
+					fontSize: {
+						corner: Math.max(8, cardWidth * 0.2),
+						suit:   Math.max(8, cardWidth * 0.25),
+						center: Math.max(12, cardWidth * 0.5),
+					},
+				};
+			}
+		}
 
-	// Debug: Draw available space box
+		if (bestLayout) return bestLayout;
+
+		// Absolute fallback: minimum dimensions
+		return {
+			cardWidth: minCardWidth,
+			cardHeight: minCardWidth * 1.5,
+			cardOverlap: minGap,
+			setGap: minGap,
+			fontSize: { corner: 8, suit: 8, center: 12 },
+		};
+	};
+
+	const layout = calculateCardLayout();
+
+	// Debug: draw available-space bounding box (now height-aware)
 	// useEffect(() => {
-	// 	// Remove existing debug box
 	// 	document.querySelectorAll('.debug-discard-box').forEach(el => el.remove());
-	//
 	// 	const debugBox = document.createElement('div');
 	// 	debugBox.className = 'debug-discard-box';
 	// 	debugBox.style.position = 'fixed';
-	// 	debugBox.style.top = '16px'; // top-4
-	// 	debugBox.style.right = '16px'; // right-4
+	// 	debugBox.style.top = '16px';
+	// 	debugBox.style.right = '16px';
 	// 	debugBox.style.width = availableWidth + 'px';
-	// 	debugBox.style.height = '140px'; // Approximate height
+	// 	debugBox.style.height = availableHeight + 'px';
 	// 	debugBox.style.border = '3px solid lime';
 	// 	debugBox.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
 	// 	debugBox.style.pointerEvents = 'none';
 	// 	debugBox.style.zIndex = '9999';
 	// 	document.body.appendChild(debugBox);
-	//
-	// 	return () => {
-	// 		document.querySelectorAll('.debug-discard-box').forEach(el => el.remove());
-	// 	};
-	// }, [availableWidth, width, height, playerPositions]);
+	// 	return () => document.querySelectorAll('.debug-discard-box').forEach(el => el.remove());
+	// }, [availableWidth, availableHeight]);
 
-		if (discards.length === 0) return null;
-		if (width < 500 || height < 500) return null;
-
+	if (discards.length === 0) return null;
+	if (width < 500 || height < 500) return null;
 
 	return (
     <div
       className="fixed top-4 right-4 rounded-lg p-4 z-0"
       style={{
         maxWidth: `${availableWidth}px`,
+        maxHeight: `${availableHeight}px`,
+        overflow: 'hidden', // hard stop — cards can never bleed past the calculated bounds
         ...(tutorialScale ? { transform: `scale(${1 / tutorialScale})`, transformOrigin: 'top right' } : {})
       }}
     >

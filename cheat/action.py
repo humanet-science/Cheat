@@ -2,6 +2,8 @@ from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import Any
 
+import pandas as pd
+
 
 # General Action class that logs an action
 @dataclass
@@ -14,7 +16,13 @@ class GameAction:
     @classmethod
     def from_dict(cls, **kwargs):
         valid = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in kwargs.items() if k in valid})
+        return cls(
+            **{
+                k: v if k != "timestamp" else pd.to_datetime(v)
+                for k, v in kwargs.items()
+                if k in valid
+            }
+        )
 
     def __eq__(self, other):
         """Equality check; timestamps are irrelevant"""

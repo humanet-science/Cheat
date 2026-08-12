@@ -132,16 +132,52 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [socket, setSocket] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [isJoining, setIsJoining] = useState(false);
+    const [joinError, setJoinError] = useState(null);
     const [maxWaitSeconds, setMaxWaitSeconds] = useState(null);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const countdownRef = useRef(null);
+    const joinTimeoutRef = useRef(null);
+
+    const clearJoinTimeout = () => {
+        if (joinTimeoutRef.current) {
+            clearTimeout(joinTimeoutRef.current);
+            joinTimeoutRef.current = null;
+        }
+    };
+
+    // Lets the player back out of a join attempt that never resolves (e.g. server
+    // never replies), instead of being stuck on "Joining..." until they refresh.
+    const cancelJoinAttempt = () => {
+        clearJoinTimeout();
+        if (socket) {
+            socket.onmessage = null;
+            socket.onerror = null;
+            socket.onclose = null;
+            socket.close();
+            setSocket(null);
+        }
+        setIsJoining(false);
+    };
 
     const handleSetup = (e) => {
         e.preventDefault();
         if (!playerName.trim() || !selectedAvatar) return;
 
+        setJoinError(null);
         const ws = new WebSocket(getWebSocketURL());
         setSocket(ws);
+
+        clearJoinTimeout();
+        joinTimeoutRef.current = setTimeout(() => {
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
+            ws.close();
+            setSocket(null);
+            setIsJoining(false);
+            setJoinError("This is taking longer than expected. Please try again.");
+        }, 10000);
 
         ws.onopen = () => {
             ws.send(JSON.stringify({
@@ -167,7 +203,10 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
             }
 
             if (msg.type === "queue_joined") {
+                clearJoinTimeout();
                 if (msg.max_wait_seconds) setMaxWaitSeconds(msg.max_wait_seconds);
+                setIsJoining(false);
+                setShowConfirm(false);
                 setPhase("waiting");
             } else if (msg.type === "new_round") {
                 // Buffer any messages that arrive between now and CheatGame setting up its
@@ -182,14 +221,26 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                 }
                 onGameStart(ws, msg);
             } else if (msg.type === "no_games_available") {
+                clearJoinTimeout();
                 ws.close();
                 setSocket(null);
+                setIsJoining(false);
+                setShowConfirm(false);
                 setPhase("no_games");
             }
         };
 
-        ws.onerror = () => setPhase("setup");
-        ws.onclose = () => setPhase((prev) => (prev === "waiting" ? "setup" : prev));
+        ws.onerror = () => {
+            clearJoinTimeout();
+            setIsJoining(false);
+            setShowConfirm(false);
+            setPhase("setup");
+        };
+        ws.onclose = () => {
+            clearJoinTimeout();
+            setIsJoining(false);
+            setPhase((prev) => (prev === "waiting" ? "setup" : prev));
+        };
     };
 
     const handleCancelWaiting = () => {
@@ -291,10 +342,10 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
         return (
             <div className="min-h-screen flex items-center justify-center px-4">
                 <form onSubmit={(e) => { e.preventDefault(); setShowConfirm(true); }} className="rounded-2xl bg-white p-8 max-w-md w-full shadow-2xl">
-                    <h2 className="text-xl font-bold text-gray-700 mb-2">You're in!</h2>
+                    <h2 className="text-xl font-bold text-gray-600 mb-2">You're in!</h2>
 
                     <p className="text-gray-500 text-sm mb-6">
-                        Choose a name and avatar, then join the waiting room. The game will start automatically once enough players have joined.
+                        Choose a name and avatar, then join the waiting room. The game will start automatically once enough other participants have joined.
                     </p>
                     <PlayerNameInput playerName={playerName} setPlayerName={setPlayerName} />
                     <AvatarSelection
@@ -320,25 +371,39 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                             <h3 className="text-lg font-bold text-gray-800 mb-4">⚠️ Before you join</h3>
                             <p className="text-gray-600 mb-8">
                                 You are about to join the waiting room and will be automatically assigned to the next
-                                available game. If no games are available, you will be given a completion
-                                code after a timeout and you will be marked as having participated. While in the
-                                waiting room, you can exit and re-join at any point. However, once the game has started
-                                closing or refreshing the browser tab will cause you to exit the study without
-                                receiving a completion code. If you are inactive in the game you will be disconnected
-                                after a timeout.
+                                available game.
+                                If a game slot is available but doesn't fill with enough participants
+                                in time, you will be given a completion code after a timeout and marked as having participated.
+                                If all study slots have already been filled, you will not be assigned a game — unfortunately
+                                this means you were too late to take part.
+                                <br/><br/>
+                                While in the waiting room, you can exit and re-join at any point.
+                                <span className="font-bold"> However, once the game has started, closing or refreshing the browser tab will cause
+                                    you to exit the study without receiving a completion code.</span>
+                                <br/><br/>
+                                <span className="font-bold">If you are inactive in the game you will be disconnected
+                                    after 60 seconds. </span> This is to prevent the game flow being interrupted
+                                    by stalling players.
                             </p>
+                            {joinError && (
+                                <p className="text-red-600 text-sm mb-4">{joinError}</p>
+                            )}
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setShowConfirm(false)}
+                                    onClick={() => {
+                                        if (isJoining) cancelJoinAttempt();
+                                        setShowConfirm(false);
+                                    }}
                                     className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
                                 >
-                                    Back
+                                    {isJoining ? "Cancel" : "Back"}
                                 </button>
                                 <button
-                                    onClick={(e) => { setShowConfirm(false); handleSetup(e); }}
-                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+                                    onClick={(e) => { setIsJoining(true); handleSetup(e); }}
+                                    disabled={isJoining}
+                                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
                                 >
-                                    I understand — Join
+                                    {isJoining ? "Joining ..." : "I understand — Join"}
                                 </button>
                             </div>
                         </div>

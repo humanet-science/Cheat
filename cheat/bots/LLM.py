@@ -282,6 +282,7 @@ class LLM_Player(Player):
             name=name,
             display_name=display_name,
             avatar=avatar,
+            verbosity=verbosity,
             type="LLM",
             display_type=display_type,
         )
@@ -290,7 +291,6 @@ class LLM_Player(Player):
         self.kind = kind
         self.model_kwargs = model_kwargs
         self.speaker_types = speaker_types
-        self.verbosity = verbosity
 
     def __dict__(self):
         return dict(

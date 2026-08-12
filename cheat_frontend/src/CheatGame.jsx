@@ -49,6 +49,10 @@ import {VALID_RANKS} from "./utils/constants";
  *   Used in Tutorial where game is scaled/transformed. If null, uses window height.
  * @param {number|null} [tutorialScale=null] - Scale factor for Tutorial context (e.g., 0.7).
  *   Passed to StatusMessage component to properly scale and position floating messages.
+ * @param {string|null} [callHintMessage=null] - Used in Tutorial. When set, clicking "Call!" shows
+ *   this message as a reminder instead of actually calling the bluff — for slides that want the
+ *   player to practice a different action (e.g. playing cards) while still allowing them to see
+ *   what calling looks like.
  */
 export default function CheatGame({
 																		socket,
@@ -64,6 +68,8 @@ export default function CheatGame({
 																		showDealAnimation = true,
 																		disableReconnect = false,
 																		clearMessagesRef = null,
+																		playerHighlight = null,
+																		callHintMessage = null,
 																	}) {
 
 	// Game state and previous state
@@ -102,6 +108,8 @@ export default function CheatGame({
 
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
+	const gameOverRef = useRef(false);
+	useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
 	const [winner, setWinner] = useState(null);
 	const [gameOverDetails, setGameOverDetails] = useState({declaredRank: null, actualCards: null});
 	const [hasClickedNextRound, setHasClickedNextRound] = useState(false);
@@ -118,7 +126,7 @@ export default function CheatGame({
 	// Idle timeout warning (seconds remaining when server sent the reminder)
 	const [timeoutRemaining, setTimeoutRemaining] = useState(null);
 
-	// Active socket (may be replaced on reconnect)
+	// Active socket (can be replaced on reconnect)
 	const [activeSocket, setActiveSocket] = useState(socket);
 	useEffect(() => { setActiveSocket(socket); }, [socket]);
 
@@ -144,6 +152,48 @@ export default function CheatGame({
 	// Called to abort a running reconnect loop when the active socket proves it's still alive
 	// (i.e. a message arrives on it while we're attempting to reconnect).
 	const cancelReconnectRef = useRef(null);
+	// Tracks the single in-flight liveness_check round trip, if any: {nonce, resolve}.
+	const pendingLivenessRef = useRef(null);
+
+	// Some browsers (Chromium/Brave observed) don't fire onclose immediately when the
+	// network drops — the socket object can sit in OPEN state and still deliver
+	// already-buffered messages after connectivity returns, even though the server
+	// gave up on it long ago. Neither a message arriving, nor a local send() not
+	// throwing, proves the socket is actually usable end-to-end right now (send()
+	// only checks local readyState — a dead TCP path can silently accept writes for a
+	// long time before the OS notices). Only a fresh round trip the server must
+	// actively participate in right now can prove that; a buffered/stale message can't
+	// fake a nonce that didn't exist until this call.
+	const verifySocketAlive = (socket) => {
+		return new Promise((resolve) => {
+			if (!socket || socket.readyState !== WebSocket.OPEN) {
+				resolve(false);
+				return;
+			}
+			const nonce = Math.random().toString(36).slice(2);
+			const timer = setTimeout(() => {
+				if (pendingLivenessRef.current?.nonce === nonce) {
+					pendingLivenessRef.current = null;
+					resolve(false);
+				}
+			}, 1500);
+			pendingLivenessRef.current = {
+				nonce,
+				resolve: (alive) => {
+					clearTimeout(timer);
+					pendingLivenessRef.current = null;
+					resolve(alive);
+				},
+			};
+			try {
+				socket.send(JSON.stringify({type: 'liveness_check', nonce}));
+			} catch (e) {
+				clearTimeout(timer);
+				pendingLivenessRef.current = null;
+				resolve(false);
+			}
+		});
+	};
 	// Ref always tracking the *current* active socket. Used inside onclose/offline handlers
 	// to discard events from old sockets that fire after a swap (race vs. React cleanup).
 	const activeSocketRef = useRef(socket);
@@ -230,7 +280,7 @@ export default function CheatGame({
 	// Attempt to reconnect using the stored session token.
 	// Keeps retrying every 2s until the server confirms (success) or explicitly rejects
 	// the token (slot expired) — rather than giving up after a fixed number of attempts.
-	// This handles the case where wifi is still off during early retries.
+	// This handles the case where Wi-Fi is still off during early retries.
 	const attemptReconnect = useCallback(async () => {
 		if (reconnectingRef.current) return;
 		if (serverErrorRef.current) return;
@@ -238,6 +288,7 @@ export default function CheatGame({
 
 		const token = sessionTokenRef.current;
 		if (!token) { reconnectingRef.current = false; setConnectionDropped(true); return; }
+		console.log('[reconnect] starting attemptReconnect loop with token', token);
 
 		// Block interaction immediately — the visual spinner appears after a short delay
 		// so instant reconnects don't flash the badge, but clicks are always swallowed.
@@ -256,15 +307,23 @@ export default function CheatGame({
 			const result = await new Promise((resolve) => {
 				const ws = new WebSocket(WS_URL);
 				let settled = false;
+				// Distinguishes "never even got a WebSocket handshake" (real transport/
+				// network failure) from "connected fine, died/rejected after" — both used
+				// to log as an undifferentiated 'error', which made it impossible to tell
+				// whether retries were actually reaching the server.
+				let opened = false;
 				const finish = (outcome, newWs = null, buf = null) => {
 					if (settled) return;
 					settled = true;
 					if (outcome !== 'confirmed') ws.close();
 					resolve({outcome, ws: newWs, buffer: buf});
 				};
-				const timer = setTimeout(() => finish('timeout'), 4000);
+				const timer = setTimeout(() => finish(opened ? 'timeout-after-open' : 'timeout-no-open'), 4000);
 				const buffer = [];
-				ws.onopen = () => ws.send(JSON.stringify({type: 'reconnect', token}));
+				ws.onopen = () => {
+					opened = true;
+					ws.send(JSON.stringify({type: 'reconnect', token}));
+				};
 				ws.onmessage = (e) => {
 					clearTimeout(timer);
 					const msg = JSON.parse(e.data);
@@ -278,11 +337,12 @@ export default function CheatGame({
 					} else if (msg.type === 'reconnect_failed') {
 						// Server has no slot yet — it hasn't detected our disconnect yet
 						// (ping timeout takes ~15s). Treat as retriable, not terminal.
-						finish('error');
+						// This outcome proves full connectivity — we got a real server reply.
+						finish('no-slot-yet');
 					}
 				};
-				ws.onerror = () => { clearTimeout(timer); finish('error'); };
-				ws.onclose = () => { clearTimeout(timer); finish('error'); };
+				ws.onerror = () => { clearTimeout(timer); finish(opened ? 'error-after-open' : 'error-before-open'); };
+				ws.onclose = () => { clearTimeout(timer); finish(opened ? 'closed-after-open' : 'closed-before-open'); };
 			});
 
 			if (cancelled) { result.ws?.close(); break; }
@@ -335,17 +395,17 @@ export default function CheatGame({
 			if (Date.now() - lastPingRef.current > 25000) {
 				clearInterval(pingWatchdogRef.current);
 				try { activeSocket.close(); } catch(e) {}
-				if (!gameOver && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !quitConfirmedRef.current) attemptReconnect();
 			}
 		}, 5000);
 		return () => clearInterval(pingWatchdogRef.current);
 	}, [activeSocket]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when wifi drops —
+	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when Wi-Fi drops —
 	// the browser keeps the socket in OPEN state until the close handshake completes.
 	// The offline event fires immediately and lets us trigger reconnect right away.
 	// Guard with navigator.onLine: Chromium can fire the offline event with a delay, after
-	// wifi has already returned. In that case onLine is true and we skip the spurious reconnect.
+	// Wi-Fi has already returned. In that case onLine is true, and we skip the spurious reconnect.
 	//
 	// The online handler skips the throttled retry delay so reconnect attempts resume
 	// immediately when the network returns, rather than waiting for a possibly-throttled
@@ -356,7 +416,7 @@ export default function CheatGame({
 			console.log('[reconnect] offline fired — onLine:', navigator.onLine,
 				'reconnecting:', reconnectingRef.current,
 				'socketState:', activeSocketRef.current?.readyState);
-			if (!gameOver && !navigator.onLine) attemptReconnect();
+			if (!gameOverRef.current && !navigator.onLine) attemptReconnect();
 		};
 		const handleOnline = () => {
 			console.log('[reconnect] online fired — reconnecting:', reconnectingRef.current);
@@ -395,21 +455,45 @@ export default function CheatGame({
 					return;
 				}
 
-				// Ping-pong with backend to keep connection alive
+				// Ping-pong with backend to keep connection alive (server's own keepalive
+				// watchdog — always reply, independent of the liveness check below).
 				if (msg.type === 'ping') {
 					lastPingRef.current = Date.now();
-					activeSocket.send(JSON.stringify({type: 'pong'}));
+					try {
+						activeSocket.send(JSON.stringify({type: 'pong'}));
+					} catch (e) {
+						// Send failed — socket is dead. The liveness check below (triggered by
+						// reconnectingRef) doesn't apply here since we're not necessarily
+						// reconnecting yet, but there's nothing more to do with this ping either.
+					}
+					return;
 				}
 
-				// Any message on the active socket proves it's still alive.
-				// If we're stuck in a reconnect loop (e.g. triggered by a brief offline
-				// event while the server never detected a drop), cancel it immediately.
-				if (reconnectingRef.current) {
-					console.log('[reconnect] active socket still alive — cancelling reconnect loop');
-					cancelReconnectRef.current?.();
+				// Resolve a pending liveness_check round trip. Only a match to a nonce we
+				// generated moments ago counts — a buffered/stale message can't fake it.
+				if (msg.type === 'liveness_ack') {
+					if (pendingLivenessRef.current?.nonce === msg.nonce) {
+						pendingLivenessRef.current.resolve(true);
+					}
+					return;
 				}
 
-				if (msg.type === 'ping') return;
+				// A message merely arriving proves nothing — a zombie socket (browser hasn't
+				// fired onclose yet after a network drop) can still deliver already-buffered
+				// messages after the server has long since given up on it. Only cancel the
+				// reconnect loop once a fresh, unfakeable round trip confirms the socket is
+				// genuinely usable right now. Guard against starting a second check while one
+				// is already in flight.
+				if (reconnectingRef.current && !pendingLivenessRef.current) {
+					verifySocketAlive(activeSocket).then((alive) => {
+						if (alive) {
+							console.log('[reconnect] verified socket alive via liveness check — cancelling reconnect loop');
+							cancelReconnectRef.current?.();
+						} else {
+							console.log('[reconnect] socket failed liveness check — keeping reconnect loop running');
+						}
+					});
+				}
 
 				try {
 
@@ -430,6 +514,12 @@ export default function CheatGame({
 					processingRef.current = false;
 					setAnimatingCards(null);
 
+					// Check whether hasActed needs to be updated
+					if (msg.current_player === msg.your_info?.id) setHasActed(false);
+
+					// Check if is my turn
+					setIsMyTurn(msg.current_player === msg.your_info?.id);
+
 					// Check if a 'new_round' message was missed
 					if (prevStateRef.current?.current_round !== msg?.current_round) {
 						setCountdown(null);
@@ -441,8 +531,6 @@ export default function CheatGame({
 						setHasClickedNextRound(false);
 						removeAllConnectionTimers();
 						setSpeakingPlayers(new Set());
-          	if (msg.current_player === msg.your_info?.id) setHasActed(false);
-          	setIsMyTurn(msg.current_player === msg.your_info?.id);
       	  }
 
 					return;
@@ -553,9 +641,9 @@ export default function CheatGame({
 				// delayed onclose, also observed in Brave).
 				const isCurrent = activeSocket === activeSocketRef.current;
 				console.log('[reconnect] onclose fired — code:', event.code, 'isCurrent:', isCurrent,
-					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOver);
+					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOverRef.current);
 				if (!isCurrent) return;
-				if (!gameOver && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
 			};
 
 			// Flush messages buffered during reconnect through the now-live handler
@@ -576,7 +664,7 @@ export default function CheatGame({
 		if (processingRef.current || animatingCards || dealingFromCenter || isDealingCards) return;
 
 		// Snapshot the queue generation. If a reconnect clears the queue while we're
-		// suspended in an await, the generation will have changed and we abort before
+		// suspended in an await, the generation will have changed, and we abort before
 		// calling removeProcessed() so we don't eat the first item of the new queue.
 		const generation = queueGenerationRef.current;
 
@@ -591,8 +679,11 @@ export default function CheatGame({
 			}
 		}
 
-		// Process the action
+		// Process the action. Wrapped in try/finally so a thrown error can't leave
+		// processingRef stuck true forever — that would silently freeze the queue and
+		// every future message for the rest of the game.
 		processingRef.current = true;
+		try {
 		if (msg.type === "state") {
 
 			// Get the previous state
@@ -615,6 +706,8 @@ export default function CheatGame({
 			// Reset hasActed if it becomes your turn
 			if (msg.current_player === msg.your_info.id) {
 				setHasActed(false);
+			} else {
+				setSelectedCards([]); // to prevent highlights being stuck
 			}
 			setIsMyTurn(msg.current_player === msg.your_info.id);
 
@@ -626,7 +719,7 @@ export default function CheatGame({
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg.player_id === msg.your_info.id));
+			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
 			const scatterRange = Math.min(Math.min(width * 0.08, 60), Math.min(height * 0.08, 50))  // Horizontal scatter based on width
@@ -815,14 +908,37 @@ export default function CheatGame({
 		// Abort if a reconnect cleared the queue while we were suspended in an await.
 		// Without this guard, a stale run would call removeProcessed() on the new queue
 		// and silently drop the first message (typically the post-reconnect state update).
-		if (queueGenerationRef.current !== generation) {
-			processingRef.current = false;
-			return;
+		if (queueGenerationRef.current === generation) {
+			// remove the processed action
+			removeProcessed(); // Remove after processing
 		}
-
-		// remove the processed action
-		removeProcessed(); // Remove after processing
-		processingRef.current = false;
+		} catch (e) {
+			console.error('CheatGame: processActionQueue failed processing message', msg, e);
+			// Drop the offending message rather than retrying it forever, so the queue
+			// (and every message behind it) isn't wedged for the rest of the game.
+			if (queueGenerationRef.current === generation) {
+				removeProcessed();
+			}
+			// Report to the backend so these show up in the game logs
+			try {
+				activeSocketRef.current?.send(JSON.stringify({
+					type: 'client_error',
+					message: String(e?.message ?? e),
+					stack: e?.stack ?? null,
+					processing_msg_type: msg?.type ?? null,
+				}));
+			} catch (sendError) {
+				// Socket unusable: do nothing
+			}
+			// If the error happened between setting and clearing one of these, it would
+			// otherwise stay stuck "true" forever, permanently freezing the queue
+			// for the rest of the game.
+			setAnimatingCards(null);
+			setDealingFromCenter(false);
+			setIsDealingCards(false);
+		} finally {
+			processingRef.current = false;
+		}
 
 	};
 
@@ -933,10 +1049,20 @@ export default function CheatGame({
 		}
 	}, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
-	// Notify backend the moment the player can see their turn, so the idle timer starts from now
+	// Notify backend the moment the player can see their turn, so the idle timer starts from now.
+	// The socket can die in the gap between a message setting isMyTurn=true and this effect
+	// actually running (effects fire after commit, not synchronously) — guard against send()
+	// throwing on a CLOSING/CLOSED socket, since an uncaught throw here has no ErrorBoundary
+	// to catch it.
 	useEffect(() => {
 		if (isMyTurn) {
-			activeSocketRef.current?.send(JSON.stringify({type: 'turn_acknowledged'}));
+			try {
+				if (activeSocketRef.current?.readyState === WebSocket.OPEN) {
+					activeSocketRef.current.send(JSON.stringify({type: 'turn_acknowledged'}));
+				}
+			} catch (e) {
+				console.error('CheatGame: failed to send turn_acknowledged', e);
+			}
 		} else {
 			setTimeoutRemaining(null);
 		}
@@ -1177,6 +1303,7 @@ export default function CheatGame({
 					state={state}
 					getPlayerColor={getPlayerColor}
 					experimentalMode={experimentalMode}
+					playerHighlight={playerHighlight}
 				/>
 
 				{/* Animation of cards being dealt */}
@@ -1237,6 +1364,7 @@ export default function CheatGame({
 					yourName={state.your_info.true_name}
 					pileCards={pileCards}
 					callBluff={callBluff}
+					callHintMessage={callHintMessage}
 					isDealingCards={isDealingCards}
 				/>
 

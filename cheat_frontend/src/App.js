@@ -22,7 +22,8 @@ function App() {
     const [gameStarted, setGameStarted] = useState(false);
 
     // Study mode phases: 'prelim' | 'game' | 'survey' | 'done'
-    const [studyPhase, setStudyPhase] = useState("prelim");
+    const initialPhase = new URLSearchParams(window.location.search).get("phase") ?? "prelim";
+    const [studyPhase, setStudyPhase] = useState(initialPhase);
     const [prolificId, setProlificId] = useState(null);
 
     const handleGameStart = (socket, initialGameData) => {

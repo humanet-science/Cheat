@@ -25,7 +25,7 @@ export default function StudyThanks({ timedOut = false }) {
                     Complete on Prolific
                 </a>
                 <p className="text-gray-600">
-                    If you are curious about the game, you can continue playing for free at{" "}
+                    If you enjoyed the game, you can continue playing for free at{" "}
                     <a
                         href="https://game.humanet.science"
                         target="_blank"
