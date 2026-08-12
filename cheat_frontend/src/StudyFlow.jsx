@@ -133,16 +133,51 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
     const [socket, setSocket] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isJoining, setIsJoining] = useState(false);
+    const [joinError, setJoinError] = useState(null);
     const [maxWaitSeconds, setMaxWaitSeconds] = useState(null);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const countdownRef = useRef(null);
+    const joinTimeoutRef = useRef(null);
+
+    const clearJoinTimeout = () => {
+        if (joinTimeoutRef.current) {
+            clearTimeout(joinTimeoutRef.current);
+            joinTimeoutRef.current = null;
+        }
+    };
+
+    // Lets the player back out of a join attempt that never resolves (e.g. server
+    // never replies), instead of being stuck on "Joining..." until they refresh.
+    const cancelJoinAttempt = () => {
+        clearJoinTimeout();
+        if (socket) {
+            socket.onmessage = null;
+            socket.onerror = null;
+            socket.onclose = null;
+            socket.close();
+            setSocket(null);
+        }
+        setIsJoining(false);
+    };
 
     const handleSetup = (e) => {
         e.preventDefault();
         if (!playerName.trim() || !selectedAvatar) return;
 
+        setJoinError(null);
         const ws = new WebSocket(getWebSocketURL());
         setSocket(ws);
+
+        clearJoinTimeout();
+        joinTimeoutRef.current = setTimeout(() => {
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
+            ws.close();
+            setSocket(null);
+            setIsJoining(false);
+            setJoinError("This is taking longer than expected. Please try again.");
+        }, 10000);
 
         ws.onopen = () => {
             ws.send(JSON.stringify({
@@ -168,6 +203,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
             }
 
             if (msg.type === "queue_joined") {
+                clearJoinTimeout();
                 if (msg.max_wait_seconds) setMaxWaitSeconds(msg.max_wait_seconds);
                 setIsJoining(false);
                 setShowConfirm(false);
@@ -185,6 +221,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                 }
                 onGameStart(ws, msg);
             } else if (msg.type === "no_games_available") {
+                clearJoinTimeout();
                 ws.close();
                 setSocket(null);
                 setIsJoining(false);
@@ -194,11 +231,13 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
         };
 
         ws.onerror = () => {
+            clearJoinTimeout();
             setIsJoining(false);
             setShowConfirm(false);
             setPhase("setup");
         };
         ws.onclose = () => {
+            clearJoinTimeout();
             setIsJoining(false);
             setPhase((prev) => (prev === "waiting" ? "setup" : prev));
         };
@@ -342,16 +381,22 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                                 <span className="font-bold"> However, once the game has started, closing or refreshing the browser tab will cause
                                     you to exit the study without receiving a completion code.</span>
                                 <br/><br/>
-                                <span className="font-bold">If you are inactive in the game you will be disconnected 60 seconds. </span>
-                                This is to prevent the game flow being interrupted by stalling players.
+                                <span className="font-bold">If you are inactive in the game you will be disconnected
+                                    after 60 seconds. </span> This is to prevent the game flow being interrupted
+                                    by stalling players.
                             </p>
+                            {joinError && (
+                                <p className="text-red-600 text-sm mb-4">{joinError}</p>
+                            )}
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setShowConfirm(false)}
-                                    disabled={isJoining}
-                                    className="flex-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-800 font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+                                    onClick={() => {
+                                        if (isJoining) cancelJoinAttempt();
+                                        setShowConfirm(false);
+                                    }}
+                                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
                                 >
-                                    Back
+                                    {isJoining ? "Cancel" : "Back"}
                                 </button>
                                 <button
                                     onClick={(e) => { setIsJoining(true); handleSetup(e); }}
