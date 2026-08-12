@@ -132,6 +132,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [socket, setSocket] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [isJoining, setIsJoining] = useState(false);
     const [maxWaitSeconds, setMaxWaitSeconds] = useState(null);
     const [secondsLeft, setSecondsLeft] = useState(null);
     const countdownRef = useRef(null);
@@ -168,6 +169,8 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
 
             if (msg.type === "queue_joined") {
                 if (msg.max_wait_seconds) setMaxWaitSeconds(msg.max_wait_seconds);
+                setIsJoining(false);
+                setShowConfirm(false);
                 setPhase("waiting");
             } else if (msg.type === "new_round") {
                 // Buffer any messages that arrive between now and CheatGame setting up its
@@ -184,12 +187,21 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
             } else if (msg.type === "no_games_available") {
                 ws.close();
                 setSocket(null);
+                setIsJoining(false);
+                setShowConfirm(false);
                 setPhase("no_games");
             }
         };
 
-        ws.onerror = () => setPhase("setup");
-        ws.onclose = () => setPhase((prev) => (prev === "waiting" ? "setup" : prev));
+        ws.onerror = () => {
+            setIsJoining(false);
+            setShowConfirm(false);
+            setPhase("setup");
+        };
+        ws.onclose = () => {
+            setIsJoining(false);
+            setPhase((prev) => (prev === "waiting" ? "setup" : prev));
+        };
     };
 
     const handleCancelWaiting = () => {
@@ -291,7 +303,7 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
         return (
             <div className="min-h-screen flex items-center justify-center px-4">
                 <form onSubmit={(e) => { e.preventDefault(); setShowConfirm(true); }} className="rounded-2xl bg-white p-8 max-w-md w-full shadow-2xl">
-                    <h2 className="text-xl font-bold text-gray-500 mb-2">You're in!</h2>
+                    <h2 className="text-xl font-bold text-gray-600 mb-2">You're in!</h2>
 
                     <p className="text-gray-500 text-sm mb-6">
                         Choose a name and avatar, then join the waiting room. The game will start automatically once enough other participants have joined.
@@ -336,15 +348,17 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setShowConfirm(false)}
-                                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+                                    disabled={isJoining}
+                                    className="flex-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-800 font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
                                 >
                                     Back
                                 </button>
                                 <button
-                                    onClick={(e) => { setShowConfirm(false); handleSetup(e); }}
-                                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
+                                    onClick={(e) => { setIsJoining(true); handleSetup(e); }}
+                                    disabled={isJoining}
+                                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap"
                                 >
-                                    I understand — Join
+                                    {isJoining ? "Joining ..." : "I understand — Join"}
                                 </button>
                             </div>
                         </div>
