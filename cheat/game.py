@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import logging
 import os
 import random
 import traceback
@@ -34,6 +35,8 @@ class CheatGame:
         game_id: str = None,
         predefined_messages: list = None,
         timeout: int = None,
+        logger_level=logging.INFO,
+        player_logger_level=logging.INFO,
     ):
         """CheatGame that can be played for multiple rounds.
 
@@ -52,6 +55,8 @@ class CheatGame:
         :param predefined_messages: list of predefined messages. If not None, players can only broadcast these messages.
             If None, the message box is visible from the frontend, from which players can send any message they like
         :param timeout: idle timeout. Backend will wait this many seconds before disconnecting a non-responsive player
+        :param logger_level: level to set for the game logger
+        :param player_logger_level: level to set for the player logger
         """
 
         # Set up the players
@@ -136,6 +141,8 @@ class CheatGame:
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
         self.player_logger = setup_player_logger(self.game_id, self.out_path)
+        self.logger.setLevel(logger_level)
+        self.player_logger.setLevel(player_logger_level)
 
         # Deal out cards to the players
         self.deal_cards()

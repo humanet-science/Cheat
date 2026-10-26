@@ -57,8 +57,16 @@ def get_client(kind: Literal["open_ai", "gemini", "deepseek"]):
 
 
 def generate_client_input(
-    kind, *, system_prompt, game_summary, additional_prompts: str = None
+    kind,
+    *,
+    system_prompt,
+    game_summary,
+    additional_prompts: str = None,
+    thinking_level: str = "low",
 ) -> dict:
+    """Builds the client-specific input. ``thinking_level`` only applies to Gemini; OpenAI and DeepSeek
+    reasoning is set via the model kwargs (``reasoning={"effort": ...}``, or the model name).
+    """
     if kind == "deepseek":
         res = [
             {"role": "system", "content": system_prompt},
@@ -81,21 +89,14 @@ def generate_client_input(
         from google.genai import types
 
         if additional_prompts:
-            res = dict(
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt
-                    + f" Remember: {additional_prompts}.",
-                    thinking_config=types.ThinkingConfig(thinking_level="low"),
-                ),
-                contents=game_summary,
-            )
-        else:
-            res = dict(
-                config=types.GenerateContentConfig(system_instruction=system_prompt),
-                thinking_config=types.ThinkingConfig(thinking_level="low"),
-                contents=game_summary,
-            )
-        return res
+            system_prompt += f" Remember: {additional_prompts}."
+        return dict(
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+            ),
+            contents=game_summary,
+        )
 
     else:
         raise ValueError(
@@ -103,15 +104,44 @@ def generate_client_input(
         )
 
 
-def input_to_client(client, kind, **model_kwargs):
+def input_to_client(client, kind, **model_kwargs) -> tuple[str, dict]:
+    """Queries the client and returns the response text, as well as metadata (model version actually served,
+    token counts) for logging. Token fields the provider does not report are None."""
     if kind == "gemini":
-        return client.models.generate_content(**model_kwargs).text
+        response = client.models.generate_content(**model_kwargs)
+        usage = response.usage_metadata
+        return response.text, dict(
+            model_version=response.model_version,
+            input_tokens=getattr(usage, "prompt_token_count", None),
+            output_tokens=getattr(usage, "candidates_token_count", None),
+            reasoning_tokens=getattr(usage, "thoughts_token_count", None),
+        )
 
     if kind == "open_ai":
-        return client.responses.create(**model_kwargs).output_text
+        response = client.responses.create(**model_kwargs)
+        usage = response.usage
+        return response.output_text, dict(
+            model_version=response.model,
+            input_tokens=getattr(usage, "input_tokens", None),
+            output_tokens=getattr(usage, "output_tokens", None),
+            reasoning_tokens=getattr(
+                getattr(usage, "output_tokens_details", None), "reasoning_tokens", None
+            ),
+        )
 
     if kind == "deepseek":
-        return client.chat.completions.create(**model_kwargs).choices[0].message.content
+        response = client.chat.completions.create(**model_kwargs)
+        usage = response.usage
+        return response.choices[0].message.content, dict(
+            model_version=response.model,
+            input_tokens=getattr(usage, "prompt_tokens", None),
+            output_tokens=getattr(usage, "completion_tokens", None),
+            reasoning_tokens=getattr(
+                getattr(usage, "completion_tokens_details", None),
+                "reasoning_tokens",
+                None,
+            ),
+        )
     else:
         raise ValueError(
             f"Unkown client {kind}! Choose from {','.join(SUPPORTED_CLIENTS)}."
@@ -276,6 +306,8 @@ class LLM_Player(Player):
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
         display_type: str | None = None,
         model_kwargs: dict = {},
+        thinking_level: str = "low",
+        max_consecutive_api_errors: int | None = None,
     ):
         super().__init__(
             id=id,
@@ -290,6 +322,12 @@ class LLM_Player(Player):
         self.system_prompt = system_prompt
         self.kind = kind
         self.model_kwargs = model_kwargs
+        self.thinking_level = thinking_level  # Gemini only
+
+        # If set, raise an error after this many API failures in a row (e.g. exhausted credits) rather than
+        # falling back to random moves indefinitely. None (default) never raises, as in live games.
+        self.max_consecutive_api_errors = max_consecutive_api_errors
+        self._consecutive_api_errors = 0
         self.speaker_types = speaker_types
 
     def __dict__(self):
@@ -298,8 +336,11 @@ class LLM_Player(Player):
             name=self.name,
             avatar=self.avatar,
             type=self.type,
+            display_type=self.display_type,
             kind=self.kind,
             system_prompt=self.system_prompt,
+            model_kwargs=self.model_kwargs,
+            thinking_level=self.thinking_level,
         )
 
     def write_info(self, path) -> None:
@@ -348,28 +389,51 @@ class LLM_Player(Player):
             game_summary=game_summary,
             system_prompt=self.system_prompt,
             additional_prompts=play_prompt,
+            thinking_level=self.thinking_level,
         )
 
         # Catch LLM response failures, e.g. due to server-side outages
         try:
-            response = input_to_client(
+            t_start = datetime.now()
+            response, response_meta = input_to_client(
                 kind=self.kind, client=self.client, **input_data, **self.model_kwargs
             )
 
-            # Log the response
+            # Log the response, along with the model version, token usage and latency
             game.player_logger.info(f"LLM response: {response}")
             game.log(
                 GameAction(
                     type="LLM_response",
                     player_id=self.id,
                     timestamp=datetime.now(),
-                    data=dict(response=response),
+                    data=dict(
+                        response=response,
+                        latency_s=(datetime.now() - t_start).total_seconds(),
+                        **response_meta,
+                    ),
                 )
             )
+            self._consecutive_api_errors = 0
 
         # Give nonsensical response that cannot be parsed. This will be caught and eventually a bot will take over
         except Exception as e:
             game.player_logger.error(f"Error obtaining LLM response: {e}")
+            game.log(
+                GameAction(
+                    type="LLM_API_error",
+                    player_id=self.id,
+                    timestamp=datetime.now(),
+                    data=dict(error=repr(e)),
+                )
+            )
+            self._consecutive_api_errors += 1
+            if (
+                self.max_consecutive_api_errors is not None
+                and self._consecutive_api_errors >= self.max_consecutive_api_errors
+            ):
+                raise RuntimeError(
+                    f"{self._consecutive_api_errors} consecutive LLM API errors; last error: {e!r}"
+                ) from e
             response = "Error"
 
         # Convert to a GameAction
@@ -425,6 +489,16 @@ class LLM_Player(Player):
                             cards_played=[str(c) for c in move.data["cards_played"]],
                         ),
                     ),
+                )
+            )
+
+            # Flag the fallback so that analyses can exclude random moves from the LLM's decisions
+            game.log(
+                GameAction(
+                    type="LLM_fallback_move",
+                    player_id=self.id,
+                    timestamp=datetime.now(),
+                    data={},
                 )
             )
             return await self.random_move(game)
