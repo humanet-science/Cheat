@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState,} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState,} from "react";
 import confetti from "canvas-confetti";
 import PlayerHand from './components/CheatGame/PlayerHand';
 
@@ -9,7 +9,7 @@ import DiscardAnimation from "./components/CheatGame/Animations/Discard";
 import {CardDeal, useCardDealAnimation} from './components/CheatGame/Animations/CardDeal';
 
 // Components
-import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay, KickedOutOverlay, TimeoutWarningOverlay} from "./components/CheatGame/GameOverlay";
+import {CardRevealOverlay, ConnectionDroppedOverlay, GameOverOverlay, GameStartOverlay, GameTerminatedOverlay, KickedOutOverlay, TimeoutWarningOverlay} from "./components/CheatGame/GameOverlay";
 import StatusMessage from "./components/CheatGame/StatusMessages";
 import {OpponentIcons} from "./components/CheatGame/Opponent";
 import {CenterPile} from "./components/CheatGame/Pile";
@@ -23,6 +23,9 @@ import {soundManager} from './utils/soundManager';
 import {useActionQueue} from './components/CheatGame/hooks/useActionQueue';
 import {useScreenSize} from "./components/CheatGame/hooks/useScreenSize";
 import {Logo} from './utils/Logo';
+import {shouldDropMessage} from './utils/chaosTesting';
+import {SESSION_KEYS, clearSessionToken, getSession, setSession} from './utils/session';
+import {report} from './utils/clientLogger';
 
 // Constants
 import {VALID_RANKS} from "./utils/constants";
@@ -38,6 +41,7 @@ import {VALID_RANKS} from "./utils/constants";
  *   - numPlayers: total number of players in game
  *   - experimentalMode: boolean for experimental features
  *   - predefinedMessages: array of allowed chat messages
+ *   - doubleDisguise: if true, a human displayed as a bot sees all other displayed bots as humans
  *   - selfId: current player's ID
  * @param {Object} currentRound - Current round state from backend
  * @param {Function} onUpdateRound - Callback to update round state
@@ -49,6 +53,10 @@ import {VALID_RANKS} from "./utils/constants";
  *   Used in Tutorial where game is scaled/transformed. If null, uses window height.
  * @param {number|null} [tutorialScale=null] - Scale factor for Tutorial context (e.g., 0.7).
  *   Passed to StatusMessage component to properly scale and position floating messages.
+ * @param {string|null} [callHintMessage=null] - Used in Tutorial. When set, clicking "Call!" shows
+ *   this message as a reminder instead of actually calling the bluff — for slides that want the
+ *   player to practice a different action (e.g. playing cards) while still allowing them to see
+ *   what calling looks like.
  */
 export default function CheatGame({
 																		socket,
@@ -64,6 +72,9 @@ export default function CheatGame({
 																		showDealAnimation = true,
 																		disableReconnect = false,
 																		clearMessagesRef = null,
+																		playerHighlight = null,
+																		callHintMessage = null,
+																		resumed = false,
 																	}) {
 
 	// Game state and previous state
@@ -92,7 +103,24 @@ export default function CheatGame({
 	} = useActionQueue();
 
 	// Use the persistent data from props
-	const {experimentalMode, numPlayers, selfId, predefinedMessages} = gameConfig;
+	const {experimentalMode, numPlayers, selfId, predefinedMessages, doubleDisguise} = gameConfig;
+
+	// Double disguise: if this (human) player is displayed to others as a bot, all other players displayed
+	// as bots are shown to them as humans, under their true names. Maps player id -> {displayName, trueName}
+	// for every opponent that is re-labelled in this way (empty if double disguise does not apply).
+	const relabelledPlayers = useMemo(() => {
+		const relabelled = new Map();
+		if (!doubleDisguise || state?.your_info?.type !== 'bot' || !state?.players) return relabelled;
+		for (const {your_info: info} of state.players) {
+			if (info.id !== state.your_info.id && info.type === 'bot') {
+				relabelled.set(info.id, {displayName: info.name, trueName: info.true_name ?? info.name});
+			}
+		}
+		return relabelled;
+	}, [doubleDisguise, state?.players, state?.your_info?.id, state?.your_info?.type]);
+
+	// Name under which a player should be shown to this player
+	const shownName = (playerId, name) => relabelledPlayers.get(playerId)?.trueName ?? name;
 
 	// New round
 	const [isNewRound, setIsNewRound] = useState(true);
@@ -102,6 +130,8 @@ export default function CheatGame({
 
 	// Track game over
 	const [gameOver, setGameOver] = useState(false);
+	const gameOverRef = useRef(false);
+	useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
 	const [winner, setWinner] = useState(null);
 	const [gameOverDetails, setGameOverDetails] = useState({declaredRank: null, actualCards: null});
 	const [hasClickedNextRound, setHasClickedNextRound] = useState(false);
@@ -109,6 +139,7 @@ export default function CheatGame({
 	// Track experiment over (experimental mode only)
 	const [experimentOver, setExperimentOver] = useState(false);
 	const [kickedOut, setKickedOut] = useState(false); // kicked mid-turn (experimental mode)
+	const [gameTerminated, setGameTerminated] = useState(false); // another player dropped out (terminate_on_dropout)
 
 	// Track connection dropped / reconnecting / reconnected flash
 	const [connectionDropped, setConnectionDropped] = useState(false);
@@ -118,17 +149,32 @@ export default function CheatGame({
 	// Idle timeout warning (seconds remaining when server sent the reminder)
 	const [timeoutRemaining, setTimeoutRemaining] = useState(null);
 
-	// Active socket (may be replaced on reconnect)
+	// Active socket (can be replaced on reconnect)
 	const [activeSocket, setActiveSocket] = useState(socket);
 	useEffect(() => { setActiveSocket(socket); }, [socket]);
 
-	// Session token for reconnection (persisted in localStorage by the queue phase)
-	const sessionTokenRef = useRef(localStorage.getItem('cheat_session_token'));
+	// Session token for reconnection (persisted in sessionStorage by the queue phase)
+	const sessionTokenRef = useRef(getSession(SESSION_KEYS.token));
+
+	// Set while the page is being refreshed/closed: the dying page must not try to reconnect,
+	// or it could claim the seat that the reloaded page is about to rejoin.
+	const unloadingRef = useRef(false);
+	// Pages put into the back/forward cache (persisted) may come back; those are reloaded on return
+	// instead (see App.js), so only a real unload counts here.
+	useEffect(() => {
+		const onPageHide = (e) => { if (!e.persisted) unloadingRef.current = true; };
+		window.addEventListener('pagehide', onPageHide);
+		return () => window.removeEventListener('pagehide', onPageHide);
+	}, []);
 
 	// Ping watchdog: if no ping arrives for 25s the connection is silently dead.
 	// Calls attemptReconnect directly — don't rely on onclose, which won't fire if
 	// the network is down and the close handshake can't complete.
 	const lastPingRef = useRef(Date.now());
+
+	// Returns a diagnostic snapshot of the current UI state; reassigned on every render so that socket
+	// handlers (which close over stale state) always get current values. See uiSnapshot below.
+	const uiSnapshotRef = useRef(() => ({}));
 	const pingWatchdogRef = useRef(null);
 	const reconnectingRef = useRef(false); // guard against double-triggering reconnect
 	const serverErrorRef = useRef(false);  // set on server_error to permanently suppress reconnect
@@ -144,6 +190,48 @@ export default function CheatGame({
 	// Called to abort a running reconnect loop when the active socket proves it's still alive
 	// (i.e. a message arrives on it while we're attempting to reconnect).
 	const cancelReconnectRef = useRef(null);
+	// Tracks the single in-flight liveness_check round trip, if any: {nonce, resolve}.
+	const pendingLivenessRef = useRef(null);
+
+	// Some browsers (Chromium/Brave observed) don't fire onclose immediately when the
+	// network drops — the socket object can sit in OPEN state and still deliver
+	// already-buffered messages after connectivity returns, even though the server
+	// gave up on it long ago. Neither a message arriving, nor a local send() not
+	// throwing, proves the socket is actually usable end-to-end right now (send()
+	// only checks local readyState — a dead TCP path can silently accept writes for a
+	// long time before the OS notices). Only a fresh round trip the server must
+	// actively participate in right now can prove that; a buffered/stale message can't
+	// fake a nonce that didn't exist until this call.
+	const verifySocketAlive = (socket) => {
+		return new Promise((resolve) => {
+			if (!socket || socket.readyState !== WebSocket.OPEN) {
+				resolve(false);
+				return;
+			}
+			const nonce = Math.random().toString(36).slice(2);
+			const timer = setTimeout(() => {
+				if (pendingLivenessRef.current?.nonce === nonce) {
+					pendingLivenessRef.current = null;
+					resolve(false);
+				}
+			}, 1500);
+			pendingLivenessRef.current = {
+				nonce,
+				resolve: (alive) => {
+					clearTimeout(timer);
+					pendingLivenessRef.current = null;
+					resolve(alive);
+				},
+			};
+			try {
+				socket.send(JSON.stringify({type: 'liveness_check', nonce}));
+			} catch (e) {
+				clearTimeout(timer);
+				pendingLivenessRef.current = null;
+				resolve(false);
+			}
+		});
+	};
 	// Ref always tracking the *current* active socket. Used inside onclose/offline handlers
 	// to discard events from old sockets that fire after a swap (race vs. React cleanup).
 	const activeSocketRef = useRef(socket);
@@ -158,9 +246,11 @@ export default function CheatGame({
 	const [animatingCards, setAnimatingCards] = useState(null); // {playerId, cards, targetPosition, starting x, starting y}
 	const [revealedCards, setRevealedCards] = useState(null); // {cards, wasLying}
 	const [pilePickupAnimation, setPilePickupAnimation] = useState(null);
-	const [isDealingCards, setIsDealingCards] = useState(true);
+	// When resuming a game after a page refresh, the cards are already dealt: skip the deal animation
+	// for the current round (later rounds are dealt as normal)
+	const [isDealingCards, setIsDealingCards] = useState(!resumed);
 	const [dealtCards, setDealtCards] = useState(0);
-	const [dealingFromCenter, setDealingFromCenter] = useState(showDealAnimation);
+	const [dealingFromCenter, setDealingFromCenter] = useState(showDealAnimation && !resumed);
 	const [centerDealCards, setCenterDealCards] = useState([]);
 	const [showLetsGo, setShowLetsGo] = useState(false);
 
@@ -230,14 +320,16 @@ export default function CheatGame({
 	// Attempt to reconnect using the stored session token.
 	// Keeps retrying every 2s until the server confirms (success) or explicitly rejects
 	// the token (slot expired) — rather than giving up after a fixed number of attempts.
-	// This handles the case where wifi is still off during early retries.
+	// This handles the case where Wi-Fi is still off during early retries.
 	const attemptReconnect = useCallback(async () => {
 		if (reconnectingRef.current) return;
 		if (serverErrorRef.current) return;
+		if (unloadingRef.current) return;
 		reconnectingRef.current = true;
 
 		const token = sessionTokenRef.current;
 		if (!token) { reconnectingRef.current = false; setConnectionDropped(true); return; }
+		console.log('[reconnect] starting attemptReconnect loop with token', token);
 
 		// Block interaction immediately — the visual spinner appears after a short delay
 		// so instant reconnects don't flash the badge, but clicks are always swallowed.
@@ -256,15 +348,23 @@ export default function CheatGame({
 			const result = await new Promise((resolve) => {
 				const ws = new WebSocket(WS_URL);
 				let settled = false;
+				// Distinguishes "never even got a WebSocket handshake" (real transport/
+				// network failure) from "connected fine, died/rejected after" — both used
+				// to log as an undifferentiated 'error', which made it impossible to tell
+				// whether retries were actually reaching the server.
+				let opened = false;
 				const finish = (outcome, newWs = null, buf = null) => {
 					if (settled) return;
 					settled = true;
 					if (outcome !== 'confirmed') ws.close();
 					resolve({outcome, ws: newWs, buffer: buf});
 				};
-				const timer = setTimeout(() => finish('timeout'), 4000);
+				const timer = setTimeout(() => finish(opened ? 'timeout-after-open' : 'timeout-no-open'), 4000);
 				const buffer = [];
-				ws.onopen = () => ws.send(JSON.stringify({type: 'reconnect', token}));
+				ws.onopen = () => {
+					opened = true;
+					ws.send(JSON.stringify({type: 'reconnect', token}));
+				};
 				ws.onmessage = (e) => {
 					clearTimeout(timer);
 					const msg = JSON.parse(e.data);
@@ -278,11 +378,12 @@ export default function CheatGame({
 					} else if (msg.type === 'reconnect_failed') {
 						// Server has no slot yet — it hasn't detected our disconnect yet
 						// (ping timeout takes ~15s). Treat as retriable, not terminal.
-						finish('error');
+						// This outcome proves full connectivity — we got a real server reply.
+						finish('no-slot-yet');
 					}
 				};
-				ws.onerror = () => { clearTimeout(timer); finish('error'); };
-				ws.onclose = () => { clearTimeout(timer); finish('error'); };
+				ws.onerror = () => { clearTimeout(timer); finish(opened ? 'error-after-open' : 'error-before-open'); };
+				ws.onclose = () => { clearTimeout(timer); finish(opened ? 'closed-after-open' : 'closed-before-open'); };
 			});
 
 			if (cancelled) { result.ws?.close(); break; }
@@ -335,17 +436,17 @@ export default function CheatGame({
 			if (Date.now() - lastPingRef.current > 25000) {
 				clearInterval(pingWatchdogRef.current);
 				try { activeSocket.close(); } catch(e) {}
-				if (!gameOver && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !quitConfirmedRef.current) attemptReconnect();
 			}
 		}, 5000);
 		return () => clearInterval(pingWatchdogRef.current);
 	}, [activeSocket]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when wifi drops —
+	// On macOS Chrome/Brave, WebSocket onclose doesn't fire immediately when Wi-Fi drops —
 	// the browser keeps the socket in OPEN state until the close handshake completes.
 	// The offline event fires immediately and lets us trigger reconnect right away.
 	// Guard with navigator.onLine: Chromium can fire the offline event with a delay, after
-	// wifi has already returned. In that case onLine is true and we skip the spurious reconnect.
+	// Wi-Fi has already returned. In that case onLine is true, and we skip the spurious reconnect.
 	//
 	// The online handler skips the throttled retry delay so reconnect attempts resume
 	// immediately when the network returns, rather than waiting for a possibly-throttled
@@ -356,7 +457,7 @@ export default function CheatGame({
 			console.log('[reconnect] offline fired — onLine:', navigator.onLine,
 				'reconnecting:', reconnectingRef.current,
 				'socketState:', activeSocketRef.current?.readyState);
-			if (!gameOver && !navigator.onLine) attemptReconnect();
+			if (!gameOverRef.current && !navigator.onLine) attemptReconnect();
 		};
 		const handleOnline = () => {
 			console.log('[reconnect] online fired — reconnecting:', reconnectingRef.current);
@@ -386,6 +487,25 @@ export default function CheatGame({
 				setDeclaredRank('');
 			}
 
+			// Chaos-testing: simulate outgoing messages getting lost, by wrapping the raw
+			// send() once per socket. No-op unless ?dropMessages=... is set; always a no-op
+			// in production builds. See utils/chaosTesting.js.
+			if (!activeSocket.__chaosWrapped) {
+				const rawSend = activeSocket.send.bind(activeSocket);
+				activeSocket.send = (data) => {
+					if (typeof data === 'string') {
+						try {
+							const parsed = JSON.parse(data);
+							if (shouldDropMessage(parsed.type, 'outgoing')) return;
+						} catch (e) {
+							// Not JSON (shouldn't happen) — send through untouched.
+						}
+					}
+					rawSend(data);
+				};
+				activeSocket.__chaosWrapped = true;
+			}
+
 			activeSocket.onmessage = (event) => {
 				let msg;
 				try {
@@ -395,21 +515,48 @@ export default function CheatGame({
 					return;
 				}
 
-				// Ping-pong with backend to keep connection alive
+				// Chaos-testing: simulate this incoming message getting lost.
+				if (shouldDropMessage(msg.type, 'incoming')) return;
+
+				// Ping-pong with backend to keep connection alive (server's own keepalive
+				// watchdog — always reply, independent of the liveness check below).
 				if (msg.type === 'ping') {
 					lastPingRef.current = Date.now();
-					activeSocket.send(JSON.stringify({type: 'pong'}));
+					try {
+						activeSocket.send(JSON.stringify({type: 'pong'}));
+					} catch (e) {
+						// Send failed — socket is dead. The liveness check below (triggered by
+						// reconnectingRef) doesn't apply here since we're not necessarily
+						// reconnecting yet, but there's nothing more to do with this ping either.
+					}
+					return;
 				}
 
-				// Any message on the active socket proves it's still alive.
-				// If we're stuck in a reconnect loop (e.g. triggered by a brief offline
-				// event while the server never detected a drop), cancel it immediately.
-				if (reconnectingRef.current) {
-					console.log('[reconnect] active socket still alive — cancelling reconnect loop');
-					cancelReconnectRef.current?.();
+				// Resolve a pending liveness_check round trip. Only a match to a nonce we
+				// generated moments ago counts — a buffered/stale message can't fake it.
+				if (msg.type === 'liveness_ack') {
+					if (pendingLivenessRef.current?.nonce === msg.nonce) {
+						pendingLivenessRef.current.resolve(true);
+					}
+					return;
 				}
 
-				if (msg.type === 'ping') return;
+				// A message merely arriving proves nothing — a zombie socket (browser hasn't
+				// fired onclose yet after a network drop) can still deliver already-buffered
+				// messages after the server has long since given up on it. Only cancel the
+				// reconnect loop once a fresh, unfakeable round trip confirms the socket is
+				// genuinely usable right now. Guard against starting a second check while one
+				// is already in flight.
+				if (reconnectingRef.current && !pendingLivenessRef.current) {
+					verifySocketAlive(activeSocket).then((alive) => {
+						if (alive) {
+							console.log('[reconnect] verified socket alive via liveness check — cancelling reconnect loop');
+							cancelReconnectRef.current?.();
+						} else {
+							console.log('[reconnect] socket failed liveness check — keeping reconnect loop running');
+						}
+					});
+				}
 
 				try {
 
@@ -417,7 +564,7 @@ export default function CheatGame({
 
 				if (msg.type === 'session_token') {
 					sessionTokenRef.current = msg.token;
-					localStorage.setItem('cheat_session_token', msg.token);
+					setSession(SESSION_KEYS.token, msg.token);
 					return;
 				}
 
@@ -430,6 +577,12 @@ export default function CheatGame({
 					processingRef.current = false;
 					setAnimatingCards(null);
 
+					// Check whether hasActed needs to be updated
+					if (msg.current_player === msg.your_info?.id) setHasActed(false);
+
+					// Check if is my turn
+					setIsMyTurn(msg.current_player === msg.your_info?.id);
+
 					// Check if a 'new_round' message was missed
 					if (prevStateRef.current?.current_round !== msg?.current_round) {
 						setCountdown(null);
@@ -441,9 +594,18 @@ export default function CheatGame({
 						setHasClickedNextRound(false);
 						removeAllConnectionTimers();
 						setSpeakingPlayers(new Set());
-          	if (msg.current_player === msg.your_info?.id) setHasActed(false);
-          	setIsMyTurn(msg.current_player === msg.your_info?.id);
       	  }
+
+					// Reconnected (or refreshed) between rounds: show the end-of-round screen again
+					if (msg.round_over && !msg.game_over) {
+						const winnerInfo = msg.players?.find(p => p.your_info.id === msg.winner_id)?.your_info;
+						const unmaskWinner = doubleDisguise && msg.your_info?.type === 'bot' && winnerInfo?.type === 'bot'
+							&& winnerInfo.id !== msg.your_info?.id;
+						setWinner(winnerInfo ? (unmaskWinner ? winnerInfo.true_name : winnerInfo.name) : null);
+						setPileCards([]);
+						setIsMyTurn(false);
+						setGameOver(true);
+					}
 
 					return;
 				}
@@ -507,12 +669,17 @@ export default function CheatGame({
 					}
 				}
 				if (msg.type === "server_error") {
+					clearSessionToken();
 					serverErrorRef.current = true;
 					setConnectionDropped(true);
 					setIsReconnecting(false);
 				}
 				if (msg.type === "timeout_reminder") {
 					setTimeoutRemaining(msg.time_remaining);
+					// Diagnose inactivity: could the player actually move? (see uiSnapshot)
+					report('ui_snapshot', {
+						reason: 'timeout_reminder', time_remaining: msg.time_remaining, ...uiSnapshotRef.current()
+					}, {withRecent: true, immediate: true});
 				}
 				if (msg.type === "player_reconnecting") {
 					addStatusMessage(msg.player_id, "Reconnecting...", false, true);
@@ -520,12 +687,24 @@ export default function CheatGame({
 				if (msg.type === "player_reconnect_resolved") {
 					removeConnectionTimer(msg.player_id);
 				}
+				if (msg.type === "game_terminated") {
+					// Another player dropped out and the game was ended early: show overlay with Finish button
+					quitConfirmedRef.current = true;  // prevents onclose from triggering reconnect
+					clearSessionToken();
+					setTimeoutRemaining(null);
+					setExperimentOver(true);
+					setGameTerminated(true);
+				}
 				if (msg.type === "study_complete") {
 					// Natural end-of-study: show win/stalemate overlay with Finish button
 					quitConfirmedRef.current = true;
+					clearSessionToken();
 					setExperimentOver(true);
 				}
 				if (msg.type === "quit_confirmed") {
+					// Sent when the player is removed for inactivity (or confirms their own quit)
+					report('ui_snapshot', {reason: 'quit_confirmed', ...uiSnapshotRef.current()}, {withRecent: true, immediate: true});
+					clearSessionToken();
 					setTimeoutRemaining(null);
 					removeConnectionTimer(state.your_info.id);
 					if (experimentalMode) {
@@ -553,9 +732,9 @@ export default function CheatGame({
 				// delayed onclose, also observed in Brave).
 				const isCurrent = activeSocket === activeSocketRef.current;
 				console.log('[reconnect] onclose fired — code:', event.code, 'isCurrent:', isCurrent,
-					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOver);
+					'reconnecting:', reconnectingRef.current, 'gameOver:', gameOverRef.current);
 				if (!isCurrent) return;
-				if (!gameOver && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
+				if (!gameOverRef.current && !disableReconnect && !quitConfirmedRef.current) attemptReconnect();
 			};
 
 			// Flush messages buffered during reconnect through the now-live handler
@@ -576,7 +755,7 @@ export default function CheatGame({
 		if (processingRef.current || animatingCards || dealingFromCenter || isDealingCards) return;
 
 		// Snapshot the queue generation. If a reconnect clears the queue while we're
-		// suspended in an await, the generation will have changed and we abort before
+		// suspended in an await, the generation will have changed, and we abort before
 		// calling removeProcessed() so we don't eat the first item of the new queue.
 		const generation = queueGenerationRef.current;
 
@@ -591,8 +770,11 @@ export default function CheatGame({
 			}
 		}
 
-		// Process the action
+		// Process the action. Wrapped in try/finally so a thrown error can't leave
+		// processingRef stuck true forever — that would silently freeze the queue and
+		// every future message for the rest of the game.
 		processingRef.current = true;
+		try {
 		if (msg.type === "state") {
 
 			// Get the previous state
@@ -615,6 +797,8 @@ export default function CheatGame({
 			// Reset hasActed if it becomes your turn
 			if (msg.current_player === msg.your_info.id) {
 				setHasActed(false);
+			} else {
+				setSelectedCards([]); // to prevent highlights being stuck
 			}
 			setIsMyTurn(msg.current_player === msg.your_info.id);
 
@@ -626,7 +810,7 @@ export default function CheatGame({
 			if (msg.declared_rank !== null) {
 				setDeclaredRank(msg.declared_rank);
 			}
-			setIsMyTurn(Boolean(msg.player_id === msg.your_info.id));
+			setIsMyTurn(Boolean(msg.current_player === msg.your_info.id));
 
 			// Generate final positions for each card BEFORE animating
 			const scatterRange = Math.min(Math.min(width * 0.08, 60), Math.min(height * 0.08, 50))  // Horizontal scatter based on width
@@ -694,8 +878,8 @@ export default function CheatGame({
 				declaredRank: msg.declared_rank,
 				caller: msg.caller,
 				accused: msg.accused,
-				caller_name: msg.caller_name,
-				accused_name: msg.accused_name
+				caller_name: shownName(msg.caller, msg.caller_name),
+				accused_name: shownName(msg.accused, msg.accused_name)
 			});
 
 			// Clear after showing cards
@@ -753,6 +937,11 @@ export default function CheatGame({
 
 		} else if (msg.type === "catch_up") {
 
+			// Restore the discarded ranks (lost if the page was refreshed)
+			if (Array.isArray(msg.discarded_ranks)) {
+				setDiscards(msg.discarded_ranks);
+			}
+
 			const expectedPileSize = msg.pile_plays.reduce((sum, p) => sum + p.card_count, 0);
 
 
@@ -794,7 +983,9 @@ export default function CheatGame({
 			// Game is over
 		} else if (msg.type === "round_over") {
 
-			setWinner(msg.winner ?? null);
+			// Winner is sent as a display name; show re-labelled players under their true name
+			const relabelledWinner = [...relabelledPlayers.values()].find(p => p.displayName === msg.winner);
+			setWinner(relabelledWinner ? relabelledWinner.trueName : (msg.winner ?? null));
 			setGameOverDetails({
 				declaredRank: msg.declared_rank ?? null,
 				actualCards: msg.actual_cards ?? null,
@@ -815,14 +1006,37 @@ export default function CheatGame({
 		// Abort if a reconnect cleared the queue while we were suspended in an await.
 		// Without this guard, a stale run would call removeProcessed() on the new queue
 		// and silently drop the first message (typically the post-reconnect state update).
-		if (queueGenerationRef.current !== generation) {
-			processingRef.current = false;
-			return;
+		if (queueGenerationRef.current === generation) {
+			// remove the processed action
+			removeProcessed(); // Remove after processing
 		}
-
-		// remove the processed action
-		removeProcessed(); // Remove after processing
-		processingRef.current = false;
+		} catch (e) {
+			console.error('CheatGame: processActionQueue failed processing message', msg, e);
+			// Drop the offending message rather than retrying it forever, so the queue
+			// (and every message behind it) isn't wedged for the rest of the game.
+			if (queueGenerationRef.current === generation) {
+				removeProcessed();
+			}
+			// Report to the backend so these show up in the game logs
+			try {
+				activeSocketRef.current?.send(JSON.stringify({
+					type: 'client_error',
+					message: String(e?.message ?? e),
+					stack: e?.stack ?? null,
+					processing_msg_type: msg?.type ?? null,
+				}));
+			} catch (sendError) {
+				// Socket unusable: do nothing
+			}
+			// If the error happened between setting and clearing one of these, it would
+			// otherwise stay stuck "true" forever, permanently freezing the queue
+			// for the rest of the game.
+			setAnimatingCards(null);
+			setDealingFromCenter(false);
+			setIsDealingCards(false);
+		} finally {
+			processingRef.current = false;
+		}
 
 	};
 
@@ -915,16 +1129,16 @@ export default function CheatGame({
 				.filter((player) => player.your_info.id !== state.your_info.id)
 				.map((player) => ({
 					id: player.your_info.id,
-					name: player.your_info.name,
+					name: shownName(player.your_info.id, player.your_info.name),
 					avatar: player.your_info.avatar,
 					cardCount: player.your_info.cardCount,
-					type: player.your_info.type,
+					type: relabelledPlayers.has(player.your_info.id) ? 'human' : player.your_info.type,
 					connected: player.your_info.connected
 				}));
 
 			setOpponents(newOpponents);
 		}
-	}, [state?.players, state?.your_info.id]);
+	}, [state?.players, state?.your_info.id, relabelledPlayers]);
 
 	// Play sound when Call Bluff! button pops up
 	useEffect(() => {
@@ -933,10 +1147,20 @@ export default function CheatGame({
 		}
 	}, [isMyTurn, state?.pile_size, state?.current_rank, hasActed]);
 
-	// Notify backend the moment the player can see their turn, so the idle timer starts from now
+	// Notify backend the moment the player can see their turn, so the idle timer starts from now.
+	// The socket can die in the gap between a message setting isMyTurn=true and this effect
+	// actually running (effects fire after commit, not synchronously) — guard against send()
+	// throwing on a CLOSING/CLOSED socket, since an uncaught throw here has no ErrorBoundary
+	// to catch it.
 	useEffect(() => {
 		if (isMyTurn) {
-			activeSocketRef.current?.send(JSON.stringify({type: 'turn_acknowledged'}));
+			try {
+				if (activeSocketRef.current?.readyState === WebSocket.OPEN) {
+					activeSocketRef.current.send(JSON.stringify({type: 'turn_acknowledged'}));
+				}
+			} catch (e) {
+				console.error('CheatGame: failed to send turn_acknowledged', e);
+			}
 		} else {
 			setTimeoutRemaining(null);
 		}
@@ -986,8 +1210,16 @@ export default function CheatGame({
 
 		// Replace any display names that do not match the actual player's name to avoid revealing
 		// experimental conditions. Make this independent of capitalisation since players will be typing fast.
-		if (state.your_info.name !== state.your_info.true_name) {
-			message = message.replace(new RegExp(state.your_info.name, 'gi'), state.your_info.true_name);
+		// Under double disguise, the same applies to the display names of re-labelled opponents.
+		const nameSubstitutions = [
+			{displayName: state.your_info.name, trueName: state.your_info.true_name},
+			...relabelledPlayers.values(),
+		];
+		for (const {displayName, trueName} of nameSubstitutions) {
+			if (displayName && trueName && displayName !== trueName) {
+				const escaped = displayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				message = message.replace(new RegExp(escaped, 'gi'), trueName);
+			}
 		}
 
 		if (playerElement) {
@@ -1103,6 +1335,71 @@ export default function CheatGame({
 		}));
 	};
 
+
+	// Diagnostic snapshot of what the player can see and do, reported when they are warned about or
+	// removed for inactivity. Distinguishes genuine inactivity from a stuck UI: are the Play / Call
+	// controls rendered, on screen, and not covered by another element? Is the action queue blocked?
+	uiSnapshotRef.current = () => {
+		try {
+			const describeElement = (el) => el
+				? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${String(el.className ?? '').slice(0, 80)}`
+				: null;
+			const controls = [...document.querySelectorAll('#play-controls button, #play-controls input')]
+				.slice(0, 20)
+				.map((el) => {
+					const r = el.getBoundingClientRect();
+					const cx = r.left + r.width / 2;
+					const cy = r.top + r.height / 2;
+					const onScreen = r.width > 0 && r.height > 0 && cx >= 0 && cy >= 0
+						&& cx <= window.innerWidth && cy <= window.innerHeight;
+					const topElement = onScreen ? document.elementFromPoint(cx, cy) : null;
+					return {
+						tag: el.tagName.toLowerCase(),
+						text: (el.textContent || el.placeholder || '').trim().slice(0, 30),
+						disabled: Boolean(el.disabled),
+						rect: [r.left, r.top, r.width, r.height].map(Math.round),
+						on_screen: onScreen,
+						covered_by: onScreen && topElement && !el.contains(topElement) ? describeElement(topElement) : null,
+					};
+				});
+			return {
+				self_id: selfId,
+				current_player: state?.current_player ?? null,
+				is_my_turn: isMyTurn,
+				has_acted: hasActed,
+				show_rank_input: showRankInput,
+				is_new_round: isNewRound,
+				declared_rank: declaredRank,
+				selected_cards: selectedCards.length,
+				hand_size: state?.your_info?.hand?.length ?? null,
+				pile_size: state?.pile_size ?? null,
+				current_rank: state?.current_rank ?? null,
+				// Things that block the action queue (processActionQueue) or the controls
+				processing: processingRef.current,
+				action_queue: actionQueue.length,
+				action_queue_types: actionQueue.slice(0, 10).map(m => m?.type),
+				animating_cards: Boolean(animatingCards),
+				dealing_from_center: dealingFromCenter,
+				is_dealing_cards: isDealingCards,
+				speaking_players: [...speakingPlayers],
+				revealed_cards: Boolean(revealedCards),
+				pile_pickup_animation: Boolean(pilePickupAnimation),
+				game_over: gameOver,
+				experiment_over: experimentOver,
+				kicked_out: kickedOut,
+				connection_dropped: connectionDropped,
+				is_reconnecting: isReconnecting,
+				socket_state: activeSocketRef.current?.readyState ?? null,
+				seconds_since_ping: Math.round((Date.now() - lastPingRef.current) / 1000),
+				has_focus: document.hasFocus(),
+				viewport: [window.innerWidth, window.innerHeight],
+				controls,
+			};
+		} catch (e) {
+			return {snapshot_error: String(e?.message ?? e)};
+		}
+	};
+
 	return (
 
 		<div className={`${containerWidth ? 'h-full' : 'min-h-screen'} text-white flex flex-col p-6`}>
@@ -1129,7 +1426,7 @@ export default function CheatGame({
 
 			{/* Game is over */}
 			<GameOverOverlay
-				gameOver={gameOver && !kickedOut}
+				gameOver={gameOver && !kickedOut && !gameTerminated}
 				winner={winner}
 				gameOverDetails={gameOverDetails}
 				parseCard={parseCard}
@@ -1177,6 +1474,7 @@ export default function CheatGame({
 					state={state}
 					getPlayerColor={getPlayerColor}
 					experimentalMode={experimentalMode}
+					playerHighlight={playerHighlight}
 				/>
 
 				{/* Animation of cards being dealt */}
@@ -1192,6 +1490,9 @@ export default function CheatGame({
 
 				{/* Kicked mid-turn in experimental mode */}
 				<KickedOutOverlay kickedOut={kickedOut} onFinish={onFinish} />
+
+				{/* Game ended early because another player dropped out (terminate_on_dropout) */}
+				<GameTerminatedOverlay gameTerminated={gameTerminated && !kickedOut} onFinish={onFinish} />
 
 				{/* Banner when game begins */}
 				<GameStartOverlay
@@ -1235,8 +1536,8 @@ export default function CheatGame({
 					playerPositions={playerPositionsRef.current}
 					yourId={selfId}
 					yourName={state.your_info.true_name}
-					pileCards={pileCards}
 					callBluff={callBluff}
+					callHintMessage={callHintMessage}
 					isDealingCards={isDealingCards}
 				/>
 

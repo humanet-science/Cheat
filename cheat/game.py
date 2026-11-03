@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import logging
 import os
 import random
 import traceback
@@ -9,7 +10,7 @@ from datetime import datetime
 from typing import List, Literal
 
 from cheat.action import GameAction
-from cheat.bots import RandomBot, SmartBot
+from cheat.bots import SmartBot
 from cheat.card import RANKS, SUITS, Card, str_to_Card
 from cheat.logging_config import setup_game_logger, setup_player_logger
 from cheat.player import Player
@@ -33,7 +34,11 @@ class CheatGame:
         round: int = 1,
         game_id: str = None,
         predefined_messages: list = None,
+        double_disguise: bool = False,
+        terminate_on_dropout: bool = False,
         timeout: int = None,
+        logger_level=logging.INFO,
+        player_logger_level=logging.INFO,
     ):
         """CheatGame that can be played for multiple rounds.
 
@@ -51,7 +56,14 @@ class CheatGame:
         :param game_id: unique game id. If None, a random UUID identifier is created
         :param predefined_messages: list of predefined messages. If not None, players can only broadcast these messages.
             If None, the message box is visible from the frontend, from which players can send any message they like
+        :param double_disguise: bool. If true, disguised players are only
+            portrayed as their displayed type to those players whose type and display type do match, but see other
+            disguised players with their real type.
+        :param terminate_on_dropout: if true, end the game if any player drops out. Only applies to experimental mode.
+            When terminating, the survey is still shown.
         :param timeout: idle timeout. Backend will wait this many seconds before disconnecting a non-responsive player
+        :param logger_level: level to set for the game logger
+        :param player_logger_level: level to set for the player logger
         """
 
         # Set up the players
@@ -76,6 +88,12 @@ class CheatGame:
 
         # List of allowed messages players can send
         self.predefined_messages = predefined_messages
+
+        # Whether disguised players also see each other as disguised
+        self.double_disguise = double_disguise
+
+        # In experimental mode, whether to terminate the game upon dropout
+        self.terminate_on_dropout = terminate_on_dropout
 
         # Ranks that have been discarded
         self.discarded_ranks = []
@@ -136,17 +154,8 @@ class CheatGame:
         # Get the loggers
         self.logger = setup_game_logger(self.game_id, self.out_path)
         self.player_logger = setup_player_logger(self.game_id, self.out_path)
-        self.log(
-            GameAction(
-                type="new_round",
-                player_id=None,
-                timestamp=datetime.now(),
-                data=dict(
-                    round=self.round,
-                    player_hands={p.id: [str(c) for c in p.hand] for p in self.players},
-                ),
-            )
-        )
+        self.logger.setLevel(logger_level)
+        self.player_logger.setLevel(player_logger_level)
 
         # Deal out cards to the players
         self.deal_cards()
@@ -160,6 +169,7 @@ class CheatGame:
             )
         )
 
+        # Set up the loggegr
         for p in self.players:
             p.logger = self.player_logger
             if self.player_info_path:
@@ -168,6 +178,19 @@ class CheatGame:
                 if p.id is not None:
                     p.write_info(self.player_info_path)
                     self.player_info_written[p.id] = True
+
+        # Write the initial state
+        self.log(
+            GameAction(
+                type="new_round",
+                player_id=None,
+                timestamp=datetime.now(),
+                data=dict(
+                    round=self.round,
+                    player_hands={p.id: [str(c) for c in p.hand] for p in self.players},
+                ),
+            )
+        )
 
     def get_player(self, player_id: int) -> Player:
         return self.players[player_id]
@@ -239,20 +262,20 @@ class CheatGame:
         # If new trick (pile empty) then this declared_rank becomes the round rank
         if len(self.pile) == 0:
             self.current_rank = declared_rank
-        else:
-            # otherwise must match current_rank
-            if declared_rank != self.current_rank:
-                raise InvalidMove(f"Must declare {self.current_rank} this trick.")
-
-        # Validate cards are in player's han: this may become necessary later when playing with LLMs
-        # TODO: error should be caught and should not crash the game!
-        for c in cards_played:
-            if c not in player.hand:
-                raise InvalidMove("Trying to play a card not in hand.")
+        # else:
+        #     # otherwise must match current_rank
+        #     if declared_rank != self.current_rank:
+        #         raise InvalidMove(f"Must declare {self.current_rank} this trick.")
+        #
+        # # Validate cards are in player's hand: this may become necessary later when playing with LLMs
+        # # TODO: error should be caught and should not crash the game!
+        # if any([c not in player.hand for c in cards_played]):
+        #     raise InvalidMove("Trying to play a card not in hand.")
 
         # remove cards and add to pile
         for c in cards_played:
             player.hand.remove(c)
+
         self.pile.extend([str_to_Card(c) for c in cards_played])
         self.pile_plays.append(
             {
@@ -349,7 +372,7 @@ class CheatGame:
                 )
             )
             self.player_logger.info(
-                f"{player.name} discards {', '.join(discarded_ranks)}."
+                f"{player.display_name} discards {', '.join(discarded_ranks)}."
             )
             return f"Player {player.id} discards {', '.join(discarded_ranks)}."
         return None
@@ -379,7 +402,7 @@ class CheatGame:
                 type="win", player_id=winner.id, timestamp=datetime.now(), data=None
             )
         )
-        self.logger.info(f"End of round: {winner.name} wins!")
+        self.logger.info(f"End of round: {winner.display_name} wins!")
 
     def log(self, action: GameAction, **kwargs):
         """Logs a new action to the database. The index of the action is appended to the players list of actions, so
@@ -440,6 +463,8 @@ class CheatGame:
             ],
             "experimental_mode": self.experimental_mode,
             "predefined_messages": self.predefined_messages,
+            "double_disguise": self.double_disguise,
+            "terminate_on_dropout": self.terminate_on_dropout,
         }
 
     async def broadcast_to_all(self, message: dict, *, append_state: bool = True):
@@ -452,10 +477,12 @@ class CheatGame:
             else:
                 await player.send_message(message)
 
-    async def broadcast_to_others(self, exclude_player_id: int, message: dict):
+    async def broadcast_to_others(self, exclude_player_id: int | list, message: dict):
         """Broadcast a message to all except one human players in game"""
+        if isinstance(exclude_player_id, int):
+            exclude_player_id = [exclude_player_id]
         for player in self.players:
-            if player.id != exclude_player_id:
+            if player.id not in exclude_player_id:
                 await player.send_message(message)
 
     async def send_state_to_all(self):
@@ -503,7 +530,9 @@ class CheatGame:
 
         msg_was_broadcast = False
         for player in _query_players:
-            if player.type in ["bot", "LLM"]:
+            if (player.type in ["bot", "LLM"]) or (
+                player.display_type == "bot" and player.type == "human"
+            ):
                 msg = player.broadcast_message(self, message_type)
                 msg_was_broadcast = msg is not None
                 if msg is not None:
@@ -516,15 +545,32 @@ class CheatGame:
                             data=msg,
                         )
                     )
-                    await self.broadcast_to_all(
-                        {
-                            "type": "bot_message",
-                            "sender_id": player.id,
-                            "message": msg,
-                            **self.get_info(),
-                        }
-                    )
-                    self.player_logger.info(f"{player.name} broadcasts: {msg}")
+                    # Fake bots broadcast the messages only to others, not to themselves. Under double disguise,
+                    # other disguised players see them as humans, so they do not receive the bot messages either.
+                    if player.display_type == "bot" and player.type == "human":
+                        await self.broadcast_to_others(
+                            exclude_player_id=[
+                                p.id for p in self.players if p.type != p.display_type
+                            ]
+                            if self.double_disguise
+                            else player.id,
+                            message={
+                                "type": "bot_message",
+                                "sender_id": player.id,
+                                "message": msg,
+                                **self.get_info(),
+                            },
+                        )
+                    else:
+                        await self.broadcast_to_all(
+                            {
+                                "type": "bot_message",
+                                "sender_id": player.id,
+                                "message": msg,
+                                **self.get_info(),
+                            }
+                        )
+                    self.player_logger.info(f"{player.display_name} broadcasts: {msg}")
 
         return msg_was_broadcast
 
@@ -556,19 +602,52 @@ class CheatGame:
                 )
             )
             self.player_logger.info(
-                f"{self.players[data['sender_id']].name} broadcasts: {data['message']}"
+                f"{self.players[data['sender_id']].display_name} broadcasts: {data['message']}"
             )
 
-            # Broadcast instantly to all players
-            await self.broadcast_to_all(
-                {
-                    "type": "human_message",
-                    "sender_id": data["sender_id"],
-                    "sender_name": self.players[data["sender_id"]].name,
-                    "message": data["message"],
-                    "num_players": len(self.players),
-                }
-            )
+            # Broadcast instantly to all players except if the player is a fake bot, in which case the
+            # human message is only reflected back to the sending player and repressed for all others to
+            # maintain the deception.
+            # If double_disguise is true, broadcast the message to all other disguised players
+            if not (
+                self.players[data["sender_id"]].display_type == "bot"
+                and self.players[data["sender_id"]].type == "human"
+            ):
+                await self.broadcast_to_all(
+                    {
+                        "type": "human_message",
+                        "sender_id": data["sender_id"],
+                        "sender_name": self.players[data["sender_id"]].name,
+                        "message": data["message"],
+                        "num_players": len(self.players),
+                    }
+                )
+            else:
+                # If double_disguise is true, broadcast the message to all other disguised players;
+                # else reflect back only to the sender
+                if self.double_disguise:
+                    await self.broadcast_to_others(
+                        exclude_player_id=[
+                            p.id for p in self.players if p.type == p.display_type
+                        ],
+                        message={
+                            "type": "human_message",
+                            "sender_id": data["sender_id"],
+                            "sender_name": self.players[data["sender_id"]].name,
+                            "message": data["message"],
+                            "num_players": len(self.players),
+                        },
+                    )
+                else:
+                    await self.players[data["sender_id"]].send_message(
+                        {
+                            "type": "human_message",
+                            "sender_id": data["sender_id"],
+                            "sender_name": self.players[data["sender_id"]].name,
+                            "message": data["message"],
+                            "num_players": len(self.players),
+                        }
+                    )
 
         elif data.get("type") == "turn_acknowledged":
             # Set directly on player rather than queuing, so the outer game loop
@@ -582,6 +661,16 @@ class CheatGame:
                 )
             )
             player.turn_acknowledged = True
+
+        # Frontend caught an exception in its own message-processing loop. Logged only —
+        # deliberately not put on message_queue, so a client-side bug can never be mistaken
+        # for a game move (e.g. consuming a human player's turn-input slot).
+        elif data.get("type") == "client_error":
+            self.logger.error(
+                f"Frontend error for player {player.id} ({player.display_name}) "
+                f"while processing '{data.get('processing_msg_type')}': {data.get('message')}\n"
+                f"{data.get('stack') or ''}"
+            )
 
         elif data.get("type") == "quit":
             await self.broadcast_to_all(
@@ -597,13 +686,17 @@ class CheatGame:
 
     async def play(self, player: Player, declared_rank: str, cards: list) -> None:
         """Play a card"""
+
+        # Copy so play_turn's hand mutations don't clear this reference
+        cards = list(cards)
+
         await self.collect_messages(
             player_id=player.id, message_type="thinking_new_play"
         )
-        self.play_turn(player, declared_rank, cards)
         self.player_logger.info(
-            f"{player.name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
+            f"{player.display_name} plays {', '.join([str(c) for c in cards])} and declares {declared_rank}."
         )
+        self.play_turn(player, declared_rank, cards)
 
         # If the player forgot to call the previous player, not realising they had no cards left,
         # that player wins
@@ -625,6 +718,7 @@ class CheatGame:
                     "actual_cards": [str(c) for c in cards],
                 }
             )
+            await self.send_state_to_all()
             self.winner_cleanup(player)
 
         # Else: broadcast the play
@@ -661,12 +755,12 @@ class CheatGame:
         # Check who picks up the pile to determine who goes next
         if f"Player {player.id} picks up" in result:
             self.player_logger.info(
-                f"Unsuccessful call by {self.players[self.turn].name}."
+                f"Unsuccessful call by {self.players[self.turn].display_name}."
             )
             was_lying = False
         else:
             self.player_logger.info(
-                f"Successful call by {self.players[self.turn].name}."
+                f"Successful call by {self.players[self.turn].display_name}."
             )
             was_lying = True
 
@@ -686,10 +780,12 @@ class CheatGame:
             }
         )
 
-        # Whoever picked up cards does a four-of-a-kind check
+        # Unsuccessful call means caller skips a turn.
+        # Whoever picked up cards also does a four-of-a-kind check
         if was_lying:
             await self.check_for_fours(self.players[last_player])
         else:
+            self.next_player()
             await self.check_for_fours(player)
 
         # Send updated state to all clients after bluff
@@ -697,11 +793,6 @@ class CheatGame:
 
         # Collect opinions
         await self.collect_messages()
-
-        # Unsuccessful call means caller skips a turn
-        if not was_lying:
-            self.next_player()
-            await self.send_state_to_all()
 
         return was_lying
 
@@ -713,6 +804,10 @@ class CheatGame:
 
         # Start the round
         while not self.round_over:
+            # Game may have been terminated externally (e.g. a dropout with terminate_on_dropout)
+            if self.game_over:
+                return
+
             # Check for new messages without blocking
             try:
                 data = await asyncio.wait_for(self.message_queue.get(), timeout=0.1)
@@ -730,7 +825,7 @@ class CheatGame:
                 continue
 
             self.logger.debug(
-                f"Current player: {current_player.name} (id: {current_player.id}, type: {current_player.type})"
+                f"Current player: {current_player.display_name} (id: {current_player.id}, type: {current_player.type})"
             )
 
             # Human's turn
@@ -854,7 +949,7 @@ class CheatGame:
                     was_lying = await self.call(current_player)
 
                     # If the call was successful, they play
-                    if was_lying:
+                    if was_lying and not self.round_over:
                         action = await current_player.make_move(self)
                         declared_rank = action.data.get("declared_rank")
                         cards = action.data.get("cards_played")
@@ -871,11 +966,46 @@ class CheatGame:
             if self.round + 1 > self.num_rounds:
                 self.game_over = True
 
+    async def terminate_due_to_dropout(self, player):
+        """End the game immediately because a player dropped out (experimental mode with terminate_on_dropout).
+        Remaining players are informed and can proceed to the survey."""
+        if self.game_over:
+            return
+        self.log(
+            GameAction(
+                type="player_exit",
+                player_id=player.id,
+                timestamp=datetime.now(),
+                data=None,
+            )
+        )
+        self.log(
+            GameAction(
+                type="game_terminated",
+                player_id=player.id,
+                timestamp=datetime.now(),
+                data=dict(reason="player_dropout"),
+            )
+        )
+        self.logger.info(
+            f"Player {player.display_name} dropped out; terminating game (terminate_on_dropout)"
+        )
+        self.game_over = True
+        await self.broadcast_to_all(
+            {"type": "game_terminated", "reason": "player_dropout"}, append_state=False
+        )
+
     async def replace_player_with_bot(self, player):
         """Replace a disconnected player with a bot in multiplayer games"""
 
         if player.id in self._replacing or self.players[player.id] is not player:
             return
+
+        # In experimental mode, a single dropout can end the game for everyone instead
+        if self.experimental_mode and self.terminate_on_dropout:
+            await self.terminate_due_to_dropout(player)
+            return
+
         self._replacing.add(player.id)
 
         self.log(
@@ -886,20 +1016,19 @@ class CheatGame:
                 data=None,
             )
         )
-        self.logger.info(f"Player {player.name} left, replacing with bot")
+        self.logger.info(f"Player {player.display_name} left, replacing with bot")
 
         # Create a bot with the same characteristics
         bot_name = f"{player.name}_bot"
-        bot = RandomBot(
+        bot = SmartBot(
             id=player.id,  # Keep the same ID
             name=bot_name,
             display_name=f"{player.display_name}_bot"
             if player.display_type != "bot"
             else player.display_name,
             avatar=player.avatar,  # Keep the same avatar
-            p_call=0.3,
-            p_lie=0.3,
-            verbosity=0.2,
+            verbosity=player.verbosity if self.experimental_mode else 0.2,
+            is_replacement=True,
         )
 
         # Transfer the hand and logger
@@ -925,9 +1054,23 @@ class CheatGame:
                 {
                     "type": "human_message",
                     "sender_id": bot.id,
-                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!",
+                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!"
+                    if not self.experimental_mode
+                    else f"🤖 {player.display_name} left, I'm their AI replacement!",
                     **self.get_info(),
                 }
+            )
+        elif self.double_disguise:
+            await self.broadcast_to_others(
+                [p.id for p in self.players if p.type == p.display_type],
+                {
+                    "type": "human_message",
+                    "sender_id": bot.id,
+                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!"
+                    if not self.experimental_mode
+                    else f"🤖 {player.display_name} left, I'm their AI replacement!",
+                    **self.get_info(),
+                },
             )
 
         # Send updated game state to all players
@@ -946,8 +1089,9 @@ class CheatGame:
         self._new_round_confirmations = set()
 
         # Start a timer: 30 seconds to start a new round in multiplayer mode
-        # Wait for at least one confirmation
-        # TODO: adjust this for the experimental mode?
+        # Wait for at least one confirmation. In experimental mode the confirmation
+        # count only drives the countdown UI — see the timeout-reached branch below,
+        # which always continues regardless of who confirmed.
         timeout = (
             30
             if (self.game_mode == "multiplayer" and self.timeout is None)
@@ -984,6 +1128,16 @@ class CheatGame:
 
             # Timeout reached
             if elapsed > timeout:
+                if self.experimental_mode:
+                    # Study games always continue automatically after the countdown,
+                    # regardless of who confirmed — a dropped "new_round" message
+                    # shouldn't get a player disconnected. The per-turn idle timeout
+                    # (game.py play_round) is what enforces inactivity once it's
+                    # actually their turn.
+                    self.logger.info(
+                        "Timeout reached in experimental mode; starting new round for everyone"
+                    )
+                    break
                 if len(self._new_round_confirmations) == 0:
                     # No one confirmed - end game
                     if self.game_mode != "single":
@@ -1014,10 +1168,12 @@ class CheatGame:
                                 player.timed_out = True
                                 await player.send_message({"type": "quit_confirmed"})
                                 await player.ws.close()
-                                self.logger.info(f"Closed WebSocket for {player.name}")
+                                self.logger.info(
+                                    f"Closed WebSocket for {player.display_name}"
+                                )
                             except Exception as e:
                                 self.logger.error(
-                                    f"Error closing WebSocket for {player.name}: {e}"
+                                    f"Error closing WebSocket for {player.display_name}: {e}"
                                 )
                             player.connected = False
                     break

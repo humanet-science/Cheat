@@ -43,7 +43,7 @@ treatments:
     predefined_messages: ~
 
     # Total number of games of this kind
-    num_games: 4
+    num_games: 0
 
     # Number of rounds per game
     num_rounds: 3
@@ -75,14 +75,14 @@ treatments:
         avatar: 🧜‍♂️
         name: Bob
       - type: SmartBot
-        name: Beep Boop
+        name: AuraAI-1
         avatar: 🤖
         verbosity: 0.3
       - type: human
         avatar: 🧜‍♂️
         name: Cooper
       - type: SmartBot
-        name: His Botness
+        name: AuraAI-2
         avatar: 🤖
         verbosity: 0.2
 
@@ -90,10 +90,10 @@ treatments:
     predefined_messages: ~
 
     # Total number of games of this kind
-    num_games: 0
+    num_games: 4
 
     # Number of rounds per game
-    num_rounds: 3
+    num_rounds: 2
 
     # Max waiting time (in minutes)
     # After this time, players will be shown the completion code and can submit.
@@ -107,7 +107,7 @@ treatments:
   - game:
       experimental_mode: True
       out_dir: ~/Cheat_game_data/ # Directory for game data
-      note: '4H2S_control' # Additional note to add to the output directory
+      note: 'control' # Additional note to add to the output directory
       game_id: ~
 
     # Player settings
@@ -124,25 +124,36 @@ treatments:
       - type: human
         avatar: 🧜‍♂️
         name: Candice
-        display_name: Beep Boop
+        display_name: AuraAI-1
         display_type: bot
+        verbosity: 0.4
       - type: human
         avatar: 🧜‍♂️
         name: Cooper
       - type: human
         avatar: 🧜‍♂️
         name: Owen
-        display_name: His Botness
+        display_name: AuraAI-2
         display_type: bot
+        verbosity: 0.4
 
     # Only allow certain custom messages. If None, players can use the full message box
-    predefined_messages: ~
+    predefined_messages:
+      - "Hello"
+      - "Hahaa"
+      - "Sorry"
+      - "Nice"
+      - "Yikes"
+      - "Damn"
+      - "No way!"
+      - "Try harder"
+      - "They lyin'"
 
     # Total number of games of this kind
-    num_games: 4
+    num_games: 0
 
     # Number of rounds per game
-    num_rounds: 3
+    num_rounds: 2
 
     # Max waiting time (in minutes)
     # After this time, players will be shown the completion code and can submit.
@@ -193,7 +204,7 @@ treatments:
     num_games: 0
 
     # Number of rounds per game
-    num_rounds: 3
+    num_rounds: 2
 
     # Max waiting time (in minutes)
     # After this time, players will be shown the completion code and can submit.

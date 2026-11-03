@@ -20,7 +20,14 @@ import yaml
 
 # Load the API keys
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -32,7 +39,7 @@ import cheat.bots
 from cheat.game import CheatGame
 from cheat.logging_config import setup_logging
 from cheat.player import HumanPlayer, get_player
-from cheat.utils import game_from_config
+from cheat.utils import game_from_config, silence_console_logs
 
 # Set up logging
 loggers = setup_logging()
@@ -279,8 +286,14 @@ def new_game(
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
         predefined_messages=game_config.get("predefined_messages", None),
+        double_disguise=game_config["game"].get("double_disguise", False),
+        terminate_on_dropout=game_config["game"].get("terminate_on_dropout", False),
         timeout=game_config.get("timeout", None),
     )
+
+    # Turn off console logging, if specified (file logging is unaffected)
+    if not game_config.get("show_logs", False):
+        silence_console_logs(game)
 
     # Set the system prompt for all LLM players, if not specified from the config
     for i, player in enumerate(game.players):
@@ -345,6 +358,9 @@ async def try_start_game_from_queue(num_players, mode):
         # If an API key is missing (e.g. for a mixed LLM-human game), kick waiting players out of the queue
         except cheat.MissingAPIKeyError as e:
             server_log.error(e)
+        except Exception as e:
+            server_log.error(f"Failed to start game: {e}")
+            traceback.print_exc()
 
 
 async def start_study_slot(slot: GameSlot):
@@ -403,9 +419,11 @@ async def run_game(_game: CheatGame):
     """Run a single game to completion"""
     try:
         server_log.info(
-            f"Starting new game with {len(_game.players)} players; game id: {_game.game_id}."
+            f"Starting game {_game.game_id} with {len(_game.players)} players."
         )
         while not _game.game_over:
+            server_log.info(f"Round {_game.round} starting in game {_game.game_id}.")
+
             await _game.broadcast_to_all(
                 {"type": "new_round", **_game.get_info()}, append_state=True
             )
@@ -430,7 +448,7 @@ async def run_game(_game: CheatGame):
         for player in _game.players:
             if player.type == "human":
                 server_log.debug(
-                    f"Player {player.name}: connected={player.connected}, has_ws={player.ws is not None}"
+                    f"Player {player.display_name}: connected={player.connected}, has_ws={player.ws is not None}"
                 )
 
         # Notify connected human players the game is over
@@ -439,9 +457,11 @@ async def run_game(_game: CheatGame):
             if player.type == "human" and player.connected and player.ws:
                 try:
                     await player.ws.send_json({"type": msg_type})
-                    server_log.info(f"Sent {msg_type} to {player.name}")
+                    server_log.info(f"Sent {msg_type} to {player.display_name}")
                 except Exception as e:
-                    server_log.error(f"Error sending {msg_type} to {player.name}: {e}")
+                    server_log.error(
+                        f"Error sending {msg_type} to {player.display_name}: {e}"
+                    )
 
     except Exception as e:
         server_log.error(f"Error in game {_game.game_id}: {e}")
@@ -551,7 +571,7 @@ async def websocket_endpoint(ws: WebSocket):
                 _game = active_games.get(game_id)
                 if not _game:
                     ws_log.info(
-                        f"Reconnect for {old_player.name}: game {game_id} already ended"
+                        f"Reconnect for {old_player.display_name}: game {game_id} already ended"
                     )
                     await ws.send_json(
                         {"type": "server_error", "message": "Game has ended"}
@@ -568,6 +588,10 @@ async def websocket_endpoint(ws: WebSocket):
                             "type": "reconnect_confirmed",
                             **old_player.get_info(),
                             **_game.get_info(),
+                            # So a refreshed page can restore the end-of-round screen between rounds
+                            "round_over": _game.round_over,
+                            "game_over": _game.game_over,
+                            "winner_id": _game.winner,
                         }
                     )
 
@@ -586,11 +610,12 @@ async def websocket_endpoint(ws: WebSocket):
                         {
                             "type": "catch_up",
                             "pile_plays": _game.pile_plays,
+                            "discarded_ranks": _game.discarded_ranks,
                         }
                     )
 
                     ws_log.info(
-                        f"Player {old_player.name} reconnected to game {game_id}"
+                        f"Player {old_player.display_name} reconnected to game {game_id}"
                     )
             else:
                 await ws.send_json({"type": "reconnect_failed"})
@@ -783,7 +808,7 @@ async def websocket_endpoint(ws: WebSocket):
                     )
                 except asyncio.TimeoutError:
                     ws_log.warning(
-                        f"Ping timeout for {player.name if player else 'unknown'}, closing connection"
+                        f"Ping timeout for {player.display_name if player else 'unknown'}, closing connection"
                     )
                     try:
                         await ws.close(code=1001)
@@ -800,6 +825,19 @@ async def websocket_endpoint(ws: WebSocket):
 
                 if message["type"] == "pong":
                     _pong_received.set()
+                    continue
+
+                # Dedicated liveness probe: the client uses this to verify a socket it
+                # suspects might be a "zombie" (browser hasn't fired onclose yet after a
+                # network drop, but the connection is actually dead) before trusting it.
+                # Unlike an inbound message merely arriving, or a local send() not
+                # throwing, echoing the nonce back requires this exact connection to
+                # still be genuinely alive end-to-end right now — a buffered/stale
+                # message can't fake a nonce that didn't exist until this round trip.
+                elif message["type"] == "liveness_check":
+                    await ws.send_json(
+                        {"type": "liveness_ack", "nonce": message.get("nonce")}
+                    )
                     continue
 
                 # Player has left the queue. If the player is the creator of the game, the game is removed from the
@@ -837,33 +875,39 @@ async def websocket_endpoint(ws: WebSocket):
 
                     # Non-creating player has left the waiting queue for a specific game
                     elif player.session_token in player_to_game:
-                        _game = waiting_games[player_to_game[player.session_token]]
-                        for p in _game.players:
-                            if p.session_token == player.session_token:
-                                p.connected = False
-                                player_to_game.pop(player.session_token)
-                                await player.ws.send_json({"type": "quit_confirmed"})
-                                p.ws = None
-                                break
+                        _game_id = player_to_game[player.session_token]
+                        if _game_id not in waiting_games:
+                            pass  # already moved to an active game; stale exit_queue, ignore
+                        else:
+                            _game = waiting_games[_game_id]
+                            for p in _game.players:
+                                if p.session_token == player.session_token:
+                                    p.connected = False
+                                    player_to_game.pop(player.session_token)
+                                    await player.ws.send_json(
+                                        {"type": "quit_confirmed"}
+                                    )
+                                    p.ws = None
+                                    break
 
-                        await _game.broadcast_to_all(
-                            {
-                                "type": "player_exited_queue",
-                                "num_connected": len(
-                                    [
-                                        p
-                                        for p in _game.players
-                                        if p.connected and p.type == "human"
-                                    ]
-                                ),
-                                "num_slots": len(
-                                    [p for p in _game.players if p.type == "human"]
-                                ),
-                            }
-                        )
-                        ws_log.info(
-                            f"{player.name} left the queue for game {_game.game_id}."
-                        )
+                            await _game.broadcast_to_all(
+                                {
+                                    "type": "player_exited_queue",
+                                    "num_connected": len(
+                                        [
+                                            p
+                                            for p in _game.players
+                                            if p.connected and p.type == "human"
+                                        ]
+                                    ),
+                                    "num_slots": len(
+                                        [p for p in _game.players if p.type == "human"]
+                                    ),
+                                }
+                            )
+                            ws_log.info(
+                                f"{player.name} left the queue for game {_game.game_id}."
+                            )
 
                     # Study player leaving the queue
                     elif player in study_participants:
@@ -925,13 +969,15 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
 
     except WebSocketDisconnect:
-        ws_log.info(f"WebSocket disconnected: {player.name if player else 'Unknown'}")
+        ws_log.info(
+            f"WebSocket disconnected: {player.display_name if player else 'Unknown'}"
+        )
     except RuntimeError as e:
         # Starlette raises RuntimeError("WebSocket is not connected") when receive_json
         # is called after the socket has already been closed (e.g. by the ping loop).
         # Treat this identically to a clean disconnect so the finally block runs normally.
         ws_log.info(
-            f"WebSocket closed unexpectedly for {player.name if player else 'Unknown'}: {e}"
+            f"WebSocket closed unexpectedly for {player.display_name if player else 'Unknown'}: {e}"
         )
     except Exception as e:
         ws_log.error(f"WebSocket error: {e}")
@@ -965,9 +1011,6 @@ async def websocket_endpoint(ws: WebSocket):
                     for p in _game.players:
                         if p.session_token == player.session_token:
                             p.connected = False
-                            server_log.info(
-                                f"Marked {p.name} as disconnected in game {game_id}"
-                            )
                             break
 
                     # Always give a grace period so the player can reconnect.
@@ -1010,7 +1053,7 @@ async def websocket_endpoint(ws: WebSocket):
                         else:
                             if grace > 0:
                                 server_log.info(
-                                    f"Grace period expired for {_p.name}, replacing with bot"
+                                    f"Grace period expired for {_p.display_name}."
                                 )
                             await _g.broadcast_to_all(
                                 {
@@ -1018,8 +1061,38 @@ async def websocket_endpoint(ws: WebSocket):
                                     "player_id": _p.id,
                                 }
                             )
+                            server_log.info(f"Replacing {_p.display_name} with a bot.")
                             await _g.replace_player_with_bot(_p)
                         reconnection_slots.pop(_t, None)
+
+                        # Re-check after popping: if two grace periods expired
+                        # simultaneously, each task may have seen the other still in
+                        # reconnection_slots and chosen bot-replacement over ending the
+                        # game. Now that this slot is removed, check whether any humans
+                        # remain and end the game if not.
+                        if not _g.game_over:
+                            still_connected_recheck = [
+                                p
+                                for p in _g.players
+                                if p.type == "human" and p.connected
+                            ]
+                            still_in_grace_recheck = [
+                                p
+                                for p in _g.players
+                                if p.type == "human"
+                                and not p.connected
+                                and getattr(p, "session_token", None)
+                                in reconnection_slots
+                            ]
+                            if (
+                                not still_connected_recheck
+                                and not still_in_grace_recheck
+                            ):
+                                ws_log.info(
+                                    f"All humans gone from game {_gid} after bot replacement, ending game."
+                                )
+                                await _g.handle_message(_p, {"type": "quit"})
+                                _g.game_over = True
 
                     task = asyncio.create_task(_delayed_replace())
                     if token and not getattr(player, "timed_out", False):
@@ -1028,9 +1101,14 @@ async def websocket_endpoint(ws: WebSocket):
                             "game_id": game_id,
                             "task": task,
                         }
-                    server_log.info(
-                        f"Marked {player.name} as disconnected in game {game_id}, grace period started"
-                    )
+                    if getattr(player, "timed_out", False):
+                        server_log.info(
+                            f"Marked {player.display_name} as disconnected in game {game_id}"
+                        )
+                    else:
+                        server_log.info(
+                            f"Marked {player.display_name} as disconnected in game {game_id}, grace period started"
+                        )
 
                     if not getattr(player, "timed_out", False):
                         await _game.broadcast_to_all(
@@ -1061,6 +1139,78 @@ async def websocket_endpoint(ws: WebSocket):
                 await _ping_task
             except asyncio.CancelledError:
                 pass
+
+
+## ---------------------------------------------------------------------------------------------------------------------
+## Client diagnostics endpoint
+## ---------------------------------------------------------------------------------------------------------------------
+
+# Limits for client diagnostic reports (see cheat_frontend/src/utils/clientLogger.js)
+CLIENT_LOG_MAX_BODY_BYTES = 512_000
+CLIENT_LOG_MAX_ENTRIES = 200
+
+
+@app.post("/api/client_log")
+async def client_log(request: Request):
+    """Store diagnostic reports from a player's browser (errors, UI snapshots, visibility changes).
+
+    Reports are appended to client_log.jsonl in the game's output folder if the game is known, otherwise to
+    game_data/client_logs/client_log_<date>.jsonl. The body is sent as text/plain JSON so that browsers can
+    send it with navigator.sendBeacon and without a CORS preflight.
+    """
+    body = await request.body()
+    if len(body) > CLIENT_LOG_MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Payload too large")
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
+        raise HTTPException(
+            status_code=400, detail="Expected an object with an 'entries' list"
+        )
+
+    game_id = payload.get("game_id")
+    out_path = game_out_paths.get(game_id) if isinstance(game_id, str) else None
+    if out_path:
+        log_file = Path(out_path) / "client_log.jsonl"
+    else:
+        log_file = (
+            Path(__file__).parent.parent
+            / "game_data"
+            / "client_logs"
+            / f"client_log_{datetime.now():%Y%m%d}.jsonl"
+        )
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    common = {
+        "received_at": datetime.now().isoformat(),
+        "game_id": game_id,
+        "player_id": payload.get("player_id"),
+        "prolific_id": payload.get("prolific_id"),
+        "page_session_id": payload.get("page_session_id"),
+        "user_agent": payload.get("user_agent"),
+    }
+    entries = [
+        e for e in payload["entries"][:CLIENT_LOG_MAX_ENTRIES] if isinstance(e, dict)
+    ]
+    with open(log_file, "a") as f:
+        for entry in entries:
+            f.write(json.dumps({**entry, **common}) + "\n")
+
+    # Surface errors in the server log too
+    for entry in entries:
+        if entry.get("kind") in (
+            "console_error",
+            "uncaught_error",
+            "unhandled_rejection",
+            "render_error",
+        ):
+            server_log.warning(
+                f"Client {entry.get('kind')} (game {game_id}, player {common['player_id']}): "
+                f"{str(entry.get('message'))[:300]}"
+            )
+    return {"status": "ok", "stored": len(entries)}
 
 
 ## ---------------------------------------------------------------------------------------------------------------------

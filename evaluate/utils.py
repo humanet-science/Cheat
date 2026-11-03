@@ -15,7 +15,7 @@ def setup_game(
     # Game players from the config
     game_players = []
     for p in config["players"]:
-        game_players.append(get_player(p))
+        game_players.append(get_player(**p))
 
     # Add players
     game = CheatGame(

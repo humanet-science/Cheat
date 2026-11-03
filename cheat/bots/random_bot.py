@@ -20,17 +20,19 @@ class RandomBot(BotPlayer):
         p_call: float = 0.3,
         p_lie: float = 0.3,
         verbosity: float = 0.3,
+        is_replacement: bool = False,
     ):
         super().__init__(
             id=id,
             name=name,
             display_name=display_name,
             avatar=avatar,
+            verbosity=verbosity,
             display_type=display_type,
+            is_replacement=is_replacement,
         )
         self.p_call = p_call
         self.p_lie = p_lie
-        self.verbosity = verbosity
 
     def __dict__(self):
         return dict(
@@ -44,9 +46,13 @@ class RandomBot(BotPlayer):
         )
 
     def write_info(self, path) -> None:
-        """Writes out the configuration"""
+        """Write out the internal configuration"""
+        _path = f"{path}/Player_{self.id if self.id is not None else self.name}.pickle"
+        if self.is_replacement:
+            _path = _path.replace(".pickle", "_replacement.pickle")
+
         with open(
-            f"{path}/Player_{self.id if self.id is not None else self.name}.pickle",
+            _path,
             "wb",
         ) as file:
             pickle.dump(self.__dict__(), file)
@@ -60,8 +66,11 @@ class RandomBot(BotPlayer):
         # If this is the first play of the trick, choose a declared rank (not Ace)
         if len(game.pile) == 0:
             # choose declared rank strategically or randomly (cannot declare Ace, and also do not declare a discarded rank)
-            available = [r for r in RANKS if r != "A" and r not in game.discarded_ranks]
-            declared_rank = random.choice(available or [r for r in RANKS if r != "A"])
+            available = list(set([c.rank for c in self.hand if c.rank != "A"]))
+            declared_rank = random.choice(
+                available
+                or [r for r in RANKS if r != "A" and r not in game.discarded_ranks]
+            )
         else:
             declared_rank = game.current_rank  # must match current trick rank
 

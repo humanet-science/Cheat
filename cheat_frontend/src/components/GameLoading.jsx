@@ -158,9 +158,8 @@ const LoadingWindow = ({
                 <>
                     <div className="text-white text-lg mb-5">
                         Share the game key <span
-                        className="whitespace-nowrap bg-gradient-to-br from-yellow-400 to-green-400 px-2 py-1 rounded-lg font-mono">{gameKey}</span> with other players so they can join by clicking <span
-                        className="inline-flex items-center justify-center gap-[1.3pt] whitespace-nowrap bg-gradient-to-br from-orange-400 to-pink-400 font-bold px-2 py-1 rounded-lg"><img src="/icons/link_icon.svg" className="w-5 h-5" alt=""/>Join Game
-                        </span> from the homepage.
+                        className="whitespace-nowrap bg-gradient-to-br from-yellow-400 to-green-400 px-2 py-1 rounded-lg font-mono">{gameKey}</span> with other players so they can join
+                        your game.
                     </div>
                 </>
             )}
