@@ -2,9 +2,9 @@ import React, {useState, useEffect, useLayoutEffect, useRef, useCallback} from '
 import CheatGame from '../CheatGame';
 
 const EXPERIMENT_NAME_MAP = {
-	'Player 1': 'Participant 1',
+	'Player 1': 'Human 1',
 	'Player 2': 'AI agent 1',
-	'Player 3': 'Participant 2',
+	'Player 3': 'Human 2',
 	'Player 4': 'AI agent 2',
 };
 
@@ -47,7 +47,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 2,
 	title: "AI agents",
-	description: "Some of the players will be AI agents; you'll recognise them by their icons.",
+	description: "Some of the players may be AI agents; you'll recognise them by their icons.",
 	experimentOnly: true,
 	playerHighlight: 'bots',
 	messages: [{
@@ -71,7 +71,7 @@ const TUTORIAL_SLIDES = [{
 }, {
 	id: 3,
 	title: "Human players",
-	description: "The rest of the players will be other participants like you; you will recognise them by their animal avatars.",
+	description: "You will recognise other human participants by their animal avatars.",
 	experimentOnly: true,
 	playerHighlight: 'humans',
 	messages: [{

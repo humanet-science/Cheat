@@ -20,7 +20,14 @@ import yaml
 
 # Load the API keys
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -279,6 +286,8 @@ def new_game(
         out_dir=game_config["game"].get("out_dir"),
         note=game_config["game"].get("note"),
         predefined_messages=game_config.get("predefined_messages", None),
+        double_disguise=game_config["game"].get("double_disguise", False),
+        terminate_on_dropout=game_config["game"].get("terminate_on_dropout", False),
         timeout=game_config.get("timeout", None),
     )
 
@@ -579,6 +588,10 @@ async def websocket_endpoint(ws: WebSocket):
                             "type": "reconnect_confirmed",
                             **old_player.get_info(),
                             **_game.get_info(),
+                            # So a refreshed page can restore the end-of-round screen between rounds
+                            "round_over": _game.round_over,
+                            "game_over": _game.game_over,
+                            "winner_id": _game.winner,
                         }
                     )
 
@@ -597,6 +610,7 @@ async def websocket_endpoint(ws: WebSocket):
                         {
                             "type": "catch_up",
                             "pile_plays": _game.pile_plays,
+                            "discarded_ranks": _game.discarded_ranks,
                         }
                     )
 
@@ -1125,6 +1139,78 @@ async def websocket_endpoint(ws: WebSocket):
                 await _ping_task
             except asyncio.CancelledError:
                 pass
+
+
+## ---------------------------------------------------------------------------------------------------------------------
+## Client diagnostics endpoint
+## ---------------------------------------------------------------------------------------------------------------------
+
+# Limits for client diagnostic reports (see cheat_frontend/src/utils/clientLogger.js)
+CLIENT_LOG_MAX_BODY_BYTES = 512_000
+CLIENT_LOG_MAX_ENTRIES = 200
+
+
+@app.post("/api/client_log")
+async def client_log(request: Request):
+    """Store diagnostic reports from a player's browser (errors, UI snapshots, visibility changes).
+
+    Reports are appended to client_log.jsonl in the game's output folder if the game is known, otherwise to
+    game_data/client_logs/client_log_<date>.jsonl. The body is sent as text/plain JSON so that browsers can
+    send it with navigator.sendBeacon and without a CORS preflight.
+    """
+    body = await request.body()
+    if len(body) > CLIENT_LOG_MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Payload too large")
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
+        raise HTTPException(
+            status_code=400, detail="Expected an object with an 'entries' list"
+        )
+
+    game_id = payload.get("game_id")
+    out_path = game_out_paths.get(game_id) if isinstance(game_id, str) else None
+    if out_path:
+        log_file = Path(out_path) / "client_log.jsonl"
+    else:
+        log_file = (
+            Path(__file__).parent.parent
+            / "game_data"
+            / "client_logs"
+            / f"client_log_{datetime.now():%Y%m%d}.jsonl"
+        )
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    common = {
+        "received_at": datetime.now().isoformat(),
+        "game_id": game_id,
+        "player_id": payload.get("player_id"),
+        "prolific_id": payload.get("prolific_id"),
+        "page_session_id": payload.get("page_session_id"),
+        "user_agent": payload.get("user_agent"),
+    }
+    entries = [
+        e for e in payload["entries"][:CLIENT_LOG_MAX_ENTRIES] if isinstance(e, dict)
+    ]
+    with open(log_file, "a") as f:
+        for entry in entries:
+            f.write(json.dumps({**entry, **common}) + "\n")
+
+    # Surface errors in the server log too
+    for entry in entries:
+        if entry.get("kind") in (
+            "console_error",
+            "uncaught_error",
+            "unhandled_rejection",
+            "render_error",
+        ):
+            server_log.warning(
+                f"Client {entry.get('kind')} (game {game_id}, player {common['player_id']}): "
+                f"{str(entry.get('message'))[:300]}"
+            )
+    return {"status": "ok", "stored": len(entries)}
 
 
 ## ---------------------------------------------------------------------------------------------------------------------

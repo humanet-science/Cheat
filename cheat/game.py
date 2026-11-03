@@ -34,6 +34,8 @@ class CheatGame:
         round: int = 1,
         game_id: str = None,
         predefined_messages: list = None,
+        double_disguise: bool = False,
+        terminate_on_dropout: bool = False,
         timeout: int = None,
         logger_level=logging.INFO,
         player_logger_level=logging.INFO,
@@ -54,6 +56,11 @@ class CheatGame:
         :param game_id: unique game id. If None, a random UUID identifier is created
         :param predefined_messages: list of predefined messages. If not None, players can only broadcast these messages.
             If None, the message box is visible from the frontend, from which players can send any message they like
+        :param double_disguise: bool. If true, disguised players are only
+            portrayed as their displayed type to those players whose type and display type do match, but see other
+            disguised players with their real type.
+        :param terminate_on_dropout: if true, end the game if any player drops out. Only applies to experimental mode.
+            When terminating, the survey is still shown.
         :param timeout: idle timeout. Backend will wait this many seconds before disconnecting a non-responsive player
         :param logger_level: level to set for the game logger
         :param player_logger_level: level to set for the player logger
@@ -81,6 +88,12 @@ class CheatGame:
 
         # List of allowed messages players can send
         self.predefined_messages = predefined_messages
+
+        # Whether disguised players also see each other as disguised
+        self.double_disguise = double_disguise
+
+        # In experimental mode, whether to terminate the game upon dropout
+        self.terminate_on_dropout = terminate_on_dropout
 
         # Ranks that have been discarded
         self.discarded_ranks = []
@@ -450,6 +463,8 @@ class CheatGame:
             ],
             "experimental_mode": self.experimental_mode,
             "predefined_messages": self.predefined_messages,
+            "double_disguise": self.double_disguise,
+            "terminate_on_dropout": self.terminate_on_dropout,
         }
 
     async def broadcast_to_all(self, message: dict, *, append_state: bool = True):
@@ -462,10 +477,12 @@ class CheatGame:
             else:
                 await player.send_message(message)
 
-    async def broadcast_to_others(self, exclude_player_id: int, message: dict):
+    async def broadcast_to_others(self, exclude_player_id: int | list, message: dict):
         """Broadcast a message to all except one human players in game"""
+        if isinstance(exclude_player_id, int):
+            exclude_player_id = [exclude_player_id]
         for player in self.players:
-            if player.id != exclude_player_id:
+            if player.id not in exclude_player_id:
                 await player.send_message(message)
 
     async def send_state_to_all(self):
@@ -528,11 +545,16 @@ class CheatGame:
                             data=msg,
                         )
                     )
-                    # Fake bots broadcast the messages only to others, not to themselves
+                    # Fake bots broadcast the messages only to others, not to themselves. Under double disguise,
+                    # other disguised players see them as humans, so they do not receive the bot messages either.
                     if player.display_type == "bot" and player.type == "human":
                         await self.broadcast_to_others(
-                            player.id,
-                            {
+                            exclude_player_id=[
+                                p.id for p in self.players if p.type != p.display_type
+                            ]
+                            if self.double_disguise
+                            else player.id,
+                            message={
                                 "type": "bot_message",
                                 "sender_id": player.id,
                                 "message": msg,
@@ -585,7 +607,8 @@ class CheatGame:
 
             # Broadcast instantly to all players except if the player is a fake bot, in which case the
             # human message is only reflected back to the sending player and repressed for all others to
-            # maintain the deception
+            # maintain the deception.
+            # If double_disguise is true, broadcast the message to all other disguised players
             if not (
                 self.players[data["sender_id"]].display_type == "bot"
                 and self.players[data["sender_id"]].type == "human"
@@ -600,15 +623,31 @@ class CheatGame:
                     }
                 )
             else:
-                await self.players[data["sender_id"]].send_message(
-                    {
-                        "type": "human_message",
-                        "sender_id": data["sender_id"],
-                        "sender_name": self.players[data["sender_id"]].name,
-                        "message": data["message"],
-                        "num_players": len(self.players),
-                    }
-                )
+                # If double_disguise is true, broadcast the message to all other disguised players;
+                # else reflect back only to the sender
+                if self.double_disguise:
+                    await self.broadcast_to_others(
+                        exclude_player_id=[
+                            p.id for p in self.players if p.type == p.display_type
+                        ],
+                        message={
+                            "type": "human_message",
+                            "sender_id": data["sender_id"],
+                            "sender_name": self.players[data["sender_id"]].name,
+                            "message": data["message"],
+                            "num_players": len(self.players),
+                        },
+                    )
+                else:
+                    await self.players[data["sender_id"]].send_message(
+                        {
+                            "type": "human_message",
+                            "sender_id": data["sender_id"],
+                            "sender_name": self.players[data["sender_id"]].name,
+                            "message": data["message"],
+                            "num_players": len(self.players),
+                        }
+                    )
 
         elif data.get("type") == "turn_acknowledged":
             # Set directly on player rather than queuing, so the outer game loop
@@ -765,6 +804,10 @@ class CheatGame:
 
         # Start the round
         while not self.round_over:
+            # Game may have been terminated externally (e.g. a dropout with terminate_on_dropout)
+            if self.game_over:
+                return
+
             # Check for new messages without blocking
             try:
                 data = await asyncio.wait_for(self.message_queue.get(), timeout=0.1)
@@ -923,11 +966,46 @@ class CheatGame:
             if self.round + 1 > self.num_rounds:
                 self.game_over = True
 
+    async def terminate_due_to_dropout(self, player):
+        """End the game immediately because a player dropped out (experimental mode with terminate_on_dropout).
+        Remaining players are informed and can proceed to the survey."""
+        if self.game_over:
+            return
+        self.log(
+            GameAction(
+                type="player_exit",
+                player_id=player.id,
+                timestamp=datetime.now(),
+                data=None,
+            )
+        )
+        self.log(
+            GameAction(
+                type="game_terminated",
+                player_id=player.id,
+                timestamp=datetime.now(),
+                data=dict(reason="player_dropout"),
+            )
+        )
+        self.logger.info(
+            f"Player {player.display_name} dropped out; terminating game (terminate_on_dropout)"
+        )
+        self.game_over = True
+        await self.broadcast_to_all(
+            {"type": "game_terminated", "reason": "player_dropout"}, append_state=False
+        )
+
     async def replace_player_with_bot(self, player):
         """Replace a disconnected player with a bot in multiplayer games"""
 
         if player.id in self._replacing or self.players[player.id] is not player:
             return
+
+        # In experimental mode, a single dropout can end the game for everyone instead
+        if self.experimental_mode and self.terminate_on_dropout:
+            await self.terminate_due_to_dropout(player)
+            return
+
         self._replacing.add(player.id)
 
         self.log(
@@ -981,6 +1059,18 @@ class CheatGame:
                     else f"🤖 {player.display_name} left, I'm their AI replacement!",
                     **self.get_info(),
                 }
+            )
+        elif self.double_disguise:
+            await self.broadcast_to_others(
+                [p.id for p in self.players if p.type == p.display_type],
+                {
+                    "type": "human_message",
+                    "sender_id": bot.id,
+                    "message": f"🤖 {player.display_name} left, I'm their bot replacement!"
+                    if not self.experimental_mode
+                    else f"🤖 {player.display_name} left, I'm their AI replacement!",
+                    **self.get_info(),
+                },
             )
 
         # Send updated game state to all players
