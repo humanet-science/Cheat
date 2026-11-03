@@ -12,6 +12,7 @@ from cheat.player import Player
 from .bot_messages import generate_comment
 
 SUPPORTED_CLIENTS = ["open_ai", "gemini", "deepseek"]
+DEEPSEEK_TIMEOUT_S = 300  # p99 of deepseek-reasoner latency in our games is ~260 s
 
 
 class MissingAPIKeyError(Exception):
@@ -47,8 +48,12 @@ def get_client(kind: Literal["open_ai", "gemini", "deepseek"]):
             raise MissingAPIKeyError(
                 "Missing API key for Deepseek! Add 'DEEPSEEK_API_KEY' to your os.environ keys!"
             )
+        # DeepSeek holds requests open when busy rather than rejecting them; without a shorter timeout than the
+        # client default (600 s), single calls can hang for most of an hour before the retry succeeds
         return OpenAI(
-            api_key=os.environ["DEEPSEEK_API_KEY"], base_url="https://api.deepseek.com"
+            api_key=os.environ["DEEPSEEK_API_KEY"],
+            base_url="https://api.deepseek.com",
+            timeout=DEEPSEEK_TIMEOUT_S,
         )
     else:
         raise ValueError(
@@ -274,6 +279,11 @@ def is_valid_move(move: GameAction, game, hand: list[Card]) -> tuple[bool, str]:
         if not all([c in hand for c in move.data.get("cards_played", [])]):
             return False, f"You can only play cards you currently hold."
 
+        # The same card listed more than once
+        cards_played = [str(c) for c in move.data.get("cards_played", [])]
+        if len(set(cards_played)) != len(cards_played):
+            return False, "You cannot play the same card more than once."
+
         # Declared rank is an Ace
         if move.data.get("declared_rank") == "A":
             return False, "You cannot declare Aces."
@@ -308,6 +318,7 @@ class LLM_Player(Player):
         model_kwargs: dict = {},
         thinking_level: str = "low",
         max_consecutive_api_errors: int | None = None,
+        connect: bool = True,
     ):
         super().__init__(
             id=id,
@@ -318,7 +329,9 @@ class LLM_Player(Player):
             type="LLM",
             display_type=display_type,
         )
-        self.client = get_client(kind)
+        # Without a connection (e.g. when loading a finished game for analysis), no API key is needed, but the player
+        # cannot make moves
+        self.client = get_client(kind) if connect else None
         self.system_prompt = system_prompt
         self.kind = kind
         self.model_kwargs = model_kwargs
