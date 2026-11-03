@@ -194,7 +194,8 @@ const WelcomePage = ({onGameStart}) => {
             }
 
             if (msg.type === "session_token") {
-                localStorage.setItem("cheat_session_token", msg.token);
+                // Kept on the socket; App stores it for refresh-to-resume once the game starts
+                ws._sessionToken = msg.token;
                 return;
             }
 

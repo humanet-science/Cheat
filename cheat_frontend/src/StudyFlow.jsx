@@ -198,7 +198,8 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
             }
 
             if (msg.type === "session_token") {
-                localStorage.setItem("cheat_session_token", msg.token);
+                // Kept on the socket; App stores it for refresh-to-resume once the game starts
+                ws._sessionToken = msg.token;
                 return;
             }
 
@@ -366,24 +367,26 @@ const StudyFlow = ({ onGameStart, onProlificId }) => {
                 </form>
 
                 {showConfirm && (
-                    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 px-4">
+                    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 px-4">
                         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full">
                             <h3 className="text-lg font-bold text-gray-800 mb-4">⚠️ Before you join</h3>
                             <p className="text-gray-600 mb-8">
                                 You are about to join the waiting room and will be automatically assigned to the next
-                                available game.
-                                If a game slot is available but doesn't fill with enough participants
-                                in time, you will be given a completion code after a timeout and marked as having participated.
-                                If all study slots have already been filled, you will not be assigned a game — unfortunately
-                                this means you were too late to take part.
+                                available game. You can leave and rejoin the waiting room at any time. If your game doesn't
+                                fill in time, you'll be given a completion code and marked as having taken part. If all
+                                study slots are already full, unfortunately you won't be assigned a game.
+
                                 <br/><br/>
-                                While in the waiting room, you can exit and re-join at any point.
-                                <span className="font-bold"> However, once the game has started, closing or refreshing the browser tab will cause
-                                    you to exit the study without receiving a completion code.</span>
-                                <br/><br/>
-                                <span className="font-bold">If you are inactive in the game you will be disconnected
-                                    after 60 seconds. </span> This is to prevent the game flow being interrupted
-                                    by stalling players.
+                                <span className="font-bold"> Once the game has started:</span>
+                                    <ul className="list-disc list-inside space-y-1">
+                                        <li><span className="font-bold">Stay on this tab.</span> Don't switch to other tabs or apps:
+                                    browsers slow down brackground tabs, which can disconnect you. Closing this tab will
+                                        cause you to leave the game without a completion code.</li>
+                                        <li><span className="font-bold">Play when it's your turn.</span> You have 60 seconds to play or
+                                            call once your turn starts, after which you'll be removed from the game. </li>
+                                        <li><span className="font-bold">If the game seems stuck, refresh the page.</span>You'll rejoin where you left off, as long as you're back within 30 seconds.</li>
+                                    </ul>
+
                             </p>
                             {joinError && (
                                 <p className="text-red-600 text-sm mb-4">{joinError}</p>
