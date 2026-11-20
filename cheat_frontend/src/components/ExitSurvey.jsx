@@ -51,105 +51,157 @@ function LikertSlider({ leftLabel, rightLabel, value, onChange }) {
     );
 }
 
-function RadioGroup({ options, value, onChange, name }) {
+function RadioGroup({ options, value, onChange, name, vertical = false }) {
     return (
-        <div className="flex gap-6">
-            {options.map((opt) => (
-                <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <div className={vertical ? "flex flex-col gap-2" : "flex flex-wrap gap-6"}>
+            {options.map(({ value: optValue, label }) => (
+                <label key={optValue} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                     <input
                         type="radio"
                         name={name}
-                        checked={value === opt}
-                        onChange={() => onChange(opt)}
+                        checked={value === optValue}
+                        onChange={() => onChange(optValue)}
                         className="accent-blue-500"
                     />
-                    {opt}
+                    {label}
                 </label>
             ))}
         </div>
     );
 }
 
-const PLAYER_TYPE_OPTIONS = ["Human", "AI agent", "Not sure"];
-
-const initSliders = () => ({ lied: NaN, called: NaN, cautious: NaN, clueless: NaN, deceitful: NaN, cynical: NaN });
-
-function PlayerSection({ side, description, type, onTypeChange, sliders, onSliderChange }) {
-    const strategySliders = side === "right"
-        ? [
-            { key: "lied",   left: "Lied too often",    right: "Almost never lied" },
-            { key: "called", left: "Called too often",   right: "Almost never called" },
-        ]
-        : [
-            { key: "called", left: "Called too often",   right: "Almost never called" },
-            { key: "lied",   left: "Lied too often",    right: "Almost never lied" },
-        ];
-
-    const personalitySliders = [
-        { key: "clueless",  left: "Clueless",    right: "Clever" },
-        { key: "deceitful", left: "Deceitful",   right: "Honest" },
-        { key: "cynical",   left: "Suspicious",  right: "Trusting" },
-        { key: "cautious",  left: "Cautious",    right: "Risk-taking" },
-    ];
-
+function NumberScale({ min, max, leftLabel, rightLabel, value, onChange, name }) {
+    const points = Array.from({ length: max - min + 1 }, (_, i) => min + i);
     return (
-        <div className="border border-gray-200 rounded-lg p-5 space-y-5">
-            <div>
-                <h4 className="text-sm font-semibold text-gray-800">{description}</h4>
-            </div>
-
-            <div>
-                <label className={labelClassName}>Were they:</label>
-                <RadioGroup options={PLAYER_TYPE_OPTIONS} value={type} onChange={onTypeChange} name={`player-type-${side}`} />
-            </div>
-
-            <div>
-                <label className={labelClassName}>What did you think of their strategy? <span className="font-normal text-gray-400">(Click on the scale to select your answer.)</span></label>
-                <div className="space-y-2">
-                    {strategySliders.map(({ key, left, right }) => (
-                        <LikertSlider
-                            key={key}
-                            leftLabel={left}
-                            rightLabel={right}
-                            value={sliders[key]}
-                            onChange={(v) => onSliderChange(key, v)}
+        <div className="flex items-center gap-4 py-1">
+            <span className="text-sm text-gray-500 w-28 text-right shrink-0">{leftLabel}</span>
+            <div className="flex-1 flex justify-between">
+                {points.map((n) => (
+                    <label key={n} className="flex flex-col items-center gap-1 text-sm text-gray-700 cursor-pointer">
+                        <input
+                            type="radio"
+                            name={name}
+                            checked={value === n}
+                            onChange={() => onChange(n)}
+                            className="accent-blue-500 w-4 h-4"
                         />
-                    ))}
-                </div>
+                        {n}
+                    </label>
+                ))}
             </div>
+            <span className="text-sm text-gray-500 w-28 shrink-0">{rightLabel}</span>
+        </div>
+    );
+}
 
-            <div>
-                <label className={labelClassName}>How would you describe them as a player?</label>
-                <div className="space-y-2">
-                    {personalitySliders.map(({ key, left, right }) => (
-                        <LikertSlider
-                            key={key}
-                            leftLabel={left}
-                            rightLabel={right}
-                            value={sliders[key]}
-                            onChange={(v) => onSliderChange(key, v)}
-                        />
-                    ))}
-                </div>
-            </div>
+const SLIDER_HINT = <span className="font-normal text-gray-400">(Click on the scale to select your answer.)</span>;
+
+const COMPOSITION_OPTIONS = [
+    { value: "3_humans",        label: "Three other humans" },
+    { value: "2_humans_1_ai",   label: "Two other humans and one AI agent" },
+    { value: "1_human_2_ai",    label: "One other human and two AI agents" },
+    { value: "3_ai",            label: "Three AI agents" },
+];
+
+const OTHER_PLAYER_OPTIONS = [
+    { value: "left",   label: "Player to your left" },
+    { value: "right",  label: "Player to your right" },
+    { value: "across", label: "Player across from you" },
+    { value: "nobody", label: "Nobody" },
+];
+
+const RANK_PLAYER_OPTIONS = [
+    { value: "you",    label: "You" },
+    { value: "left",   label: "Player to your left" },
+    { value: "right",  label: "Player to your right" },
+    { value: "across", label: "Player across from you" },
+];
+
+// Keys are the attitude components (not shown to participants).
+const AI_ATTITUDE_STATEMENTS = [
+    { key: "behavioural", text: "I want to use AI in my daily life." },
+    { key: "affective",   text: "I am afraid of AI." },
+    { key: "cognitive",   text: "AI has many advantages." },
+];
+
+const RANK_PLACES = [
+    { key: "first",  label: "First place" },
+    { key: "second", label: "Second place" },
+    { key: "third",  label: "Third place" },
+    { key: "last",   label: "Last place" },
+];
+
+function Question({ label, children }) {
+    return (
+        <div className="border border-gray-200 rounded-lg p-5">
+            <label className={labelClassName}>{label}</label>
+            {children}
+        </div>
+    );
+}
+
+function RankingQuestion({ ranking, onChange }) {
+    return (
+        <div className="space-y-3">
+            {RANK_PLACES.map(({ key, label }) => {
+                const takenElsewhere = new Set(
+                    Object.entries(ranking).filter(([k, v]) => k !== key && v).map(([, v]) => v)
+                );
+                return (
+                    <div key={key} className="flex items-center gap-4">
+                        <span className="text-sm text-gray-700 w-28 shrink-0">{label}</span>
+                        <select
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            value={ranking[key]}
+                            onChange={(e) => onChange({ ...ranking, [key]: e.target.value })}
+                        >
+                            <option value="">Select a player…</option>
+                            {RANK_PLAYER_OPTIONS.map(({ value, label: optLabel }) => (
+                                <option key={value} value={value} disabled={takenElsewhere.has(value)}>
+                                    {optLabel}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                );
+            })}
         </div>
     );
 }
 
 export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
-    const [myStrategy, setMyStrategy] = useState("");
-    const [rightType, setRightType] = useState("");
-    const [rightSliders, setRightSliders] = useState(initSliders());
-    const [leftType, setLeftType] = useState("");
-    const [leftSliders, setLeftSliders] = useState(initSliders());
+    const [otherPlayers, setOtherPlayers] = useState("");
+    const [preferredPlayers, setPreferredPlayers] = useState("");
+    const [enjoyment, setEnjoyment] = useState(NaN);
+    const [winnerDeserved, setWinnerDeserved] = useState(NaN);
+    const [winnerHappy, setWinnerHappy] = useState(NaN);
+    const [replacePlayer, setReplacePlayer] = useState("");
+    const [teamPlayer, setTeamPlayer] = useState("");
+    const [ownPerformance, setOwnPerformance] = useState(NaN);
+    const [fairChance, setFairChance] = useState(NaN);
+    const [ranking, setRanking] = useState({ first: "", second: "", third: "", last: "" });
+    const [aiAttitudes, setAiAttitudes] = useState({ behavioural: NaN, affective: NaN, cognitive: NaN });
+    const [comments, setComments] = useState("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState(null);
 
+    // Sliders are stored as 1–5 (1 = left label, 5 = right label); NaN = unanswered → null.
+    const sliderValue = (v) => (Number.isNaN(v) ? null : v);
+
     const latestData = useRef({});
     latestData.current = {
-        myStrategy,
-        rightPlayer: { type: rightType, sliders: rightSliders },
-        leftPlayer:  { type: leftType,  sliders: leftSliders  },
+        otherPlayers,
+        preferredPlayers,
+        enjoyment: sliderValue(enjoyment),
+        winnerDeserved: sliderValue(winnerDeserved),
+        winnerHappy: sliderValue(winnerHappy),
+        replacePlayer,
+        teamPlayer,
+        ownPerformance: sliderValue(ownPerformance),
+        fairChance: sliderValue(fairChance),
+        ranking,
+        aiAttitudes: Object.fromEntries(Object.entries(aiAttitudes).map(([k, v]) => [k, sliderValue(v)])),
+        comments: comments.trim(),
     };
 
     async function handleSubmit(event) {
@@ -200,34 +252,75 @@ export default function ExitSurvey({ prolificId, gameId, onSubmit }) {
                     )}
 
                     <div className="space-y-6">
-                        <div>
-                            <label className={labelClassName}>What was your overall strategy in the game?</label>
+                        <Question label="Who were the other players in the game?">
+                            <RadioGroup vertical options={COMPOSITION_OPTIONS} value={otherPlayers} onChange={setOtherPlayers} name="other-players" />
+                        </Question>
+
+                        <Question label="Rate your overall enjoyment playing the game.">
+                            <NumberScale min={1} max={5} leftLabel="Not at all" rightLabel="Very much" value={enjoyment} onChange={setEnjoyment} name="enjoyment" />
+                        </Question>
+
+                        <Question label={<>Do you think you had a fair chance of winning?</>}>
+                            <NumberScale min={1} max={5} leftLabel="Not at all" rightLabel="Very much" value={fairChance} onChange={setFairChance} name="fair-chance" />
+                        </Question>
+
+                        <Question label="If you were to play again, who would you prefer to play with?">
+                            <RadioGroup vertical options={COMPOSITION_OPTIONS} value={preferredPlayers} onChange={setPreferredPlayers} name="preferred-players" />
+                        </Question>
+
+                        {/*<Question label={<>Think about the person who won the last round. {SLIDER_HINT}</>}>*/}
+                        {/*    <div className="space-y-4">*/}
+                        {/*        <div>*/}
+                        {/*            <p className="text-sm text-gray-600 mb-1">Did they deserve it?</p>*/}
+                        {/*            <LikertSlider leftLabel="Not at all" rightLabel="Completely" value={winnerDeserved} onChange={setWinnerDeserved} />*/}
+                        {/*        </div>*/}
+                        {/*        <div>*/}
+                        {/*            <p className="text-sm text-gray-600 mb-1">Are you happy they won?</p>*/}
+                        {/*            <LikertSlider leftLabel="Very unhappy" rightLabel="Very happy" value={winnerHappy} onChange={setWinnerHappy} />*/}
+                        {/*        </div>*/}
+                        {/*    </div>*/}
+                        {/*</Question>*/}
+
+                        {/*<Question label="If you had to replace one player, who would that be?">*/}
+                        {/*    <RadioGroup vertical options={OTHER_PLAYER_OPTIONS} value={replacePlayer} onChange={setReplacePlayer} name="replace-player" />*/}
+                        {/*</Question>*/}
+
+                        {/*<Question label="If there were a team version of this game, who would you team up with?">*/}
+                        {/*    <RadioGroup vertical options={OTHER_PLAYER_OPTIONS} value={teamPlayer} onChange={setTeamPlayer} name="team-player" />*/}
+                        {/*</Question>*/}
+
+                        {/*<Question label="Rank the players in the group in order of their performance.">*/}
+                        {/*    <RankingQuestion ranking={ranking} onChange={setRanking} />*/}
+                        {/*</Question>*/}
+
+                        <Question label="How much do you agree with each of these statements?">
+                            <div className="space-y-5">
+                                {AI_ATTITUDE_STATEMENTS.map(({ key, text }) => (
+                                    <div key={key}>
+                                        <p className="text-sm text-gray-600 mb-1">{text}</p>
+                                        <NumberScale
+                                            min={1}
+                                            max={5}
+                                            leftLabel="Don't agree"
+                                            rightLabel="Agree"
+                                            value={aiAttitudes[key]}
+                                            onChange={(v) => setAiAttitudes((prev) => ({ ...prev, [key]: v }))}
+                                            name={`ai-attitude-${key}`}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </Question>
+
+                        <Question label="Do you have any other comments about the game or your experience you would like to tell us?">
                             <textarea
-                                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                dir="auto"
-                                rows={3}
-                                value={myStrategy}
-                                onChange={(e) => setMyStrategy(e.target.value)}
+                                rows={4}
+                                value={comments}
+                                onChange={(e) => setComments(e.target.value)}
+                                placeholder="Optional"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-y"
                             />
-                        </div>
-
-                        <PlayerSection
-                            side="right"
-                            description="Think of the player to your right. This is the player who played immediately before you, and whom you could either call out or continue their play."
-                            type={rightType}
-                            onTypeChange={setRightType}
-                            sliders={rightSliders}
-                            onSliderChange={(key, val) => setRightSliders((prev) => ({ ...prev, [key]: val }))}
-                        />
-
-                        <PlayerSection
-                            side="left"
-                            description="Think of the player to your left. This is the player who played immediately after you, and who could either call you out or continue your play."
-                            type={leftType}
-                            onTypeChange={setLeftType}
-                            sliders={leftSliders}
-                            onSliderChange={(key, val) => setLeftSliders((prev) => ({ ...prev, [key]: val }))}
-                        />
+                        </Question>
                     </div>
 
                     <div className="mb-12">
