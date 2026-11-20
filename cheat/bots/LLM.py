@@ -312,6 +312,7 @@ class LLM_Player(Player):
         avatar: str | None = None,
         system_prompt: str | None = None,
         speaker_types: dict | None = None,
+        speaker_names: dict | None = None,
         verbosity: float = 0.3,
         kind: Literal["open_ai", "gemini", "deepseek"] = "deepseek",
         display_type: str | None = None,
@@ -342,6 +343,8 @@ class LLM_Player(Player):
         self.max_consecutive_api_errors = max_consecutive_api_errors
         self._consecutive_api_errors = 0
         self.speaker_types = speaker_types
+        # Names under which this player sees the others (player id -> name); 'Player <id>' if None
+        self.speaker_names = speaker_names
 
     def __dict__(self):
         return dict(
@@ -352,6 +355,7 @@ class LLM_Player(Player):
             display_type=self.display_type,
             kind=self.kind,
             system_prompt=self.system_prompt,
+            speaker_names=self.speaker_names,
             model_kwargs=self.model_kwargs,
             thinking_level=self.thinking_level,
         )
@@ -367,6 +371,12 @@ class LLM_Player(Player):
             res = self.__dict__()
             pickle.dump(res, file)
 
+    def player_ref(self, pid: int) -> str:
+        """How this player refers to player ``pid``"""
+        if self.speaker_names is not None:
+            return self.speaker_names[pid]
+        return f"Player {pid}"
+
     def game_summary(self, game) -> tuple[str, str]:
         """Return a summary of the game that can be passed to the LLM"""
 
@@ -374,7 +384,9 @@ class LLM_Player(Player):
         summary = []
         for action in game.history:
             action_str = action.__str__(
-                speaker_id=self.id, speaker_types=self.speaker_types
+                speaker_id=self.id,
+                speaker_types=self.speaker_types,
+                speaker_names=self.speaker_names,
             )
             if action_str != "":
                 summary.append(action_str)
@@ -382,7 +394,14 @@ class LLM_Player(Player):
 
         play_prompt = ""
         if game.turn == self.id:
-            play_prompt += f"\n- It's your turn. The hand sizes of the other players: {'; '.join([f'Player {player.id}: {len(player.hand)} card(s)' for player in game.players if player.id != self.id])}, "
+            # The other players are listed in turn order, starting with the next player, so that every seat sees the
+            # same structure (the previous player, the only one that can be called, always comes last)
+            n = len(game.players)
+            others = [game.players[(self.id + k) % n] for k in range(1, n)]
+            hand_sizes = "; ".join(
+                f"{self.player_ref(p.id)}: {len(p.hand)} card(s)" for p in others
+            )
+            play_prompt += f"\n- It's your turn. The hand sizes of the other players: {hand_sizes}, "
             play_prompt += f"and your hand is {[str(c) for c in self.hand]}."
         if game.current_rank is not None:
             play_prompt += f" The current declared rank is {game.current_rank}."
