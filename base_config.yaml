@@ -33,12 +33,10 @@ players:
 #      model: deepseek-chat
 #      stream: False
 #    verbosity: 0.2
-  - type: RandomBot
+  - type: SmartBot
     name: Beep Boop
     avatar: 🍕
     verbosity: 0.2
-    p_call: 0.2
-    p_lie: 0.6
   - type: SmartBot
     name: His Botness
     avatar: 🧜‍♂️
@@ -51,12 +49,10 @@ players:
     name: B0Tanical
     avatar: 🌼
     verbosity: 0.2
-  - type: RandomBot
-    name: BOTtled Up
+  - type: SmartBot
+    name: B0Ttled Up
     avatar: 🍾
     verbosity: 0.1
-    p_call: 0.5
-    p_lie: 0.5
 
 # Predefined messages: if a list of messages is passed, only these messages can be sent between the players.
 # If none, they can use the message box to send arbitrary messages

@@ -367,6 +367,28 @@ export function KickedOutOverlay({ kickedOut, onFinish }) {
 	);
 }
 
+export function GameTerminatedOverlay({ gameTerminated, onFinish }) {
+	if (!gameTerminated) return null;
+	return (
+		<div className="fixed inset-0 flex items-center justify-center z-[70] bg-black bg-opacity-60 backdrop-blur-sm">
+			<div className="text-center bg-white rounded-2xl p-8 shadow-2xl max-w-[90%]">
+				<div className="text-5xl mb-4">🛑</div>
+				<div className="text-2xl font-bold text-gray-900 mb-3">Game ended</div>
+				<div className="text-lg text-gray-600 mb-6">
+					Another player has left, so this game has ended early.<br/>
+					Please click Finish to continue to the final survey.
+				</div>
+				<button
+					onClick={onFinish}
+					className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl text-lg whitespace-nowrap"
+				>
+					Finish
+				</button>
+			</div>
+		</div>
+	);
+}
+
 export function TimeoutWarningOverlay({ timeoutRemaining, pileSize }) {
 	const [countdown, setCountdown] = useState(null);
 	const [showHint, setShowHint] = useState(false);
